@@ -85,6 +85,7 @@ function AddItemRow({ boardId, groupId, colSpan, groupName }: { boardId: string;
 
 export function TableView({ board, items, users, onOpenItem, filtered }: Props) {
   const canEdit = board.myRole !== 'viewer';
+  const assignable = board.members.map((m) => ({ id: m.userId, name: m.name }));
   const updateItem = useUpdateItem(board.id);
   const { toast } = useFeedback();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -163,6 +164,7 @@ export function TableView({ board, items, users, onOpenItem, filtered }: Props) 
                                 column={c}
                                 value={item.values[c.id]}
                                 users={users}
+                                assignable={assignable}
                                 readOnly={!canEdit}
                                 label={`${c.title} — ${item.name}`}
                                 overdue={overdue && c.settings.role === 'due'}

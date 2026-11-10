@@ -6,7 +6,7 @@
 
 | נכס | שחקן איום | איום | בקרות קיימות | סיכון שיורי |
 |-----|-----------|------|--------------|-------------|
-| חשבונות משתמשים | תוקף חיצוני ברשת הארגון | Brute force / credential stuffing | rate-limit להתחברות לפי IP (10/15 דק'), נעילת חשבון (5 כשלונות → 15 דק'), scrypt, הודעת שגיאה גנרית, השוואת זמנים לחשבון לא קיים, יומן אבטחה | בינוני — אין MFA (שלב 2) |
+| חשבונות משתמשים | תוקף חיצוני ברשת הארגון | Brute force / credential stuffing / סיסמה שדלפה | rate-limit להתחברות לפי IP (10/15 דק'), נעילת חשבון, scrypt, הודעה גנרית, השוואת זמנים, **MFA (TOTP) — חובה למנהלי מערכת** | נמוך–בינוני (MFA רשות לשאר התפקידים) |
 | Session | XSS / רשת | גניבת cookie, fixation | `HttpOnly`, `Secure`, `SameSite=Strict`, token אקראי 256 bit שנשמר רק כ-SHA-256, token חדש בכל התחברות, תפוגה מוחלטת (12ש') ותפוגת חוסר פעילות (2ש'), ביטול כל הסשנים בהחלפת/איפוס סיסמה והשבתת משתמש | נמוך |
 | פעולות משנות מצב | אתר זדוני | CSRF | SameSite=Strict + כותרת חובה `X-Requested-With` (מחייבת preflight שה-API לעולם לא מאשר) + בדיקת `Origin` מול allow-list | נמוך |
 | נתוני לוחות | משתמש מחובר | IDOR / BOLA | כל נתיב מאתר בשרת את הלוח של המשאב (`AccessService`) ובודק הרשאה; משתמש ללא גישה מקבל 404 (לא חושף קיום); בדיקות אוטומטיות לכל סוגי המשאבים | נמוך |
@@ -17,6 +17,12 @@
 | Clickjacking | אתר זדוני | מסגור | `frame-ancestors 'none'`, `X-Frame-Options` | נמוך |
 | לוגים | מי שיש לו גישה ללוגים | דליפת סודות | redaction של cookie/authorization/set-cookie; אין רישום גוף בקשות; IP ביומן הביקורת כ-HMAC | נמוך |
 
+| סודות MFA | גישה לקובץ ה-DB / גיבוי | גניבת סודות TOTP | הצפנת AES-256-GCM עם מפתח מחוץ ל-DB, קשירה למזהה המשתמש (AAD), קודי שחזור כ-hash בלבד | נמוך |
+| MFA | תוקף עם סיסמה | ניחוש / replay של קוד | אסימון ביניים 5 דק' עם 5 ניסיונות, rate-limit, דחיית קוד שכבר נוצל (time-step), יומן אבטחה | נמוך |
+| קבצים מצורפים | משתמש / קובץ נגוע | נוזקה, XSS דרך קובץ, path traversal, הצפת דיסק | allow-list לפי magic bytes + התאמת סיומת, דחיית מאקרו, שם UUID מחוץ ל-web root, הסגר עד ClamAV (fail-closed), CSP sandbox + attachment + nosniff בהורדה, 10MB/קובץ, 20/פריט, rate-limit | נמוך–בינוני (תלוי בעדכניות חתימות ClamAV) |
+| ייצוא | משתמש מורשה | CSV/Formula injection, דליפת נתונים | תחילית `'` לתאים מסוכנים, הרשאת צופה, rate-limit, רישום ביומן | נמוך |
+| דוא"ל | — | HTML injection, דליפת תוכן | escape לכל תוכן משתמש, ללא טקסט חופשי בדוא"ל, STARTTLS חובה | נמוך |
+
 ## כותרות HTTP
 
 `Content-Security-Policy` (ללא unsafe-inline), `Strict-Transport-Security` (כש-Secure), `X-Content-Type-Options: nosniff`,
@@ -25,21 +31,24 @@
 
 ## Endpoints — ציבורי מול מוגן
 
-- **ציבוריים:** `GET /api/health`, `POST /api/auth/login`.
+- **ציבוריים:** `GET /api/health`, `POST /api/auth/login`, `POST /api/auth/mfa/verify` (דורש אסימון ביניים תקף).
 - **כל השאר** דורשים Session. נתיבים תחת `/api/users` (פרט ל-`/directory`) ו-`/api/admin/*` — admin בלבד.
-- בזמן "סיסמה זמנית" רק `/auth/me`, `/auth/change-password`, `/auth/logout` זמינים.
+- בזמן "סיסמה זמנית" או "נדרשת הגדרת MFA" רק `/auth/me`, `/auth/change-password`, `/auth/logout`, `/auth/mfa/setup|enable` זמינים.
+- התראות: כל פעולה מוגבלת למשתמש המבקש בלבד (אין גישה להתראות של אחרים).
 - `/api/users/directory` מחזיר רק `id` ו-`name` (ללא דוא"ל) — לבחירת אחראים.
 
 ## סודות
 
-- אין סודות בקוד. `AUDIT_IP_SECRET` חובה ב-production (≥32 תווים), נטען ממשתני סביבה בלבד.
+- אין סודות בקוד. `AUDIT_IP_SECRET` ו-`MFA_ENCRYPTION_KEY` חובה ב-production, נטענים ממשתני סביבה בלבד; סיסמת SMTP ב-`.env` בלבד.
 - סיסמת מנהל ראשונית נקלטת אינטראקטיבית (לא ב-argv / היסטוריית shell).
 - סיסמאות זמניות נוצרות בדפדפן ב-`crypto.getRandomValues` ומוצגות פעם אחת.
 
 ## קבצים מצורפים
 
-לא קיימים בשלב 1 במכוון. בשלב 2: allow-list לסוגים, אימות MIME, שינוי שם, אחסון מחוץ ל-web root,
-הסגר (quarantine) עד סריקת ClamAV, חסימה ותיעוד בכשל — ראו `PLAN.md` §11.
+זרימה: ולידציה (גודל, magic bytes, סיומת תואמת, ללא מאקרו) → רשומה `pending` → כתיבה ל-`quarantine/` בשם UUID
+(הרשאות 600) → סריקת clamd (INSTREAM) → `clean`: העברה ל-`store/`; `infected`: מחיקה מהדיסק + אירוע `malware_detected`;
+סורק לא זמין: נשאר בהסגר ונסרק מחדש כל 5 דקות. רק `clean` ניתן להורדה. השרת לעולם לא מריץ, ממיר או מפענח קבצים.
+קבצים יתומים (אחרי מחיקת פריט/קבוצה) נמחקים בתחזוקה השעתית.
 
 ## תלויות
 

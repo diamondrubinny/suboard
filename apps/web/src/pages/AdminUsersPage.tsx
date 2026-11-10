@@ -150,7 +150,7 @@ function IssuedPasswordDialog({ issued, onClose }: { issued: { name: string; pas
 }
 
 function UserRow({ u, isSelf, onIssued }: { u: AdminUser; isSelf: boolean; onIssued: (v: { name: string; password: string }) => void }) {
-  const { update } = useUserMutations();
+  const { update, resetMfa } = useUserMutations();
   const { toast, confirm } = useFeedback();
   const onErr = (e: unknown) => toast(errorMessage(e), 'error');
 
@@ -190,6 +190,7 @@ function UserRow({ u, isSelf, onIssued }: { u: AdminUser; isSelf: boolean; onIss
           </span>
         )}
         {u.mustChangePassword && <span className="badge" style={{ marginInlineStart: '0.3rem' }}>סיסמה זמנית</span>}
+        {u.mfaEnabled && <span className="badge success" style={{ marginInlineStart: '0.3rem' }}>MFA</span>}
       </td>
       <td className="muted nowrap">{u.lastLoginAt ? formatDateTime(u.lastLoginAt) : 'מעולם לא'}</td>
       <td>
@@ -202,6 +203,18 @@ function UserRow({ u, isSelf, onIssued }: { u: AdminUser; isSelf: boolean; onIss
           <button type="button" className="btn btn-sm" onClick={resetPassword}>
             איפוס סיסמה
           </button>
+          {u.mfaEnabled && !isSelf && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              onClick={async () => {
+                if (!(await confirm({ title: 'איפוס אימות דו-שלבי', message: `לאפס את האימות הדו-שלבי של ${u.name}? יש לוודא את זהות המבקש/ת לפני כן. המשתמש ינותק ויידרש להגדיר מחדש.`, confirmLabel: 'איפוס', danger: true }))) return;
+                resetMfa.mutate(u.id, { onSuccess: () => toast('האימות הדו-שלבי אופס'), onError: onErr });
+              }}
+            >
+              איפוס MFA
+            </button>
+          )}
           {!isSelf && (
             <button
               type="button"

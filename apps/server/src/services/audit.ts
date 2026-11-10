@@ -15,7 +15,16 @@ export type AuditEvent =
   | 'board_archived'
   | 'member_set'
   | 'member_removed'
-  | 'access_denied';
+  | 'access_denied'
+  | 'mfa_enabled'
+  | 'mfa_disabled'
+  | 'mfa_disable_failed'
+  | 'mfa_failed'
+  | 'mfa_recovery_code_used'
+  | 'mfa_reset'
+  | 'upload_rejected'
+  | 'malware_detected'
+  | 'data_export';
 
 /**
  * Security audit trail. Stores an HMAC of the client IP (never the raw IP) and only

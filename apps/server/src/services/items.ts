@@ -6,6 +6,7 @@ import type { AccessService, Actor } from './access.js';
 import type { ActivityService } from './activity.js';
 import type { BoardService } from './boards.js';
 import { toItem, type ItemRow } from './mappers.js';
+import type { NotificationService } from './notifications.js';
 
 export class ItemService {
   constructor(
@@ -13,7 +14,19 @@ export class ItemService {
     private readonly access: AccessService,
     private readonly boards: BoardService,
     private readonly activity: ActivityService,
+    private readonly notifications: NotificationService,
   ) {}
+
+  /** User ids present in `next` person columns but not in `prev` (newly assigned). */
+  private newAssignees(boardId: string, prev: Record<string, unknown>, next: Record<string, unknown>): string[] {
+    const out: string[] = [];
+    for (const c of this.boards.columns(boardId)) {
+      if (c.type !== 'person' || !(c.id in next)) continue;
+      const before = new Set(Array.isArray(prev[c.id]) ? (prev[c.id] as string[]) : []);
+      for (const id of Array.isArray(next[c.id]) ? (next[c.id] as string[]) : []) if (!before.has(id)) out.push(id);
+    }
+    return out;
+  }
 
   private getRow(itemId: string): Item {
     const r = this.db.prepare('SELECT * FROM items WHERE id = ?').get(itemId) as ItemRow | undefined;
@@ -47,10 +60,15 @@ export class ItemService {
       if (col.type === 'person' && Array.isArray(v)) {
         const ids = [...new Set(v)];
         if (ids.length) {
+          // Assignees must be active and able to see the board (members, or system admins).
           const found = this.db
-            .prepare(`SELECT COUNT(*) AS n FROM users WHERE is_active = 1 AND id IN (${ids.map(() => '?').join(',')})`)
-            .get(...ids) as { n: number };
-          if (found.n !== ids.length) throw badRequest(`משתמש לא תקין בעמודה "${col.title}"`, { [columnId]: 'משתמש לא תקין' });
+            .prepare(
+              `SELECT COUNT(*) AS n FROM users u
+               WHERE u.is_active = 1 AND u.id IN (${ids.map(() => '?').join(',')})
+                 AND (u.role = 'admin' OR EXISTS (SELECT 1 FROM board_members m WHERE m.board_id = ? AND m.user_id = u.id))`,
+            )
+            .get(...ids, boardId) as { n: number };
+          if (found.n !== ids.length) throw badRequest(`ניתן לשייך רק חברי לוח פעילים (עמודה "${col.title}")`, { [columnId]: 'משתמש לא תקין' });
         }
         v = ids.length ? ids : null;
       }
@@ -76,6 +94,7 @@ export class ItemService {
       this.activity.record(boardId, actor.id, 'item_created', { name: input.name }, id);
       this.boards.touch(boardId);
     })();
+    this.notifications.onAssigned(actor, boardId, id, input.name, this.newAssignees(boardId, {}, values));
     return this.getRow(id);
   }
 
@@ -141,7 +160,9 @@ export class ItemService {
       this.db.prepare(`UPDATE items SET ${sets.join(', ')} WHERE id = ?`).run(...params, itemId);
       this.boards.touch(boardId);
     })();
-    return this.getRow(itemId);
+    const updated = this.getRow(itemId);
+    if (Object.keys(patch).length) this.notifications.onAssigned(actor, boardId, itemId, updated.name, this.newAssignees(boardId, item.values, patch));
+    return updated;
   }
 
   delete(actor: Actor, itemId: string): void {

@@ -4,6 +4,10 @@
  * so it does not end up in shell history or process listings.
  *
  *   npm run create-admin -- --email admin@example.org --name "מנהל מערכת"
+ *
+ * Break-glass for a locked-out administrator (lost MFA device and recovery codes), requires shell
+ * access to the server; the action is written to the security audit log:
+ *   npm run create-admin -- --email admin@example.org --reset-mfa
  */
 import { createUserSchema, emailSchema, passwordSchema } from '@suboard/shared';
 import { createInterface } from 'node:readline';
@@ -38,16 +42,30 @@ async function readPassword(prompt: string): Promise<string> {
 }
 
 async function main() {
-  const { values } = parseArgs({ options: { email: { type: 'string' }, name: { type: 'string' } } });
+  const { values } = parseArgs({ options: { email: { type: 'string' }, name: { type: 'string' }, 'reset-mfa': { type: 'boolean' } } });
   const email = emailSchema.parse(values.email ?? '');
   const name = values.name?.trim() || 'מנהל מערכת';
+
+  if (values['reset-mfa']) {
+    const config = loadConfig();
+    const db = openDatabase(config.databasePath);
+    const services = createServices(db, config, { mailer: null, scanner: null });
+    const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as { id: string } | undefined;
+    if (!user) throw new Error(`No user with e-mail ${email}`);
+    services.mfa.clear(user.id);
+    services.auth.revokeAllSessions(user.id);
+    services.audit.log('mfa_reset', { userId: null, meta: { targetUserId: user.id, via: 'cli' } });
+    console.log(`MFA reset for ${email}. The user must enrol again at next sign-in.`);
+    db.close();
+    return;
+  }
 
   const password = await readPassword('Password (min 12 chars): ');
   passwordSchema.parse(password);
 
   const config = loadConfig();
   const db = openDatabase(config.databasePath);
-  const services = createServices(db, config);
+  const services = createServices(db, config, { mailer: null, scanner: null });
 
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as { id: string } | undefined;
   if (existing) {

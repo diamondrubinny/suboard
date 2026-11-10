@@ -6,8 +6,7 @@ beforeEach(async () => {
   ctx = await setup({ LOCKOUT_THRESHOLD: '3' });
 });
 afterEach(async () => {
-  await ctx.app.close();
-  ctx.db.close();
+  await ctx.close();
 });
 
 describe('authentication', () => {
@@ -66,7 +65,7 @@ describe('authentication', () => {
     const codes: number[] = [];
     for (let i = 0; i < 3; i++) codes.push((await c.post('/api/auth/login', { email: 'z@x.org', password: 'x' })).statusCode);
     expect(codes[2]).toBe(429);
-    await limited.app.close();
+    await limited.close();
   });
 });
 

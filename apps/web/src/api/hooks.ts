@@ -1,4 +1,6 @@
 import type {
+  AppNotification,
+  Attachment,
   ActivityEntry,
   AdminUser,
   AuditEntry,
@@ -18,7 +20,7 @@ import type {
   TemplateInfo,
 } from '@suboard/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from './client';
+import { api, uploadFile } from './client';
 
 export const qk = {
   me: ['me'] as const,
@@ -31,7 +33,52 @@ export const qk = {
   itemActivity: (itemId: string) => ['item-activity', itemId] as const,
   users: ['users'] as const,
   audit: (event: string) => ['audit', event] as const,
+  meMeta: ['me-meta'] as const,
+  notifications: ['notifications'] as const,
+  attachments: (itemId: string) => ['attachments', itemId] as const,
 };
+
+// ------------------------------------------------------------------ phase 2
+export const useMeMeta = () =>
+  useQuery({
+    queryKey: qk.meMeta,
+    queryFn: () => api<{ recoveryCodesLeft: number | null; emailAvailable: boolean }>('/auth/me'),
+  });
+
+export const useNotifications = () =>
+  useQuery({
+    queryKey: qk.notifications,
+    queryFn: () => api<{ notifications: AppNotification[]; unread: number }>('/notifications'),
+    refetchInterval: 60_000,
+  });
+
+export function useMarkNotificationsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { all: true } | { ids: string[] }) => api('/notifications/read', 'POST', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.notifications }),
+  });
+}
+
+export const useAttachments = (itemId: string) =>
+  useQuery({
+    queryKey: qk.attachments(itemId),
+    queryFn: () => api<{ attachments: Attachment[]; scanner: string | null; maxBytes: number }>(`/items/${itemId}/attachments`),
+    // Poll while something is still waiting in quarantine.
+    refetchInterval: (q) => (q.state.data?.attachments.some((a) => a.status === 'pending') ? 15_000 : false),
+  });
+
+export function useAttachmentMutations(itemId: string) {
+  const qc = useQueryClient();
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: qk.attachments(itemId) });
+    void qc.invalidateQueries({ queryKey: qk.itemActivity(itemId) });
+  };
+  return {
+    upload: useMutation({ mutationFn: (file: File) => uploadFile<{ attachment: Attachment }>(`/items/${itemId}/attachments`, file), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/attachments/${id}`, 'DELETE'), onSuccess: refresh }),
+  };
+}
 
 // ------------------------------------------------------------------ queries
 export const useBoards = () => useQuery({ queryKey: qk.boards, queryFn: () => api<{ boards: BoardSummary[] }>('/boards').then((r) => r.boards) });
@@ -252,5 +299,6 @@ export function useUserMutations() {
         api<{ user: AdminUser }>(`/users/${id}`, 'PATCH', patch),
       onSuccess: refresh,
     }),
+    resetMfa: useMutation({ mutationFn: (id: string) => api<{ user: AdminUser }>(`/users/${id}/reset-mfa`, 'POST'), onSuccess: refresh }),
   };
 }

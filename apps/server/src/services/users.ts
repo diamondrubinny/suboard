@@ -13,6 +13,7 @@ interface Row {
   role: GlobalRole;
   is_active: number;
   must_change_password: number;
+  mfa_enabled: number;
   locked_until: string | null;
   last_login_at: string | null;
   created_at: string;
@@ -25,6 +26,7 @@ const toAdminUser = (r: Row): AdminUser => ({
   role: r.role,
   isActive: r.is_active === 1,
   mustChangePassword: r.must_change_password === 1,
+  mfaEnabled: r.mfa_enabled === 1,
   lockedUntil: r.locked_until && Date.parse(r.locked_until) > Date.now() ? r.locked_until : null,
   lastLoginAt: r.last_login_at,
   createdAt: r.created_at,
@@ -114,6 +116,15 @@ export class UserService {
         ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
       },
     });
+    return this.get(id);
+  }
+
+  /** Admin reset of a user's MFA (lost device). Signs the user out everywhere. */
+  resetMfa(actor: Actor, id: string, mfa: { clear(userId: string): void }): AdminUser {
+    this.get(id);
+    mfa.clear(id);
+    this.auth.revokeAllSessions(id);
+    this.audit.log('mfa_reset', { userId: actor.id, meta: { targetUserId: id } });
     return this.get(id);
   }
 

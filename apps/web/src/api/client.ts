@@ -46,8 +46,37 @@ export async function api<T>(path: string, method: Method = 'GET', body?: unknow
     const e = (data as ApiErrorBody | null)?.error;
     const err = new ApiError(res.status, e?.code ?? `HTTP_${res.status}`, e?.message ?? 'הבקשה נכשלה', e?.fields);
     if (res.status === 401 && path !== '/auth/login' && path !== '/auth/me') authEvents.dispatchEvent(new Event('unauthorized'));
-    if (err.code === 'PASSWORD_CHANGE_REQUIRED') authEvents.dispatchEvent(new Event('password-change-required'));
+    if (err.code === 'PASSWORD_CHANGE_REQUIRED' || err.code === 'MFA_SETUP_REQUIRED') authEvents.dispatchEvent(new Event('password-change-required'));
     throw err;
+  }
+  return data as T;
+}
+
+/** multipart upload of a single file (field name "file"). */
+export async function uploadFile<T>(path: string, file: File): Promise<T> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'X-Requested-With': 'suboard' },
+      body: form,
+    });
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'אין חיבור לשרת. בדקו את החיבור ונסו שוב.');
+  }
+  let data: unknown = null;
+  try {
+    data = await res.json();
+  } catch {
+    /* empty */
+  }
+  if (!res.ok) {
+    const e = (data as ApiErrorBody | null)?.error;
+    if (res.status === 401) authEvents.dispatchEvent(new Event('unauthorized'));
+    throw new ApiError(res.status, e?.code ?? `HTTP_${res.status}`, e?.message ?? (res.status === 413 ? 'הקובץ גדול מהמותר' : 'ההעלאה נכשלה'), e?.fields);
   }
   return data as T;
 }

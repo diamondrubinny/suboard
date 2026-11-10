@@ -2,6 +2,11 @@ import type { FastifyInstance, InjectOptions } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { openDatabase, type DB } from '../src/db/index.js';
+import { MemoryMailer } from '../src/lib/mailer.js';
+import type { ServiceOverrides } from '../src/services/index.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 export const ORIGIN = 'http://localhost:5173';
 export const PASSWORD = 'Correct-Horse-Battery-1';
@@ -9,20 +14,38 @@ export const PASSWORD = 'Correct-Horse-Battery-1';
 export interface TestCtx {
   app: FastifyInstance;
   db: DB;
+  mailer: MemoryMailer;
+  uploadDir: string;
+  /** Closes the app and DB and removes the temp upload directory. */
+  close: () => Promise<void>;
 }
 
-export async function setup(env: Record<string, string> = {}): Promise<TestCtx> {
+export async function setup(env: Record<string, string> = {}, overrides: ServiceOverrides = {}): Promise<TestCtx> {
+  const uploadDir = mkdtempSync(join(tmpdir(), 'suboard-test-'));
   const config = loadConfig({
     NODE_ENV: 'test',
     APP_ORIGIN: ORIGIN,
     LOGIN_MAX_PER_WINDOW: '1000',
     STATIC_DIR: '/nonexistent',
+    MFA_REQUIRED_ROLES: '',
+    UPLOAD_DIR: uploadDir,
     ...env,
   });
   const db = openDatabase(':memory:');
-  const app = await buildApp(config, db);
+  const mailer = new MemoryMailer();
+  const app = await buildApp(config, db, { mailer, scanner: null, ...overrides });
   await app.ready();
-  return { app, db };
+  return {
+    app,
+    db,
+    mailer,
+    uploadDir,
+    close: async () => {
+      await app.close();
+      db.close();
+      rmSync(uploadDir, { recursive: true, force: true });
+    },
+  };
 }
 
 /** Minimal HTTP client that keeps the session cookie and adds the CSRF header. */
@@ -35,12 +58,23 @@ export class Client {
       method,
       url,
       ...(body !== undefined ? { payload: body as InjectOptions['payload'] } : {}),
-      headers: { 'x-requested-with': 'suboard', origin: ORIGIN, ...(extra.headers ?? {}) },
+      headers: { 'x-requested-with': 'suboard', origin: ORIGIN, ...((extra.headers as Record<string, string>) ?? {}) },
       cookies: this.token ? { sb_session: this.token } : {},
     });
     const set = res.cookies.find((c) => c.name === 'sb_session');
     if (set) this.token = set.value || null;
     return res;
+  }
+  /** multipart/form-data upload of a single file field. */
+  async upload(url: string, filename: string, data: Buffer) {
+    const boundary = '----suboardtest' + Math.random().toString(16).slice(2);
+    const head = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`,
+    );
+    const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+    return this.req('POST', url, Buffer.concat([head, data, tail]), {
+      headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+    });
   }
   get = (url: string) => this.req('GET', url);
   post = (url: string, body?: unknown) => this.req('POST', url, body ?? {});

@@ -16,7 +16,7 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     /** Route is reachable without a session. */
     public?: boolean;
-    /** Route is reachable while the user still has to replace a temporary password. */
+    /** Route is reachable while the user still has to replace a temporary password or enrol MFA. */
     allowPendingPasswordChange?: boolean;
   }
 }
@@ -45,6 +45,9 @@ export const authPlugin = fp(async (app: FastifyInstance, opts: { auth: AuthServ
     if (!req.user) throw unauthorized();
     if (req.user.mustChangePassword && !cfg?.allowPendingPasswordChange) {
       throw new AppError(403, 'PASSWORD_CHANGE_REQUIRED', 'יש להחליף את הסיסמה הזמנית לפני המשך עבודה');
+    }
+    if (req.user.mfaSetupRequired && !cfg?.allowPendingPasswordChange) {
+      throw new AppError(403, 'MFA_SETUP_REQUIRED', 'יש להגדיר אימות דו-שלבי לפני המשך עבודה');
     }
   });
 });

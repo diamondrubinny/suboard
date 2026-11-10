@@ -19,7 +19,9 @@ export type ActivityAction =
   | 'column_updated'
   | 'column_deleted'
   | 'member_set'
-  | 'member_removed';
+  | 'member_removed'
+  | 'attachment_added'
+  | 'attachment_removed';
 
 /** Business-level change history shown to board members (distinct from the security audit log). */
 export class ActivityService {

@@ -9,6 +9,10 @@ export interface SessionUser {
   name: string;
   role: GlobalRole;
   mustChangePassword: boolean;
+  mfaEnabled: boolean;
+  /** The user's role requires MFA and it is not enrolled yet. */
+  mfaSetupRequired: boolean;
+  emailNotifications: boolean;
 }
 
 export interface DirectoryUser {
@@ -23,6 +27,7 @@ export interface AdminUser {
   role: GlobalRole;
   isActive: boolean;
   mustChangePassword: boolean;
+  mfaEnabled: boolean;
   lockedUntil: string | null;
   lastLoginAt: string | null;
   createdAt: string;
@@ -154,4 +159,39 @@ export interface AuditEntry {
 
 export interface ApiErrorBody {
   error: { code: string; message: string; fields?: Record<string, string> };
+}
+
+export type LoginResponse = { user: SessionUser; mfaRequired?: false } | { mfaRequired: true; challengeToken: string };
+
+export interface MfaSetup {
+  secret: string;
+  otpauthUri: string;
+  qrSvg: string;
+}
+
+export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow';
+
+export interface AppNotification {
+  id: string;
+  kind: NotificationKind;
+  boardId: string | null;
+  itemId: string | null;
+  title: string;
+  actorName: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export type AttachmentStatus = 'pending' | 'clean' | 'infected' | 'error';
+
+export interface Attachment {
+  id: string;
+  itemId: string;
+  originalName: string;
+  mime: string;
+  size: number;
+  status: AttachmentStatus;
+  uploadedBy: string | null;
+  uploaderName: string | null;
+  createdAt: string;
 }

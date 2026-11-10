@@ -15,11 +15,15 @@ export function personNames(ids: string[], users: DirectoryUser[]): string {
 export function PersonPicker({
   value,
   users,
+  candidates,
   label,
   onChange,
 }: {
   value: string[];
+  /** Directory used to display names of current values. */
   users: DirectoryUser[];
+  /** Users offered for selection (board members); current values are always listed too. */
+  candidates?: DirectoryUser[];
   label: string;
   onChange: (ids: string[]) => void;
 }) {
@@ -49,7 +53,10 @@ export function PersonPicker({
     setLocal(next);
     onChange(next);
   };
-  const visible = users.filter((u) => u.name.includes(filter.trim()));
+  const pool = candidates ?? users;
+  // Keep currently-assigned people visible (so they can be unassigned) even if no longer members.
+  const options = [...pool, ...users.filter((u) => local.includes(u.id) && !pool.some((p) => p.id === u.id))];
+  const visible = options.filter((u) => u.name.includes(filter.trim()));
 
   return (
     <div
@@ -94,7 +101,7 @@ export function PersonPicker({
         <div className="popover" id={popId}>
           <fieldset>
             <legend>{label}</legend>
-            {users.length > 8 && (
+            {options.length > 8 && (
               <input
                 className="input"
                 style={{ marginBottom: '0.4rem' }}

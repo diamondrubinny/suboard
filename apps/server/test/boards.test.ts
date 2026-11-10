@@ -31,8 +31,7 @@ beforeEach(async () => {
   await manager.put(`/api/boards/${board.id}/members`, { userId: ids.viewer, role: 'viewer' });
 });
 afterEach(async () => {
-  await ctx.app.close();
-  ctx.db.close();
+  await ctx.close();
 });
 
 async function newItem(name = 'פריט', values: Record<string, unknown> = {}) {

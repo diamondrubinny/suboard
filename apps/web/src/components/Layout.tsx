@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { A11yToolbar } from './A11yToolbar';
 import { LoadingState, useFeedback } from './Feedback';
 import { Icon } from './Icon';
+import { NotificationsBell } from './NotificationsBell';
 import { Avatar } from './StatusPill';
 
 export function Logo() {
@@ -42,7 +43,7 @@ export function RequireAuth({ admin = false }: { admin?: boolean }) {
   const location = useLocation();
   if (loading) return <LoadingState />;
   if (!user) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
-  if (user.mustChangePassword && location.pathname !== '/profile') return <Navigate to="/profile" replace />;
+  if ((user.mustChangePassword || user.mfaSetupRequired) && location.pathname !== '/profile') return <Navigate to="/profile" replace />;
   if (admin && user.role !== 'admin') return <Navigate to="/" replace />;
   return <Outlet />;
 }
@@ -64,7 +65,7 @@ export function Layout() {
   }, [location.pathname]);
 
   if (!user) return null;
-  const pending = user.mustChangePassword;
+  const pending = user.mustChangePassword || user.mfaSetupRequired;
 
   const onLogout = async () => {
     await logout();
@@ -96,6 +97,7 @@ export function Layout() {
         </Link>
         <span className="header-spacer" />
         <div className="user-chip">
+          {!pending && <NotificationsBell />}
           <Avatar name={user.name} />
           <Link to="/profile" className="nowrap">
             {user.name}
@@ -119,6 +121,11 @@ export function Layout() {
               <li>
                 <NavLink to="/boards" end className="nav-link">
                   <Icon name="boards" /> כל הלוחות
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/profile" className="nav-link">
+                  <Icon name="user" /> הפרופיל שלי
                 </NavLink>
               </li>
               {user.role === 'admin' && (

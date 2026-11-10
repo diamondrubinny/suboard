@@ -23,6 +23,27 @@ cp .env.example .env && chmod 600 .env
 npm run create-admin -- --email admin@example.org --name "מנהל מערכת"
 ```
 
+## 1א. ClamAV (חובה לקבצים מצורפים)
+
+```bash
+sudo apt-get install -y clamav-daemon clamav-freshclam
+```
+
+```bash
+sudo systemctl enable --now clamav-freshclam clamav-daemon
+```
+
+ב-`/etc/clamav/clamd.conf` ודאו `TCPSocket 3310` ו-`TCPAddr 127.0.0.1` (או השתמשו ב-`CLAMAV_SOCKET` עם ה-Unix socket),
+ו-`StreamMaxLength` גדול מ-`MAX_UPLOAD_MB`. בלי סורק פעיל קבצים נשארים בהסגר ואינם ניתנים להורדה (fail-closed),
+ונסרקים אוטומטית מחדש כל 5 דקות כשהסורק חוזר.
+
+## 1ב. דוא"ל ו-MFA
+
+- הגדירו `SMTP_HOST` / `SMTP_USER` / `SMTP_PASSWORD` (ב-`.env` בלבד). STARTTLS נדרש; TLS 1.2 ומעלה.
+- `MFA_ENCRYPTION_KEY` — מפתח 64 תווים הקסדצימליים. **גבו אותו בנפרד ממסד הנתונים** (למשל בכספת סודות):
+  גיבוי DB בלי המפתח לא יאפשר אימות MFA, וזליגת DB בלי המפתח לא חושפת את סודות ה-TOTP.
+- ייתכן שיש להוסיף את `ReadWritePaths` גם לתיקיית `UPLOAD_DIR` ב-systemd.
+
 ## 2. systemd (`/etc/systemd/system/suboard.service`)
 
 ```ini
@@ -38,7 +59,7 @@ ExecStart=/usr/bin/node --env-file=/opt/suboard/.env dist/index.js
 Restart=on-failure
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/var/lib/suboard
+ReadWritePaths=/var/lib/suboard /var/lib/suboard/uploads
 PrivateTmp=true
 
 [Install]
@@ -56,7 +77,7 @@ server {
   ssl_certificate     /etc/ssl/certs/safety.crt;
   ssl_certificate_key /etc/ssl/private/safety.key;
   ssl_protocols TLSv1.2 TLSv1.3;
-  client_max_body_size 200k;
+  client_max_body_size 12m;   # MAX_UPLOAD_MB + overhead
 
   limit_req_zone $binary_remote_addr zone=suboard:10m rate=20r/s;  # (בבלוק http)
   location / {
@@ -76,7 +97,7 @@ server { listen 80; server_name safety.example.org; return 301 https://$host$req
 15 2 * * * cd /opt/suboard/apps/server && /usr/bin/node --env-file=/opt/suboard/.env dist/scripts/backup.js --out /var/backups/suboard --keep 14
 ```
 
-העתיקו את תיקיית הגיבוי מוצפנת לאחסון חיצוני, ובדקו **שחזור** אחת לרבעון (עצירת שירות → החלפת קובץ ה-DB → הפעלה).
+גבו גם את תיקיית `UPLOAD_DIR/store` (קבצים מצורפים שנסרקו). העתיקו את תיקיית הגיבוי מוצפנת לאחסון חיצוני, ובדקו **שחזור** אחת לרבעון (עצירת שירות → החלפת קובץ ה-DB → הפעלה).
 
 ## 5. עדכון גרסה
 
@@ -85,3 +106,13 @@ git pull && npm ci && npm run build && npm test && sudo systemctl restart suboar
 ```
 
 מיגרציות מסד הנתונים רצות אוטומטית בעליית השרת. גבו לפני כל עדכון.
+
+## 6. מנהל שננעל מחוץ ל-MFA (Break-glass)
+
+אם מנהל איבד גם את מכשיר האימות וגם את קודי השחזור, ואין מנהל נוסף שיכול לאפס — מתוך השרת:
+
+```bash
+cd /opt/suboard/apps/server && node --env-file=/opt/suboard/.env dist/scripts/create-admin.js --email admin@example.org --reset-mfa
+```
+
+הפעולה מנתקת את כל החיבורים של המשתמש ונרשמת ביומן האבטחה (`mfa_reset`, `via: cli`). יש לאמת את זהות המבקש לפני ביצוע.

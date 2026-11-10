@@ -116,4 +116,67 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE INDEX idx_audit_created ON audit_log(created_at);
     `,
   },
+  {
+    version: 2,
+    name: 'mfa_notifications_attachments',
+    sql: /* sql */ `
+      ALTER TABLE users ADD COLUMN mfa_secret_enc TEXT;
+      ALTER TABLE users ADD COLUMN mfa_enabled INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE users ADD COLUMN mfa_last_step INTEGER;
+      ALTER TABLE users ADD COLUMN email_notifications INTEGER NOT NULL DEFAULT 1;
+
+      CREATE TABLE mfa_recovery_codes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        code_hash TEXT NOT NULL,
+        used_at TEXT
+      );
+      CREATE INDEX idx_recovery_user ON mfa_recovery_codes(user_id);
+
+      CREATE TABLE mfa_challenges (
+        id TEXT PRIMARY KEY,               -- sha256(token)
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TEXT NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0
+      );
+
+      CREATE TABLE notifications (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        board_id TEXT REFERENCES boards(id) ON DELETE CASCADE,
+        item_id TEXT REFERENCES items(id) ON DELETE CASCADE,
+        title TEXT NOT NULL,
+        actor_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        read_at TEXT,
+        emailed_at TEXT,
+        created_at TEXT NOT NULL,
+        day TEXT NOT NULL                  -- local YYYY-MM-DD, for once-per-day reminders
+      );
+      CREATE INDEX idx_notifications_user ON notifications(user_id, created_at);
+      CREATE INDEX idx_notifications_dedupe ON notifications(user_id, item_id, kind, day);
+
+      CREATE TABLE attachments (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        original_name TEXT NOT NULL,
+        mime TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        sha256 TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending','clean','infected','error')),
+        scan_detail TEXT,
+        scanned_at TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_attachments_item ON attachments(item_id);
+      CREATE INDEX idx_attachments_status ON attachments(status);
+
+      CREATE TABLE job_runs (
+        name TEXT PRIMARY KEY,
+        last_run_day TEXT NOT NULL
+      );
+    `,
+  },
 ];

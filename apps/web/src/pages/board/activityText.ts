@@ -59,6 +59,10 @@ export function activityText(entry: ActivityEntry, board: BoardDetail, users: Di
       return 'עדכן/ה הרשאות חבר בלוח';
     case 'member_removed':
       return 'הסיר/ה חבר מהלוח';
+    case 'attachment_added':
+      return `צירף/ה את הקובץ "${String(d.name ?? '')}"`;
+    case 'attachment_removed':
+      return `מחק/ה את הקובץ "${String(d.name ?? '')}"`;
     default:
       return entry.action;
   }

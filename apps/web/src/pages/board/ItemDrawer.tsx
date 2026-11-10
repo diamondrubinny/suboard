@@ -9,8 +9,15 @@ import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback
 import { Icon } from '../../components/Icon';
 import { Avatar } from '../../components/StatusPill';
 import { activityText, formatDateTime } from './activityText';
+import { AttachmentsPanel } from './AttachmentsPanel';
 
-type Tab = 'details' | 'updates' | 'history';
+type Tab = 'details' | 'updates' | 'files' | 'history';
+const TABS: [Tab, string][] = [
+  ['details', 'פרטים'],
+  ['updates', 'עדכונים'],
+  ['files', 'קבצים'],
+  ['history', 'היסטוריה'],
+];
 
 export function ItemDrawer({ board, itemId, users, onClose }: { board: BoardDetail; itemId: string | null; users: DirectoryUser[]; onClose: () => void }) {
   const item = board.items.find((i) => i.id === itemId) ?? null;
@@ -21,13 +28,7 @@ export function ItemDrawer({ board, itemId, users, onClose }: { board: BoardDeta
       {item && (
         <>
           <div role="tablist" aria-label="מידע על הפריט" className="tabs">
-            {(
-              [
-                ['details', 'פרטים'],
-                ['updates', 'עדכונים'],
-                ['history', 'היסטוריה'],
-              ] as const
-            ).map(([key, label]) => (
+            {TABS.map(([key, label]) => (
               <button
                 key={key}
                 type="button"
@@ -38,10 +39,12 @@ export function ItemDrawer({ board, itemId, users, onClose }: { board: BoardDeta
                 tabIndex={tab === key ? 0 : -1}
                 onClick={() => setTab(key)}
                 onKeyDown={(e) => {
-                  const order: Tab[] = ['details', 'updates', 'history'];
+                  const order = TABS.map(([k]) => k);
                   const idx = order.indexOf(key);
-                  // RTL: ArrowLeft moves forward.
-                  const next = e.key === 'ArrowLeft' ? order[(idx + 1) % 3] : e.key === 'ArrowRight' ? order[(idx + 2) % 3] : null;
+                  const n = order.length;
+                  // RTL: ArrowLeft moves forward; Home/End jump to the ends.
+                  const next =
+                    e.key === 'ArrowLeft' ? order[(idx + 1) % n] : e.key === 'ArrowRight' ? order[(idx + n - 1) % n] : e.key === 'Home' ? order[0] : e.key === 'End' ? order[n - 1] : null;
                   if (next) {
                     setTab(next);
                     document.getElementById(`tab-${next}`)?.focus();
@@ -55,6 +58,7 @@ export function ItemDrawer({ board, itemId, users, onClose }: { board: BoardDeta
           <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
             {tab === 'details' && <DetailsPanel board={board} itemId={item.id} users={users} onDeleted={onClose} />}
             {tab === 'updates' && <UpdatesPanel board={board} itemId={item.id} />}
+            {tab === 'files' && <AttachmentsPanel board={board} itemId={item.id} />}
             {tab === 'history' && <HistoryPanel board={board} itemId={item.id} users={users} />}
           </div>
         </>
@@ -66,6 +70,7 @@ export function ItemDrawer({ board, itemId, users, onClose }: { board: BoardDeta
 function DetailsPanel({ board, itemId, users, onDeleted }: { board: BoardDetail; itemId: string; users: DirectoryUser[]; onDeleted: () => void }) {
   const item = board.items.find((i) => i.id === itemId)!;
   const canEdit = board.myRole !== 'viewer';
+  const assignable = board.members.map((m) => ({ id: m.userId, name: m.name }));
   const update = useUpdateItem(board.id);
   const del = useDeleteItem(board.id);
   const { toast, confirm } = useFeedback();
@@ -128,6 +133,7 @@ function DetailsPanel({ board, itemId, users, onDeleted }: { board: BoardDetail;
               column={c}
               value={item.values[c.id]}
               users={users}
+              assignable={assignable}
               readOnly={!canEdit}
               label={c.title}
               mode="drawer"

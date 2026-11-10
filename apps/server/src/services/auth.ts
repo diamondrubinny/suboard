@@ -4,6 +4,7 @@ import { nowIso, type DB } from '../db/index.js';
 import { getDummyHash, hashPassword, newSessionToken, sha256, verifyPassword } from '../lib/crypto.js';
 import { AppError, badRequest } from '../lib/errors.js';
 import type { AuditService } from './audit.js';
+import type { MfaService } from './mfa.js';
 
 interface UserRow {
   id: string;
@@ -15,12 +16,16 @@ interface UserRow {
   must_change_password: number;
   failed_logins: number;
   locked_until: string | null;
+  mfa_enabled: number;
+  email_notifications: number;
 }
 
 export interface ResolvedSession {
   sessionId: string;
   user: SessionUser;
 }
+
+export type LoginResult = { kind: 'session'; token: string; user: SessionUser } | { kind: 'mfa'; challengeToken: string };
 
 /** Single generic message: does not reveal whether the account exists, is locked or disabled. */
 const INVALID_CREDENTIALS = 'אימייל או סיסמה שגויים, או שהחשבון ננעל זמנית. נסו שוב מאוחר יותר.';
@@ -30,9 +35,10 @@ export class AuthService {
     private readonly db: DB,
     private readonly config: AppConfig,
     private readonly audit: AuditService,
+    private readonly mfa: MfaService,
   ) {}
 
-  async login(email: string, password: string, meta: { ip: string; userAgent?: string }): Promise<{ token: string; user: SessionUser }> {
+  async login(email: string, password: string, meta: { ip: string; userAgent?: string }): Promise<LoginResult> {
     const row = this.db.prepare('SELECT * FROM users WHERE email = ?').get(email) as UserRow | undefined;
 
     if (!row) {
@@ -41,8 +47,7 @@ export class AuthService {
       throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
     }
 
-    const now = Date.now();
-    if (row.locked_until && Date.parse(row.locked_until) > now) {
+    if (row.locked_until && Date.parse(row.locked_until) > Date.now()) {
       await verifyPassword(password, await getDummyHash());
       this.audit.log('login_failed', { userId: row.id, ip: meta.ip, meta: { reason: 'locked' } });
       throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
@@ -55,20 +60,33 @@ export class AuthService {
       throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
     }
 
+    // Password is correct. With MFA enrolled, a second factor is required before any session exists.
+    if (row.mfa_enabled) {
+      this.db.prepare('UPDATE users SET failed_logins = 0 WHERE id = ?').run(row.id);
+      return { kind: 'mfa', challengeToken: this.mfa.createChallenge(row.id) };
+    }
+    return this.startSession(row, meta);
+  }
+
+  async completeMfaLogin(challengeToken: string, code: string, meta: { ip: string; userAgent?: string }): Promise<LoginResult> {
+    const userId = this.mfa.completeChallenge(challengeToken, code, meta.ip);
+    const row = this.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined;
+    if (!row || !row.is_active) throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
+    return this.startSession(row, meta);
+  }
+
+  private startSession(row: UserRow, meta: { ip: string; userAgent?: string }): LoginResult {
     const token = newSessionToken();
     const ts = nowIso();
     this.db.transaction(() => {
-      this.db
-        .prepare('UPDATE users SET failed_logins = 0, locked_until = NULL, last_login_at = ? WHERE id = ?')
-        .run(ts, row.id);
+      this.db.prepare('UPDATE users SET failed_logins = 0, locked_until = NULL, last_login_at = ? WHERE id = ?').run(ts, row.id);
       this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND expires_at < ?').run(row.id, ts);
       this.db
         .prepare('INSERT INTO sessions (id, user_id, created_at, expires_at, last_seen_at, user_agent) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(sha256(token), row.id, ts, new Date(now + this.config.sessionTtlMs).toISOString(), ts, meta.userAgent?.slice(0, 200) ?? null);
+        .run(sha256(token), row.id, ts, new Date(Date.now() + this.config.sessionTtlMs).toISOString(), ts, meta.userAgent?.slice(0, 200) ?? null);
     })();
-    this.audit.log('login_success', { userId: row.id, ip: meta.ip });
-
-    return { token, user: toSessionUser(row) };
+    this.audit.log('login_success', { userId: row.id, ip: meta.ip, meta: { mfa: row.mfa_enabled === 1 } });
+    return { kind: 'session', token, user: this.toSessionUser(row) };
   }
 
   private registerFailure(row: UserRow, ip: string): void {
@@ -105,7 +123,7 @@ export class AuthService {
     if (now - Date.parse(row.last_seen_at) > 60_000) {
       this.db.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?').run(new Date(now).toISOString(), id);
     }
-    return { sessionId: id, user: toSessionUser(row) };
+    return { sessionId: id, user: this.toSessionUser(row) };
   }
 
   logout(sessionId: string, userId: string, ip: string): void {
@@ -114,40 +132,54 @@ export class AuthService {
   }
 
   async changePassword(userId: string, sessionId: string, current: string, next: string, ip: string): Promise<void> {
-    const row = this.db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as
-      | { password_hash: string }
-      | undefined;
+    const row = this.db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as { password_hash: string } | undefined;
     if (!row || !(await verifyPassword(current, row.password_hash))) {
       this.audit.log('password_change_failed', { userId, ip });
       throw badRequest('הסיסמה הנוכחית שגויה', { currentPassword: 'הסיסמה הנוכחית שגויה' });
     }
     const hash = await hashPassword(next);
     this.db.transaction(() => {
-      this.db
-        .prepare('UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?')
-        .run(hash, nowIso(), userId);
+      this.db.prepare('UPDATE users SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?').run(hash, nowIso(), userId);
       // Revoke every other session of this user.
       this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND id <> ?').run(userId, sessionId);
     })();
     this.audit.log('password_changed', { userId, ip });
   }
 
+  setPreferences(userId: string, prefs: { emailNotifications: boolean }): void {
+    this.db.prepare('UPDATE users SET email_notifications = ?, updated_at = ? WHERE id = ?').run(prefs.emailNotifications ? 1 : 0, nowIso(), userId);
+  }
+
+  getSessionUser(userId: string): SessionUser {
+    return this.toSessionUser(this.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow);
+  }
+
   revokeAllSessions(userId: string): void {
     this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
   }
 
+  /** Revoke every session of a user except the given one (e.g. after enabling MFA). */
+  revokeOtherSessions(userId: string, keepSessionId: string): void {
+    this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND id <> ?').run(userId, keepSessionId);
+  }
+
   purgeExpiredSessions(): number {
     const idleCutoff = new Date(Date.now() - this.config.sessionIdleMs).toISOString();
+    this.db.prepare('DELETE FROM mfa_challenges WHERE expires_at < ?').run(nowIso());
     return this.db.prepare('DELETE FROM sessions WHERE expires_at < ? OR last_seen_at < ?').run(nowIso(), idleCutoff).changes;
   }
-}
 
-function toSessionUser(row: UserRow): SessionUser {
-  return {
-    id: row.id,
-    email: row.email,
-    name: row.name,
-    role: row.role,
-    mustChangePassword: row.must_change_password === 1,
-  };
+  private toSessionUser(row: UserRow): SessionUser {
+    const mfaEnabled = row.mfa_enabled === 1;
+    return {
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      mustChangePassword: row.must_change_password === 1,
+      mfaEnabled,
+      mfaSetupRequired: !mfaEnabled && this.config.mfaRequiredRoles.includes(row.role),
+      emailNotifications: row.email_notifications === 1,
+    };
+  }
 }

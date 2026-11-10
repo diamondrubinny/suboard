@@ -9,6 +9,8 @@ export interface CellEditorProps {
   onChange: (value: CellValue) => void;
   readOnly: boolean;
   users: DirectoryUser[];
+  /** People that may be assigned (board members). Defaults to `users`. */
+  assignable?: DirectoryUser[];
   /** Accessible name, e.g. "סטטוס — <item name>". */
   label: string;
   overdue?: boolean;
@@ -78,7 +80,7 @@ function LongTextEditor({ value, onCommit, label, id }: { value: string; onCommi
 }
 
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onChange, readOnly, users, label, overdue, mode = 'table', onOpenItem, id } = props;
+  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id } = props;
   const options = column.settings.options ?? [];
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -109,7 +111,7 @@ export function CellEditor(props: CellEditorProps) {
     case 'person': {
       const ids = Array.isArray(value) ? value : [];
       if (readOnly) return <span className="cell-readonly person-names">{personNames(ids, users) || '—'}</span>;
-      return <PersonPicker value={ids} users={users} label={label} onChange={(next) => onChange(next.length ? next : null)} />;
+      return <PersonPicker value={ids} users={users} candidates={assignable ?? users} label={label} onChange={(next) => onChange(next.length ? next : null)} />;
     }
 
     case 'date': {

@@ -18,13 +18,32 @@ async function main() {
     try {
       const sessions = app.services.auth.purgeExpiredSessions();
       const audit = app.services.audit.purgeOlderThan(AUDIT_RETENTION_DAYS);
-      if (sessions || audit) app.log.info({ sessions, audit }, 'housekeeping purge');
+      const notifications = app.services.notifications.purgeOlderThan(config.notificationRetentionDays);
+      const orphans = app.services.attachments.sweepOrphans();
+      if (sessions || audit || notifications || orphans) app.log.info({ sessions, audit, notifications, orphans }, 'housekeeping purge');
     } catch (err) {
       app.log.error({ err }, 'housekeeping failed');
     }
   };
   housekeeping();
   setInterval(housekeeping, 60 * 60_000).unref();
+
+  // Frequent jobs: daily reminders (self-gated to once per day after DIGEST_HOUR) and
+  // re-scanning of quarantined uploads left pending while the scanner was unavailable.
+  const frequent = async () => {
+    try {
+      await app.services.notifications.runDailyReminders();
+      await app.services.attachments.rescanPending();
+    } catch (err) {
+      app.log.error({ err }, 'scheduled job failed');
+    }
+  };
+  void frequent();
+  setInterval(() => void frequent(), 5 * 60_000).unref();
+
+  if (!app.services.notifications.emailEnabled) app.log.warn('SMTP not configured: e-mail notifications are disabled (in-app notifications still work)');
+  if (!app.services.attachments.scannerName) app.log.warn('No malware scanner configured: uploaded files stay quarantined and cannot be downloaded');
+  if (app.services.attachments.scannerName === 'disabled-unsafe') app.log.warn('UNSAFE: malware scanning is disabled (development only)');
 
   const shutdown = async (signal: string) => {
     app.log.info({ signal }, 'shutting down');

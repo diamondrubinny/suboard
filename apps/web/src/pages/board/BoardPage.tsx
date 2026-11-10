@@ -98,6 +98,9 @@ export function BoardPage() {
           <span className="badge" title="ההרשאה שלך בלוח">
             {BOARD_ROLE_LABELS[b.myRole]}
           </span>
+          <a href={`/api/boards/${b.id}/export.csv`} className="btn" download>
+            <Icon name="download" /> ייצוא ל-CSV
+          </a>
           {b.myRole === 'owner' && (
             <Link to={`/boards/${b.id}/settings`} className="btn">
               <Icon name="gear" /> הגדרות לוח

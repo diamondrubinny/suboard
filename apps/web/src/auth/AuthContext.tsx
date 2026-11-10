@@ -1,4 +1,4 @@
-import type { SessionUser } from '@suboard/shared';
+import type { LoginResponse, SessionUser } from '@suboard/shared';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { api, ApiError, authEvents } from '../api/client';
@@ -7,7 +7,11 @@ import { qk } from '../api/hooks';
 interface AuthValue {
   user: SessionUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<SessionUser>;
+  /** Returns the user, or a challenge token when a second factor is required. */
+  login: (email: string, password: string) => Promise<{ user: SessionUser } | { challengeToken: string }>;
+  verifyMfa: (challengeToken: string, code: string) => Promise<SessionUser>;
+  /** Replace the cached session user after a server-side change (MFA, preferences). */
+  setUser: (user: SessionUser) => void;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -51,12 +55,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const { user } = await api<{ user: SessionUser }>('/auth/login', 'POST', { email, password });
-      resetCache(qc, user);
-      return user;
+      const res = await api<LoginResponse>('/auth/login', 'POST', { email, password });
+      if (res.mfaRequired) return { challengeToken: res.challengeToken };
+      resetCache(qc, res.user);
+      return { user: res.user };
     },
     [qc],
   );
+
+  const verifyMfa = useCallback(
+    async (challengeToken: string, code: string) => {
+      const res = await api<LoginResponse>('/auth/mfa/verify', 'POST', { challengeToken, code });
+      if (res.mfaRequired) throw new Error('unexpected MFA response');
+      resetCache(qc, res.user);
+      return res.user;
+    },
+    [qc],
+  );
+
+  const setUser = useCallback((user: SessionUser) => qc.setQueryData(qk.me, user), [qc]);
 
   const logout = useCallback(async () => {
     try {
@@ -71,8 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [qc]);
 
   const value = useMemo<AuthValue>(
-    () => ({ user: me.data ?? null, loading: me.isPending, login, logout, refresh }),
-    [me.data, me.isPending, login, logout, refresh],
+    () => ({ user: me.data ?? null, loading: me.isPending, login, verifyMfa, setUser, logout, refresh }),
+    [me.data, me.isPending, login, verifyMfa, setUser, logout, refresh],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

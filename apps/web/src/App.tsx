@@ -75,6 +75,6 @@ export function App() {
 function AuthOptionalLayout() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user && !user.mustChangePassword) return <Layout />;
+  if (user && !user.mustChangePassword && !user.mfaSetupRequired) return <Layout />;
   return <Outlet />;
 }

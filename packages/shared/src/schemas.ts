@@ -49,6 +49,29 @@ export const changePasswordSchema = z
     path: ['newPassword'],
   });
 
+// ---------- MFA ----------
+/** A 6-digit TOTP code or a recovery code (xxxxx-xxxxx). Whitespace is ignored. */
+export const mfaCodeSchema = z
+  .string()
+  .transform((s) => s.replace(/\s/g, '').toLowerCase())
+  .pipe(z.string().regex(/^(\d{6}|[a-z0-9]{5}-[a-z0-9]{5})$/, 'קוד לא תקין'));
+
+export const mfaVerifySchema = z.object({
+  challengeToken: z.string().min(20).max(100),
+  code: mfaCodeSchema,
+});
+
+export const mfaEnableSchema = z.object({ code: z.string().regex(/^\d{6}$/, 'יש להזין קוד בן 6 ספרות') });
+
+export const mfaDisableSchema = z.object({
+  password: z.string().min(1, 'שדה חובה').max(LIMITS.passwordMax),
+  code: mfaCodeSchema,
+});
+
+export const preferencesSchema = z.object({ emailNotifications: z.boolean() });
+
+export const markNotificationsReadSchema = z.union([z.object({ all: z.literal(true) }), z.object({ ids: z.array(idSchema).min(1).max(200) })]);
+
 // ---------- Users ----------
 export const createUserSchema = z.object({
   email: emailSchema,

@@ -4,6 +4,7 @@ import { api, ApiError, errorMessage } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import { useFeedback } from '../components/Feedback';
 import { usePageTitle } from '../components/Layout';
+import { MfaSection, NotificationPrefsSection } from './MfaSection';
 
 export function ProfilePage() {
   usePageTitle('פרופיל');
@@ -107,6 +108,8 @@ export function ProfilePage() {
             </button>
           </form>
         </section>
+        {!user.mustChangePassword && <MfaSection />}
+        {!user.mustChangePassword && !user.mfaSetupRequired && <NotificationPrefsSection />}
       </div>
     </>
   );

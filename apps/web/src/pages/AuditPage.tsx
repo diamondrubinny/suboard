@@ -19,7 +19,18 @@ const EVENTS: Record<string, string> = {
   member_set: 'עדכון הרשאת לוח',
   member_removed: 'הסרת חבר מלוח',
   access_denied: 'ניסיון גישה שנדחה',
+  mfa_enabled: 'הפעלת אימות דו-שלבי',
+  mfa_disabled: 'ביטול אימות דו-שלבי',
+  mfa_disable_failed: 'ניסיון ביטול MFA נכשל',
+  mfa_failed: 'קוד אימות שגוי',
+  mfa_recovery_code_used: 'שימוש בקוד שחזור',
+  mfa_reset: 'איפוס MFA ע"י מנהל',
+  upload_rejected: 'קובץ נדחה (סוג לא מותר)',
+  malware_detected: 'זוהתה נוזקה בקובץ',
+  data_export: 'ייצוא נתונים',
 };
+
+const DANGER = new Set(['login_failed', 'account_locked', 'access_denied', 'mfa_failed', 'mfa_disable_failed', 'malware_detected', 'upload_rejected']);
 
 const REASONS: Record<string, string> = {
   unknown_account: 'חשבון לא קיים',
@@ -34,6 +45,9 @@ function describeMeta(meta: Record<string, unknown>): string {
   if (typeof meta.role === 'string') parts.push(`תפקיד: ${meta.role}`);
   if (Array.isArray(meta.changed)) parts.push(`שדות: ${meta.changed.join(', ')}`);
   if (typeof meta.route === 'string') parts.push(`${String(meta.method ?? '')} ${meta.route}`);
+  if (typeof meta.signature === 'string') parts.push(`חתימה: ${meta.signature}`);
+  if (typeof meta.rows === 'number') parts.push(`${meta.rows} שורות`);
+  if (meta.mfa === true) parts.push('עם MFA');
   if (typeof meta.until === 'string') parts.push(`עד ${formatDateTime(meta.until)}`);
   return parts.join(' · ');
 }
@@ -82,7 +96,7 @@ export function AuditPage() {
                 <tr key={e.id}>
                   <td className="nowrap">{formatDateTime(e.createdAt)}</td>
                   <td>
-                    <span className={e.event === 'login_failed' || e.event === 'account_locked' || e.event === 'access_denied' ? 'badge danger' : 'badge'}>
+                    <span className={DANGER.has(e.event) ? 'badge danger' : 'badge'}>
                       {EVENTS[e.event] ?? e.event}
                     </span>
                   </td>

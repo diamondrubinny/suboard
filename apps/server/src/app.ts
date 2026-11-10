@@ -1,4 +1,5 @@
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
@@ -13,8 +14,9 @@ import { authPlugin } from './plugins/auth.js';
 import { csrfPlugin } from './plugins/csrf.js';
 import { authRoutes } from './routes/auth.js';
 import { boardRoutes } from './routes/boards.js';
+import { operationsRoutes } from './routes/operations.js';
 import { userRoutes } from './routes/users.js';
-import { createServices, type Services } from './services/index.js';
+import { createServices, type ServiceOverrides, type Services } from './services/index.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -31,7 +33,7 @@ const GENERIC_BY_STATUS: Record<number, string> = {
   429: 'יותר מדי בקשות. נסו שוב בעוד מספר דקות.',
 };
 
-export async function buildApp(config: AppConfig, db: DB): Promise<FastifyInstance> {
+export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOverrides = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger:
       config.env === 'test'
@@ -47,7 +49,9 @@ export async function buildApp(config: AppConfig, db: DB): Promise<FastifyInstan
     disableRequestLogging: config.env === 'production' ? false : undefined,
   });
 
-  const services = createServices(db, config);
+  const services = createServices(db, config, overrides);
+  services.notifications.setLogger(app.log);
+  services.attachments.setLogger(app.log);
   app.decorate('services', services);
 
   await app.register(helmet, {
@@ -72,6 +76,8 @@ export async function buildApp(config: AppConfig, db: DB): Promise<FastifyInstan
     referrerPolicy: { policy: 'same-origin' },
   });
   await app.register(cookie);
+  // Multipart only for attachment uploads: one file, no extra fields, bounded size.
+  await app.register(multipart, { limits: { fileSize: config.maxUploadBytes, files: 1, fields: 0, parts: 1, headerPairs: 50 } });
   await app.register(rateLimit, {
     global: true,
     max: 600,
@@ -123,6 +129,7 @@ export async function buildApp(config: AppConfig, db: DB): Promise<FastifyInstan
       await api.register(authRoutes, { services, config });
       await api.register(userRoutes, { services });
       await api.register(boardRoutes, { services });
+      await api.register(operationsRoutes, { services, config });
     },
     { prefix: '/api' },
   );
