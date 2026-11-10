@@ -199,6 +199,22 @@ export const RECIPES: Recipe[] = [
     },
   },
   {
+    key: 'periodic',
+    label: 'בדיקה תקופתית: כשסטטוס הופך ל"תקין/הושלם" ← הבדיקה הבאה בעוד שנה',
+    build: (b) => {
+      const st = findPrimaryStatusColumn(b.columns);
+      const done = doneOption(st);
+      const date = b.columns.filter((c) => c.type === 'date').find((c) => c.settings.role !== 'due' && /בדיקה|הבא/.test(c.title)) ?? first(b, 'date');
+      if (!st || !done || !date) return null;
+      return {
+        name: 'בדיקה תקופתית — קידום מועד הבדיקה הבאה',
+        trigger: { type: 'status_changed', columnId: st.id, to: done },
+        conditions: [],
+        actions: [{ type: 'set_date', columnId: date.id, offsetDays: 365 }],
+      };
+    },
+  },
+  {
     key: 'new-due',
     label: 'פריט חדש ללא יעד ← יעד בעוד 14 יום',
     build: (b) => {

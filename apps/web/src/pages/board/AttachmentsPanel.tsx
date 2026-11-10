@@ -4,6 +4,7 @@ import { errorMessage } from '../../api/client';
 import { useAttachmentMutations, useAttachments } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback';
+import { CameraButton } from '../../components/CameraButton';
 import { Icon } from '../../components/Icon';
 import { formatDateTime } from './activityText';
 
@@ -69,9 +70,12 @@ export function AttachmentsPanel({ board, itemId }: { board: BoardDetail; itemId
             void send(e.dataTransfer.files);
           }}
         >
-          <label htmlFor="attach-input" className="btn" style={{ cursor: 'pointer' }}>
-            <Icon name="paperclip" /> בחירת קבצים
-          </label>
+          <div className="toolbar">
+            <label htmlFor="attach-input" className="btn" style={{ cursor: 'pointer' }}>
+              <Icon name="paperclip" /> בחירת קבצים
+            </label>
+            <CameraButton disabled={upload.isPending} onFiles={(f) => void send(f)} />
+          </div>
           <input
             id="attach-input"
             ref={inputRef}

@@ -9,6 +9,7 @@ import { Icon } from '../../components/Icon';
 import { usePageTitle } from '../../components/Layout';
 import { NotFoundPage } from '../NotFoundPage';
 import { BulkBar, ColumnsMenu, ImportDialog, TrashDialog, ViewsMenu } from './BoardTools';
+import { RiskMatrixView } from './RiskMatrixView';
 import { CalendarView } from './CalendarView';
 import { ItemDrawer } from './ItemDrawer';
 import { KanbanView } from './KanbanView';
@@ -21,7 +22,7 @@ type ViewKind = ViewConfig['view'];
 function readView(boardId: string): ViewKind {
   try {
     const v = localStorage.getItem(`${VIEW_KEY}.${boardId}`);
-    return v === 'kanban' || v === 'calendar' ? v : 'table';
+    return v === 'kanban' || v === 'calendar' || v === 'risk' ? v : 'table';
   } catch {
     return 'table';
   }
@@ -116,6 +117,9 @@ export function BoardPage() {
           <Link to={`/boards/${b.id}/report`} className="btn btn-ghost">
             <Icon name="chart" /> סיכום
           </Link>
+          <Link to={`/boards/${b.id}/qr`} className="btn btn-ghost">
+            <Icon name="grid" /> מדבקות QR
+          </Link>
           <Link to={`/boards/${b.id}/automations`} className="btn">
             <Icon name="bolt" /> אוטומציות
           </Link>
@@ -152,6 +156,11 @@ export function BoardPage() {
           <button type="button" aria-pressed={config.view === 'calendar'} onClick={() => changeView('calendar')}>
             <Icon name="history" /> לוח שנה
           </button>
+          {b.columns.some((c) => c.type === 'risk') && (
+            <button type="button" aria-pressed={config.view === 'risk'} onClick={() => changeView('risk')}>
+              <Icon name="grid" /> מפת סיכונים
+            </button>
+          )}
         </div>
         <label htmlFor="board-search" className="sr-only">
           חיפוש בלוח
@@ -210,6 +219,10 @@ export function BoardPage() {
       )}
       {config.view === 'calendar' && (
         <CalendarView board={b} items={filteredItems} onOpenItem={openItem} columnId={config.calendarColumnId} onColumnChange={(id) => patch({ calendarColumnId: id })} />
+      )}
+
+      {config.view === 'risk' && (
+        <RiskMatrixView board={b} items={filteredItems.filter((i) => !i.parentId)} onOpenItem={openItem} columnId={config.riskColumnId} onColumnChange={(id) => patch({ riskColumnId: id })} />
       )}
 
       {isFiltered && shownCount === 0 && <p className="muted">לא נמצאו פריטים התואמים לסינון.</p>}

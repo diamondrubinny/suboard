@@ -11,6 +11,7 @@ const TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
   due_tomorrow: (n) => `תאריך יעד מחר: "${n.title}"`,
   mentioned: (n) => `${n.actorName ?? 'מישהו'} הזכיר/ה אותך ב"${n.title}"`,
   automation: (n) => `${n.detail ?? 'אוטומציה'}: "${n.title}"`,
+  effectiveness: (n) => `הגיע מועד בדיקת אפקטיביות: "${n.title}"`,
   report: (n) => `${n.detail ?? 'דוח מתוזמן'} — לוח "${n.title}"`,
 };
 

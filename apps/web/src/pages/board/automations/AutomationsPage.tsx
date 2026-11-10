@@ -348,7 +348,7 @@ function RunsPanel({ board }: { board: BoardDetail }) {
       {q.isError && <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} />}
       {q.data?.length === 0 && <p className="muted">עוד לא היו הרצות.</p>}
       {q.data && q.data.length > 0 && (
-        <div className="table-scroll">
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="טבלת יומן ההרצות">
           <table className="data-table">
             <caption className="sr-only">יומן הרצות אוטומציה</caption>
             <thead>

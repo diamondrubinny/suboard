@@ -1,4 +1,4 @@
-import { formatDateHe, formatDateRangeHe, type ActivityEntry, type BoardDetail, type DirectoryUser } from '@suboard/shared';
+import { checklistStats, formatDateHe, formatRisk, formatDateRangeHe, type ActivityEntry, type BoardDetail, type DirectoryUser } from '@suboard/shared';
 import { personNames } from '../../components/cells/PersonPicker';
 
 function formatValue(entry: ActivityEntry, v: unknown, board: BoardDetail, users: DirectoryUser[]): string {
@@ -22,6 +22,10 @@ function formatValue(entry: ActivityEntry, v: unknown, board: BoardDetail, users
       return `${String(v)}/5`;
     case 'checkbox':
       return v ? 'מסומן' : 'לא מסומן';
+    case 'risk':
+      return formatRisk(v) || 'ריק';
+    case 'checklist':
+      return column ? (() => { const s = checklistStats(column, v); return `${s.pass} תקין, ${s.fail} לא תקין, ${s.na} לא רלוונטי`; })() : 'עודכן';
     default:
       return String(v);
   }
@@ -93,6 +97,20 @@ export function activityText(entry: ActivityEntry, board: BoardDetail, users: Di
       return `עדכן/ה את הדוח המתוזמן "${String(d.name ?? '')}"`;
     case 'report_deleted':
       return `מחק/ה את הדוח המתוזמן "${String(d.name ?? '')}"`;
+    case 'investigation_updated':
+      return d.result === 'effective' ? 'עדכן/ה תחקיר — הפעולות נמצאו אפקטיביות' : d.result === 'not_effective' ? 'עדכן/ה תחקיר — הפעולות לא היו אפקטיביות' : 'עדכן/ה את התחקיר';
+    case 'action_linked':
+      return `פתח/ה פעולה מתקנת מקושרת "${String(d.name ?? '')}"`;
+    case 'compliance_updated':
+      return d.enabled ? 'הגדיר/ה מעקב תאימות' : 'ביטל/ה מעקב תאימות';
+    case 'form_created':
+      return `יצר/ה טופס "${String(d.name ?? '')}"`;
+    case 'form_updated':
+      return `עדכן/ה את הטופס "${String(d.name ?? '')}"`;
+    case 'form_deleted':
+      return `מחק/ה את הטופס "${String(d.name ?? '')}"`;
+    case 'form_submitted':
+      return `דיווח/ה דרך הטופס "${String(d.form ?? '')}"`;
     case 'items_imported':
       return `ייבא/ה ${String(d.count ?? '')} פריטים`;
     case 'attachment_added':

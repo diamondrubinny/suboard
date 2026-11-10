@@ -21,6 +21,7 @@ import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback
 import { Icon } from '../../components/Icon';
 import { usePageTitle } from '../../components/Layout';
 import { colorStyle } from '../../components/StatusPill';
+import { ChecklistSettingsEditor, ComplianceSection } from './FieldSettings';
 
 export function BoardSettingsPage() {
   const { boardId = '' } = useParams();
@@ -43,6 +44,14 @@ export function BoardSettingsPage() {
       <div className="grid" style={{ gap: '1.25rem' }}>
         <GeneralSection board={b} />
         <ColumnsSection board={b} />
+        <ComplianceSection board={b} />
+        <section className="card" aria-labelledby="forms-h">
+          <h2 id="forms-h">טפסים</h2>
+          <p className="muted">טפסי דיווח שיוצרים פריטים בלוח — לחברי הלוח או לכל המשתמשים המחוברים (למשל דיווח כמעט-אירוע).</p>
+          <Link to={`/boards/${b.id}/forms`} className="btn">
+            ניהול טפסים
+          </Link>
+        </section>
         <GroupsSection board={b} />
         <MembersSection board={b} />
         <DangerSection board={b} />
@@ -189,6 +198,11 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
                     {c.type === 'tags' ? 'עריכת תגיות' : 'עריכת תוויות'}
                   </button>
                 )}
+                {c.type === 'checklist' && (
+                  <button type="button" className="btn btn-sm" aria-expanded={editing === c.id} onClick={() => setEditing(editing === c.id ? null : c.id)}>
+                    עריכת סעיפים
+                  </button>
+                )}
                 {c.type === 'auto_id' && <PrefixInput column={c} onSave={(prefix) => update.mutate({ columnId: c.id, patch: { settings: { prefix } } }, { onError: onErr })} />}
                 <button
                   type="button"
@@ -204,7 +218,17 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
                 </button>
               </span>
             </div>
-            {editing === c.id && (
+            {editing === c.id && c.type === 'checklist' && (
+              <ChecklistSettingsEditor
+                board={board}
+                column={c}
+                saving={update.isPending}
+                onSave={(checklist) =>
+                  update.mutate({ columnId: c.id, patch: { settings: { checklist } } }, { onSuccess: () => (setEditing(null), toast('הצ\'קליסט נשמר')), onError: onErr })
+                }
+              />
+            )}
+            {editing === c.id && c.type !== 'checklist' && (
               <StatusOptionsEditor
                 column={c}
                 saving={update.isPending}

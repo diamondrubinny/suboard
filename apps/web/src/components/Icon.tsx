@@ -1,4 +1,7 @@
 const PATHS = {
+  camera: 'M3 8h3l2-3h8l2 3h3v12H3zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  printer: 'M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v7H8z',
+  checks: 'M3 12l3 3 6-6M12 15l2 2 7-7',
   bolt: 'M13 2 3 14h8l-1 8 10-12h-8l1-8z',
   repeat: 'M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3',
   calendar: 'M3 6h18v15H3zM3 10h18M8 3v4M16 3v4',

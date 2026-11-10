@@ -2161,3 +2161,455 @@ td.today .cal-num {
 .page-header .actions .select {
   inline-size: auto;
 }
+
+/* ==========================================================================
+   Wave C: risk matrix, checklists, item links, investigations, QR, compliance, forms, print
+   ========================================================================== */
+
+.link-btn {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--primary-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  text-align: start;
+}
+
+/* ---------- risk ---------- */
+.risk-pill {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.risk-popover fieldset {
+  display: grid;
+  gap: var(--space-2);
+}
+.risk-result {
+  margin: 0;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.risk-layout {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(min(18rem, 100%), 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .risk-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.risk-matrix {
+  border-collapse: separate;
+  border-spacing: 4px;
+}
+.risk-matrix caption {
+  text-align: start;
+  font-weight: 600;
+  padding-bottom: var(--space-2);
+}
+.risk-matrix th {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+  padding: var(--space-1);
+  max-inline-size: 5.5rem;
+}
+.risk-matrix th .num {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+.risk-cell-td {
+  padding: 0;
+}
+.risk-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  inline-size: 4.25rem;
+  block-size: 3.5rem;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  cursor: pointer;
+}
+.risk-cell.empty {
+  opacity: 0.45;
+}
+.risk-cell[aria-pressed='true'] {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--surface) inset;
+  opacity: 1;
+}
+.risk-count {
+  font-size: 1.25rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.risk-score {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-end: 5px;
+  font-size: 0.65rem;
+  font-weight: 600;
+}
+.risk-axis {
+  font-size: 0.8125rem;
+}
+@media (max-width: 560px) {
+  .risk-cell {
+    inline-size: 2.9rem;
+    block-size: 2.75rem;
+  }
+  .risk-matrix th {
+    max-inline-size: 3.2rem;
+    font-size: 0.65rem;
+  }
+}
+
+/* ---------- checklist ---------- */
+.checklist {
+  display: grid;
+  gap: var(--space-2);
+}
+.checklist-summary {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.checklist-items {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.checklist-item fieldset {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  min-inline-size: 0;
+}
+.checklist-item.fail fieldset {
+  border-inline-start-color: var(--danger);
+  background: var(--danger-tint);
+}
+.checklist-item legend {
+  padding: 0;
+  font-weight: 500;
+}
+.checklist-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 2.25rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+.choice input {
+  inline-size: 1rem;
+  block-size: 1rem;
+}
+.choice:has(input:checked) {
+  font-weight: 700;
+  border-width: 2px;
+}
+.choice-pass:has(input:checked) {
+  border-color: var(--success);
+  background: var(--success-tint);
+}
+.choice-fail:has(input:checked) {
+  border-color: var(--danger);
+  background: var(--danger-tint);
+}
+.choice-na:has(input:checked) {
+  border-color: var(--ink-muted);
+  background: var(--surface-sunken);
+}
+.checklist-capa {
+  display: inline-block;
+  margin-top: var(--space-1);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.checklist-settings {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* ---------- links & investigation ---------- */
+.links-section h3 {
+  font-size: 0.95rem;
+  margin: var(--space-4) 0 var(--space-2);
+}
+.link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.link-kind {
+  font-size: 0.8125rem;
+}
+.investigation {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* ---------- QR ---------- */
+.qr {
+  display: block;
+  border-radius: var(--radius-sm);
+}
+.qr-dialog {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+.qr-url {
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+.qr-card {
+  max-inline-size: 40rem;
+  margin-inline: auto;
+  display: grid;
+  gap: var(--space-4);
+}
+.qr-card h1 {
+  margin: 0;
+}
+.qr-card-board {
+  margin: 0;
+}
+.qr-fields {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+.qr-field {
+  display: grid;
+  grid-template-columns: minmax(7rem, 35%) 1fr;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.qr-field dt {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+}
+.qr-field dd {
+  margin: 0;
+  min-inline-size: 0;
+}
+.qr-report {
+  display: grid;
+  gap: var(--space-2);
+}
+.qr-report h2 {
+  margin: 0;
+}
+.qr-pick {
+  margin-bottom: var(--space-4);
+}
+.qr-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--space-3);
+}
+.qr-sheet-s {
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+}
+.qr-sheet-l {
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+}
+.qr-label {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: #000;
+  text-align: center;
+  break-inside: avoid;
+}
+.qr-label-name {
+  font-weight: 700;
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+.qr-label-meta {
+  font-size: 0.7rem;
+}
+
+/* ---------- compliance ---------- */
+.meter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-inline-size: 9rem;
+}
+.meter-track {
+  flex: 1;
+  block-size: 0.6rem;
+  min-inline-size: 4rem;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.meter-fill {
+  display: block;
+  block-size: 100%;
+  border-radius: 999px;
+}
+.meter-good .meter-fill {
+  background: var(--success);
+}
+.meter-warn .meter-fill {
+  background: var(--hue-sun);
+}
+.meter-bad .meter-fill {
+  background: var(--danger);
+}
+.compliance-board h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.data-table .total-row th,
+.data-table .total-row td {
+  font-weight: 700;
+  border-top: 2px solid var(--line-strong);
+}
+.compliance-overdue summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-top: var(--space-3);
+}
+.compliance-overdue summary svg {
+  vertical-align: -0.15em;
+}
+
+/* ---------- forms ---------- */
+.form-list {
+  display: grid;
+  gap: var(--space-2);
+}
+.form-link {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid var(--hue-berry);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+}
+.form-link:hover strong {
+  color: var(--primary-ink);
+  text-decoration: underline;
+}
+.form-page {
+  max-inline-size: 40rem;
+  margin-inline: auto;
+}
+.form-page form,
+.form-page .form-done {
+  display: grid;
+  gap: var(--space-3);
+}
+.form-page h1 {
+  margin: 0;
+}
+.form-page h1 svg {
+  vertical-align: -0.15em;
+  color: var(--success);
+}
+.form-desc {
+  white-space: pre-line;
+  margin: 0;
+}
+.form-field-row {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.form-photos {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--tint-sky);
+}
+
+/* ---------- print (QR label sheets) ---------- */
+@media print {
+  .app-header,
+  .sidebar,
+  .app-footer,
+  .a11y-fab,
+  .a11y-panel,
+  .toasts,
+  .no-print,
+  .skip-link {
+    display: none !important;
+  }
+  body,
+  .main {
+    background: #fff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .qr-sheet {
+    gap: 6mm;
+  }
+  .qr-label {
+    border-color: #999;
+  }
+}
+@media (forced-colors: active) {
+  .risk-cell[aria-pressed='true'] {
+    outline: 3px solid Highlight;
+  }
+  .meter-fill {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}
+.compliance-board,
+.grid > .card {
+  min-inline-size: 0;
+}
+.table-scroll:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}

@@ -17,6 +17,12 @@ import { LoadingState } from './components/Feedback';
 // Wave B pages are loaded on demand to keep the main bundle small.
 const AutomationsPage = lazy(() => import('./pages/board/automations/AutomationsPage').then((m) => ({ default: m.AutomationsPage })));
 const ReportPage = lazy(() => import('./pages/board/automations/ReportPage').then((m) => ({ default: m.ReportPage })));
+const CompliancePage = lazy(() => import('./pages/field/CompliancePage').then((m) => ({ default: m.CompliancePage })));
+const QrLandingPage = lazy(() => import('./pages/field/QrPages').then((m) => ({ default: m.QrLandingPage })));
+const QrSheetPage = lazy(() => import('./pages/field/QrPages').then((m) => ({ default: m.QrSheetPage })));
+const FormsPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormsPage })));
+const FormFillPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormFillPage })));
+const FormsAdminPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormsAdminPage })));
 const lazyPage = (node: ReactNode) => <Suspense fallback={<LoadingState />}>{node}</Suspense>;
 import { ProfilePage } from './pages/ProfilePage';
 
@@ -57,6 +63,12 @@ export function App() {
                   <Route path="boards/:boardId/settings" element={<BoardSettingsPage />} />
                   <Route path="boards/:boardId/automations" element={lazyPage(<AutomationsPage />)} />
                   <Route path="boards/:boardId/report" element={lazyPage(<ReportPage />)} />
+                  <Route path="boards/:boardId/qr" element={lazyPage(<QrSheetPage />)} />
+                  <Route path="boards/:boardId/forms" element={lazyPage(<FormsAdminPage />)} />
+                  <Route path="q/:itemId" element={lazyPage(<QrLandingPage />)} />
+                  <Route path="compliance" element={lazyPage(<CompliancePage />)} />
+                  <Route path="forms" element={lazyPage(<FormsPage />)} />
+                  <Route path="forms/:formId" element={lazyPage(<FormFillPage />)} />
                   <Route path="profile" element={<ProfilePage />} />
                   <Route element={<RequireAuth admin />}>
                     <Route path="admin/users" element={<AdminUsersPage />} />

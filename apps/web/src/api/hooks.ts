@@ -1,4 +1,14 @@
 import type {
+  BoardCompliance,
+  BoardForm,
+  ComplianceSettings,
+  CreateFormInput,
+  FormForFill,
+  Investigation,
+  InvestigationInput,
+  ItemCard,
+  ItemLink,
+  MySubmission,
   Automation,
   AutomationRun,
   BoardReportSummary,
@@ -57,6 +67,15 @@ export const qk = {
   recurrences: (boardId: string) => ['recurrences', boardId] as const,
   reports: (boardId: string) => ['reports', boardId] as const,
   reportSummary: (boardId: string, days: number) => ['report-summary', boardId, days] as const,
+  card: (itemId: string) => ['card', itemId] as const,
+  links: (itemId: string) => ['links', itemId] as const,
+  investigation: (itemId: string) => ['investigation', itemId] as const,
+  compliance: ['compliance'] as const,
+  boardCompliance: (boardId: string) => ['compliance', boardId] as const,
+  boardForms: (boardId: string) => ['board-forms', boardId] as const,
+  forms: ['forms'] as const,
+  form: (id: string) => ['form', id] as const,
+  mySubmissions: ['my-submissions'] as const,
 };
 
 // ------------------------------------------------------------------ phase 2
@@ -105,7 +124,7 @@ export function useAttachmentMutations(itemId: string) {
 export const useBoards = () => useQuery({ queryKey: qk.boards, queryFn: () => api<{ boards: BoardSummary[] }>('/boards').then((r) => r.boards) });
 
 export const useBoard = (id: string) =>
-  useQuery({ queryKey: qk.board(id), queryFn: () => api<{ board: BoardDetail }>(`/boards/${id}`).then((r) => r.board) });
+  useQuery({ queryKey: qk.board(id), queryFn: () => api<{ board: BoardDetail }>(`/boards/${id}`).then((r) => r.board), enabled: Boolean(id) });
 
 export const useDirectory = () =>
   useQuery({ queryKey: qk.directory, queryFn: () => api<{ users: DirectoryUser[] }>('/users/directory').then((r) => r.users), staleTime: 5 * 60_000 });
@@ -228,6 +247,8 @@ export function useUpdateItem(boardId: string) {
       if ((pendingEdits.get(item.id) ?? 0) <= 1) update((b) => ({ ...b, items: b.items.map((i) => (i.id === item.id ? item : i)) }));
       void qc.invalidateQueries({ queryKey: qk.itemActivity(item.id) });
       void qc.invalidateQueries({ queryKey: qk.dashboard });
+      // A failed checklist entry may have opened (and linked) a corrective action on another board.
+      void qc.invalidateQueries({ queryKey: qk.links(item.id) });
     },
     onSettled: (_d, _e, v) => {
       const n = (pendingEdits.get(v.itemId) ?? 1) - 1;
@@ -492,3 +513,89 @@ export const useReportSummary = (boardId: string, periodDays: number) =>
     queryKey: qk.reportSummary(boardId, periodDays),
     queryFn: () => api<{ summary: BoardReportSummary }>(`/boards/${boardId}/report-summary?periodDays=${periodDays}`).then((r) => r.summary),
   });
+
+// ------------------------------------------------------------------ wave C
+export const useItemCard = (itemId: string) =>
+  useQuery({ queryKey: qk.card(itemId), queryFn: () => api<{ card: ItemCard }>(`/items/${itemId}/card`).then((r) => r.card), retry: false });
+
+export const useItemLinks = (itemId: string) =>
+  useQuery({ queryKey: qk.links(itemId), queryFn: () => api<{ links: ItemLink[] }>(`/items/${itemId}/links`).then((r) => r.links) });
+
+export const useInvestigation = (itemId: string) =>
+  useQuery({ queryKey: qk.investigation(itemId), queryFn: () => api<{ investigation: Investigation }>(`/items/${itemId}/investigation`).then((r) => r.investigation) });
+
+export function useInvestigationMutations(itemId: string, boardId: string) {
+  const qc = useQueryClient();
+  return {
+    save: useMutation({
+      mutationFn: (input: InvestigationInput) => api<{ investigation: Investigation }>(`/items/${itemId}/investigation`, 'PUT', input).then((r) => r.investigation),
+      onSuccess: (inv) => {
+        qc.setQueryData(qk.investigation(itemId), inv);
+        void qc.invalidateQueries({ queryKey: qk.itemActivity(itemId) });
+      },
+    }),
+    action: useMutation({
+      mutationFn: (input: { boardId: string; groupId: string; name: string }) => api<{ item: Item }>(`/items/${itemId}/investigation/action`, 'POST', input).then((r) => r.item),
+      onSuccess: (_item, input) => {
+        void qc.invalidateQueries({ queryKey: qk.links(itemId) });
+        void qc.invalidateQueries({ queryKey: qk.board(input.boardId) });
+        void qc.invalidateQueries({ queryKey: qk.board(boardId) });
+      },
+    }),
+  };
+}
+
+export const useComplianceOverview = () =>
+  useQuery({ queryKey: qk.compliance, queryFn: () => api<{ boards: BoardCompliance[] }>('/compliance').then((r) => r.boards) });
+
+export const useBoardCompliance = (boardId: string) =>
+  useQuery({ queryKey: qk.boardCompliance(boardId), queryFn: () => api<{ compliance: BoardCompliance | null }>(`/boards/${boardId}/compliance`).then((r) => r.compliance) });
+
+export function useConfigureCompliance(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (settings: ComplianceSettings) => api<{ compliance: BoardCompliance | null }>(`/boards/${boardId}/compliance`, 'PUT', { settings }).then((r) => r.compliance),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.compliance }),
+  });
+}
+
+export const useBoardForms = (boardId: string) =>
+  useQuery({ queryKey: qk.boardForms(boardId), queryFn: () => api<{ forms: BoardForm[] }>(`/boards/${boardId}/forms`).then((r) => r.forms) });
+
+export function useFormMutations(boardId: string) {
+  const qc = useQueryClient();
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: qk.boardForms(boardId) });
+    void qc.invalidateQueries({ queryKey: qk.forms });
+  };
+  return {
+    create: useMutation({
+      mutationFn: (input: CreateFormInput) => api<{ form: BoardForm }>(`/boards/${boardId}/forms`, 'POST', input).then((r) => r.form),
+      onSuccess: refresh,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: Partial<CreateFormInput> }) => api<{ form: BoardForm }>(`/forms/${id}`, 'PATCH', patch).then((r) => r.form),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/forms/${id}`, 'DELETE'), onSuccess: refresh }),
+  };
+}
+
+export const useAvailableForms = () => useQuery({ queryKey: qk.forms, queryFn: () => api<{ forms: BoardForm[] }>('/forms').then((r) => r.forms) });
+export const useFormForFill = (id: string) =>
+  useQuery({ queryKey: qk.form(id), queryFn: () => api<{ form: FormForFill }>(`/forms/${id}`).then((r) => r.form), retry: false });
+export const useMySubmissions = () =>
+  useQuery({ queryKey: qk.mySubmissions, queryFn: () => api<{ submissions: MySubmission[] }>('/forms/mine').then((r) => r.submissions) });
+
+export function useSubmitForm(id: string) {
+  const qc = useQueryClient();
+  return {
+    submit: useMutation({
+      mutationFn: (input: { name: string; values: Record<string, unknown> }) => api<{ itemId: string; ref: string }>(`/forms/${id}/submit`, 'POST', input),
+      onSuccess: () => void qc.invalidateQueries({ queryKey: qk.mySubmissions }),
+    }),
+    photo: useMutation({
+      mutationFn: ({ itemId, file }: { itemId: string; file: File }) => uploadFile(`/forms/${id}/items/${itemId}/attachments`, file),
+    }),
+  };
+}

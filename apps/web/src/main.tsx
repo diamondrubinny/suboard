@@ -10,6 +10,15 @@ import './styles/global.css';
 
 initTheme();
 
+// Installable app (PWA). Production only, so development never serves stale bundles.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* Not critical: the app works without it. */
+    });
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

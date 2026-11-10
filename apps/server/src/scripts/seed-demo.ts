@@ -63,6 +63,38 @@ async function main() {
     { group: 1, name: 'מקלחת חירום — מעבדה 214', values: (c) => ({ [c['מצב']!]: 'needs_service', [c['סוג ציוד']!]: 'shower', [c['מיקום']!]: 'מעבדה 214', [c['בדיקה הבאה']!]: d(-4), [c['אחראי']!]: [member.id] }) },
   ]);
 
+  // Wave C: periodic compliance on the equipment board (by location).
+  const eqCols = Object.fromEntries(s.boards.columns(equipment.id).map((c) => [c.title, c.id]));
+  s.compliance.configure(manager, equipment.id, { dateColumnId: eqCols['בדיקה הבאה']!, groupByColumnId: eqCols['מיקום']!, windowDays: 30 });
+
+  // Wave C: a lab-survey board whose checklist opens corrective actions on the CAPA board.
+  const surveys = s.boards.create(manager, { name: 'סקרי בטיחות במעבדות', templateKey: 'lab_surveys' });
+  s.boards.setMember(manager, surveys.id, member.id, 'editor');
+  const checklist = s.boards.columns(surveys.id).find((c) => c.type === 'checklist')!;
+  s.boards.updateColumn(manager, checklist.id, { settings: { checklist: { ...checklist.settings.checklist!, capaBoardId: capa.id, capaGroupId: null } } });
+  fill(surveys.id, [
+    { group: 0, name: 'מעבדה 214 — כימיה אורגנית', values: (c) => ({ [c['סטטוס']!]: 'planned', [c['מבנה / חדר']!]: 'בניין A, 214', [c['סוקר']!]: [member.id], [c['תאריך סקר']!]: d(2) }) },
+  ]);
+
+  // Wave C: a near-miss report form open to every signed-in user.
+  const incCols = s.boards.columns(incidents.id);
+  const byTitle = (t: string) => incCols.find((c) => c.title === t)!.id;
+  s.forms.create(manager, incidents.id, {
+    name: 'דיווח כמעט-אירוע',
+    description: 'ראית מפגע או כמעט-אירוע? דווח/י כאן — הדיווח מגיע ליחידת הבטיחות.',
+    groupId: s.boards.get(manager, incidents.id).groups[0]!.id,
+    nameLabel: 'מה קרה? (במשפט)',
+    fields: [
+      { columnId: byTitle('סוג אירוע'), required: true, label: 'סוג' },
+      { columnId: byTitle('מיקום'), required: true },
+      { columnId: byTitle('תאריך האירוע'), required: false },
+      { columnId: byTitle('תיאור (ללא פרטים רפואיים)'), required: false, help: 'ללא שמות נפגעים או מידע רפואי' },
+    ],
+    audience: 'all_users',
+    allowPhotos: true,
+    enabled: true,
+  });
+
   console.log('\nDemo data created. One-time credentials (fictitious users):');
   console.table(creds);
   console.log(`(admin id ${admin.id.slice(0, 8)}…)`);

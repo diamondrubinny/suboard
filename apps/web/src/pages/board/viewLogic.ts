@@ -1,4 +1,4 @@
-import { findPrimaryStatusColumn, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Item, type ViewConfig } from '@suboard/shared';
+import { isDateRange, findPrimaryStatusColumn, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Item, type ViewConfig } from '@suboard/shared';
 
 /** Items matching the view's search / status / "mine" filters (parents and sub-items alike). */
 export function filterItems(board: BoardDetail, config: ViewConfig, userId: string | undefined): Item[] {
@@ -29,7 +29,7 @@ function sortKey(c: Column | undefined, v: CellValue | undefined, item: Item, us
     case 'person':
       return Array.isArray(v) ? (users.find((u) => u.id === v[0])?.name ?? null) : null;
     case 'date_range':
-      return typeof v === 'object' && !Array.isArray(v) ? v.from : null;
+      return isDateRange(v) ? v.from : null;
     case 'checkbox':
       return v ? 1 : 0;
     default:

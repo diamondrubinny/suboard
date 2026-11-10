@@ -1,4 +1,4 @@
-import { findPrimaryStatusColumn, isOverdue, todayIso, type BoardDetail, type Item } from '@suboard/shared';
+import { isDateRange, findPrimaryStatusColumn, isOverdue, todayIso, type BoardDetail, type Item } from '@suboard/shared';
 import { useState } from 'react';
 import { EmptyState } from '../../components/Feedback';
 import { colorStyle } from '../../components/StatusPill';
@@ -36,7 +36,7 @@ export function CalendarView({
   const dateOf = (i: Item): string | null => {
     const v = i.values[col.id];
     if (typeof v === 'string') return v;
-    if (v && typeof v === 'object' && !Array.isArray(v)) return v.from;
+    if (isDateRange(v)) return v.from;
     return null;
   };
   const byDay = new Map<string, Item[]>();

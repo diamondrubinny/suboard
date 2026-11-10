@@ -1,8 +1,9 @@
-import { formatAutoId, formatDateHe, type CellValue, type Column, type DirectoryUser } from '@suboard/shared';
+import { checklistStats, isDateRange, formatAutoId, formatDateHe, type CellValue, type Column, type DirectoryUser } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { colorStyle, StatusPill } from '../StatusPill';
 import { ContactEditor, DateRangeEditor, ProgressEditor, RatingEditor, TagsPicker } from './ExtraCells';
 import { PersonPicker, personNames } from './PersonPicker';
+import { ChecklistEditor, ChecklistSummary, RiskEditor } from './FieldCells';
 
 export interface CellEditorProps {
   column: Column;
@@ -82,6 +83,11 @@ function LongTextEditor({ value, onCommit, label, id }: { value: string; onCommi
   );
 }
 
+function checklistLabel(label: string, column: Column, value: unknown): string {
+  const st = checklistStats(column, value);
+  return `${label}: ${st.total - st.open} מתוך ${st.total} נבדקו${st.fail ? `, ${st.fail} לא תקין` : ''} — פתיחה לעריכה`;
+}
+
 export function CellEditor(props: CellEditorProps) {
   const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq } = props;
   const options = column.settings.options ?? [];
@@ -94,6 +100,17 @@ export function CellEditor(props: CellEditorProps) {
         <span className="cell-readonly auto-id num" id={inputId}>
           {seq ? formatAutoId(seq, column.settings.prefix) : '—'}
         </span>
+      );
+
+    case 'risk':
+      return <RiskEditor value={value} label={label} readOnly={readOnly} onChange={onChange} />;
+
+    case 'checklist':
+      if (mode === 'drawer') return <ChecklistEditor column={column} value={value} label={label} readOnly={readOnly} onChange={onChange} />;
+      return (
+        <button type="button" className="long-text-btn" onClick={onOpenItem} aria-label={checklistLabel(label, column, value)}>
+          <ChecklistSummary column={column} value={value} />
+        </button>
       );
 
     case 'tags': {
@@ -110,7 +127,7 @@ export function CellEditor(props: CellEditorProps) {
     }
 
     case 'date_range': {
-      const v = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+      const v = isDateRange(value) ? value : null;
       return <DateRangeEditor value={v} label={label} readOnly={readOnly} onChange={onChange} />;
     }
 

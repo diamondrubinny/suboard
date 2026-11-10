@@ -1,5 +1,5 @@
 import { findPrimaryStatusColumn, LIMITS, todayIso, isOverdue, type BoardDetail, type CellValue, type DirectoryUser } from '@suboard/shared';
-import { useRef, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useRef, useState, type FormEvent } from 'react';
 import { errorMessage } from '../../api/client';
 import { useBoard, useBoards, useCreateItem, useDeleteItem, useItemActions, useItemActivity, useItemUpdates, useUpdateItem, useUpdateMutations } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
@@ -10,12 +10,18 @@ import { Icon } from '../../components/Icon';
 import { Avatar, StatusPill } from '../../components/StatusPill';
 import { activityText, actorLabel, formatDateTime } from './activityText';
 import { AttachmentsPanel } from './AttachmentsPanel';
+import { LinksSection } from './LinksSection';
 
-type Tab = 'details' | 'updates' | 'files' | 'history';
+// Loaded on demand (QR encoder and the investigation form are not needed for everyday editing).
+const InvestigationPanel = lazy(() => import('./FieldPanels').then((m) => ({ default: m.InvestigationPanel })));
+const QrDialog = lazy(() => import('./FieldPanels').then((m) => ({ default: m.QrDialog })));
+
+type Tab = 'details' | 'updates' | 'files' | 'investigation' | 'history';
 const TABS: [Tab, string][] = [
   ['details', 'פרטים'],
   ['updates', 'עדכונים'],
   ['files', 'קבצים'],
+  ['investigation', 'תחקיר'],
   ['history', 'היסטוריה'],
 ];
 
@@ -71,6 +77,11 @@ export function ItemDrawer({
             {tab === 'details' && <DetailsPanel board={board} itemId={item.id} users={users} onDeleted={onClose} onOpenItem={onOpenItem} />}
             {tab === 'updates' && <UpdatesPanel board={board} itemId={item.id} />}
             {tab === 'files' && <AttachmentsPanel board={board} itemId={item.id} />}
+            {tab === 'investigation' && (
+              <Suspense fallback={<LoadingState />}>
+                <InvestigationPanel board={board} itemId={item.id} />
+              </Suspense>
+            )}
             {tab === 'history' && <HistoryPanel board={board} itemId={item.id} users={users} />}
           </div>
         </>
@@ -99,6 +110,7 @@ function DetailsPanel({
   const del = useDeleteItem(board.id);
   const { restore, duplicate } = useItemActions(board.id);
   const [moving, setMoving] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const { toast, confirm } = useFeedback();
   const parent = item.parentId ? board.items.find((i) => i.id === item.parentId) : undefined;
   const [name, setName] = useState(item.name);
@@ -190,6 +202,17 @@ function DetailsPanel({
         נוצר: {formatDateTime(item.createdAt)} · עודכן: {formatDateTime(item.updatedAt)}
       </p>
       {!parent && <SubitemsSection board={board} parentId={item.id} onOpenItem={onOpenItem} />}
+      <LinksSection itemId={item.id} />
+      <div className="toolbar" style={{ marginTop: 'var(--space-3)' }}>
+        <button type="button" className="btn btn-sm" onClick={() => setQrOpen(true)}>
+          <Icon name="grid" /> קוד QR
+        </button>
+      </div>
+      {qrOpen && (
+        <Suspense fallback={null}>
+          <QrDialog board={board} itemId={item.id} open onClose={() => setQrOpen(false)} />
+        </Suspense>
+      )}
       {canEdit && (
         <div className="toolbar" style={{ marginTop: 'var(--space-4)' }}>
           {!parent && (
