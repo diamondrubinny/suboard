@@ -10,6 +10,9 @@ interface Props {
   items: Item[];
   users: DirectoryUser[];
   onOpenItem: (itemId: string) => void;
+  /** Status column to group by (part of the saved view). */
+  columnId?: string;
+  onColumnChange: (id: string) => void;
 }
 
 const NONE = '__none__';
@@ -18,9 +21,8 @@ const NONE = '__none__';
  * Kanban grouped by a status column. Drag-and-drop for pointer users, plus a
  * per-card select as the keyboard / screen-reader alternative (WCAG 2.1.1, 2.5.7).
  */
-export function KanbanView({ board, items, users, onOpenItem }: Props) {
+export function KanbanView({ board, items, users, onOpenItem, columnId, onColumnChange }: Props) {
   const statusColumns = board.columns.filter((c) => c.type === 'status');
-  const [columnId, setColumnId] = useState(statusColumns[0]?.id ?? '');
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const update = useUpdateItem(board.id);
@@ -55,7 +57,7 @@ export function KanbanView({ board, items, users, onOpenItem }: Props) {
       {statusColumns.length > 1 && (
         <div className="toolbar">
           <label htmlFor="kanban-col">קיבוץ לפי</label>
-          <select id="kanban-col" className="select" value={column.id} onChange={(e) => setColumnId(e.target.value)}>
+          <select id="kanban-col" className="select" value={column.id} onChange={(e) => onColumnChange(e.target.value)}>
             {statusColumns.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.title}

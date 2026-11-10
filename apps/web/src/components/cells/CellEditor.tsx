@@ -1,6 +1,7 @@
-import { formatDateHe, type CellValue, type Column, type DirectoryUser } from '@suboard/shared';
+import { formatAutoId, formatDateHe, type CellValue, type Column, type DirectoryUser } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { colorStyle, StatusPill } from '../StatusPill';
+import { ContactEditor, DateRangeEditor, ProgressEditor, RatingEditor, TagsPicker } from './ExtraCells';
 import { PersonPicker, personNames } from './PersonPicker';
 
 export interface CellEditorProps {
@@ -18,6 +19,8 @@ export interface CellEditorProps {
   mode?: 'table' | 'drawer';
   onOpenItem?: () => void;
   id?: string;
+  /** The item's running number (for `auto_id` columns). */
+  seq?: number;
 }
 
 /** Text-like input that commits on blur / Enter and reverts on Escape. */
@@ -80,32 +83,52 @@ function LongTextEditor({ value, onCommit, label, id }: { value: string; onCommi
 }
 
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id } = props;
+  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq } = props;
   const options = column.settings.options ?? [];
   const autoId = useId();
   const inputId = id ?? autoId;
 
   switch (column.type) {
+    case 'auto_id':
+      return (
+        <span className="cell-readonly auto-id num" id={inputId}>
+          {seq ? formatAutoId(seq, column.settings.prefix) : '—'}
+        </span>
+      );
+
+    case 'tags': {
+      const ids = Array.isArray(value) ? (value as string[]) : [];
+      if (readOnly) {
+        const sel = options.filter((o) => ids.includes(o.id));
+        return (
+          <span className="tag-list">
+            {sel.length ? sel.map((o) => <StatusPill key={o.id} label={o.label} color={o.color} />) : '—'}
+          </span>
+        );
+      }
+      return <TagsPicker value={ids} options={options} label={label} onChange={(next) => onChange(next.length ? next : null)} />;
+    }
+
+    case 'date_range': {
+      const v = value && typeof value === 'object' && !Array.isArray(value) ? value : null;
+      return <DateRangeEditor value={v} label={label} readOnly={readOnly} onChange={onChange} />;
+    }
+
+    case 'progress':
+      return <ProgressEditor value={typeof value === 'number' ? value : null} label={label} readOnly={readOnly} onChange={onChange} />;
+
+    case 'rating':
+      return <RatingEditor value={typeof value === 'number' ? value : null} label={label} readOnly={readOnly} onChange={onChange} />;
+
+    case 'link':
+    case 'email':
+    case 'phone':
+      return <ContactEditor type={column.type} value={typeof value === 'string' ? value : null} label={label} readOnly={readOnly} onChange={onChange} />;
+
     case 'status': {
       const current = typeof value === 'string' ? options.find((o) => o.id === value) : undefined;
       if (readOnly) return <StatusPill label={current?.label} color={current?.color} />;
-      return (
-        <select
-          id={inputId}
-          className={current ? 'pill-select' : 'pill-select empty'}
-          style={colorStyle(current?.color)}
-          value={current?.id ?? ''}
-          aria-label={label}
-          onChange={(e) => onChange(e.target.value || null)}
-        >
-          <option value="">—</option>
-          {options.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      );
+      return <StatusSelect id={inputId} options={options} value={current?.id ?? ''} label={label} onChange={(v) => onChange(v || null)} />;
     }
 
     case 'person': {
@@ -137,20 +160,8 @@ export function CellEditor(props: CellEditorProps) {
       );
     }
 
-    case 'checkbox': {
-      const checked = value === true;
-      return (
-        <input
-          id={inputId}
-          type="checkbox"
-          checked={checked}
-          disabled={readOnly}
-          aria-label={label}
-          style={{ inlineSize: '1.15rem', blockSize: '1.15rem' }}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-      );
-    }
+    case 'checkbox':
+      return <CheckboxCell id={inputId} value={value === true} readOnly={readOnly} label={label} onChange={onChange} />;
 
     case 'number': {
       const v = typeof value === 'number' ? String(value) : '';
@@ -190,4 +201,48 @@ export function CellEditor(props: CellEditorProps) {
       return <CommitInput id={inputId} type="text" value={v} label={label} onCommit={(s) => onChange(s.trim() ? s.trim() : null)} />;
     }
   }
+}
+
+/** Mirrors a server value locally so a controlled field reflects the user's change immediately. */
+function useLocal<T>(server: T): [T, (v: T) => void] {
+  const [v, setV] = useState(server);
+  useEffect(() => setV(server), [server]);
+  return [v, setV];
+}
+
+function StatusSelect({ id, options, value, label, onChange }: { id: string; options: NonNullable<Column['settings']['options']>; value: string; label: string; onChange: (v: string) => void }) {
+  const [local, setLocal] = useLocal(value);
+  const current = options.find((o) => o.id === local);
+  return (
+    <select
+      id={id}
+      className={current ? 'pill-select' : 'pill-select empty'}
+      style={colorStyle(current?.color)}
+      value={local}
+      aria-label={label}
+      onChange={(e) => (setLocal(e.target.value), onChange(e.target.value))}
+    >
+      <option value="">—</option>
+      {options.map((o) => (
+        <option key={o.id} value={o.id}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function CheckboxCell({ id, value, readOnly, label, onChange }: { id: string; value: boolean; readOnly: boolean; label: string; onChange: (v: boolean) => void }) {
+  const [local, setLocal] = useLocal(value);
+  return (
+    <input
+      id={id}
+      type="checkbox"
+      checked={local}
+      disabled={readOnly}
+      aria-label={label}
+      style={{ inlineSize: '1.15rem', blockSize: '1.15rem' }}
+      onChange={(e) => (setLocal(e.target.checked), onChange(e.target.checked))}
+    />
+  );
 }

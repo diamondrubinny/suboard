@@ -2,14 +2,21 @@ import { createContext, useCallback, useContext, useRef, useState, type ReactNod
 import { Dialog } from './Dialog';
 
 // ------------------------------------------------------------------ toasts
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface Toast {
   id: number;
   message: string;
   kind: 'info' | 'error';
+  action?: ToastAction;
 }
 
 interface FeedbackValue {
-  toast: (message: string, kind?: Toast['kind']) => void;
+  /** `action` adds a button (e.g. "ביטול" after a delete); such toasts stay longer (10s). */
+  toast: (message: string, kind?: Toast['kind'], action?: ToastAction) => void;
   confirm: (opts: { title: string; message: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
 }
 
@@ -23,10 +30,10 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   >(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
 
-  const toast = useCallback((message: string, kind: Toast['kind'] = 'info') => {
+  const toast = useCallback((message: string, kind: Toast['kind'] = 'info', action?: ToastAction) => {
     const id = nextId.current++;
-    setToasts((t) => [...t, { id, message, kind }]);
-    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 8000 : 4000);
+    setToasts((t) => [...t, { id, message, kind, action }]);
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 10000 : kind === 'error' ? 8000 : 4000);
   }, []);
 
   const confirm = useCallback<FeedbackValue['confirm']>(
@@ -50,6 +57,18 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
             .map((t) => (
               <div key={t.id} className="toast">
                 <span>{t.message}</span>
+                {t.action && (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => {
+                      t.action!.onClick();
+                      setToasts((x) => x.filter((y) => y.id !== t.id));
+                    }}
+                  >
+                    {t.action.label}
+                  </button>
+                )}
                 <button type="button" onClick={() => setToasts((x) => x.filter((y) => y.id !== t.id))} aria-label="סגירת הודעה">
                   ✕
                 </button>

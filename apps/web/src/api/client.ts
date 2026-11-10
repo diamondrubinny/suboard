@@ -81,8 +81,12 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
   return data as T;
 }
 
-export const errorMessage = (err: unknown): string =>
-  err instanceof ApiError ? err.message : 'אירעה שגיאה בלתי צפויה';
+/** User-facing message; when the server names exactly one invalid field, its reason is appended. */
+export const errorMessage = (err: unknown): string => {
+  if (!(err instanceof ApiError)) return 'אירעה שגיאה בלתי צפויה';
+  const reasons = Object.values(err.fields ?? {});
+  return reasons.length === 1 && !err.message.includes(reasons[0]!) ? `${err.message}: ${reasons[0]}` : err.message;
+};
 
 /** Accept only same-app relative paths for post-login redirects (prevents open redirects). */
 export function safeNextPath(next: string | null): string {

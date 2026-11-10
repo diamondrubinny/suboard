@@ -86,17 +86,17 @@ function StatusOptionsEditor({ column, onSave, saving }: { column: Column; onSav
   const set = (idx: number, patch: Partial<StatusOption>) => setOptions((o) => o.map((x, i) => (i === idx ? { ...x, ...patch } : x)));
   const add = () =>
     setOptions((o) => [...o, { id: `opt_${Math.random().toString(36).slice(2, 10)}`, label: 'תווית חדשה', color: COLOR_KEYS[o.length % COLOR_KEYS.length]! }]);
-  const valid = options.length > 0 && options.every((o) => o.label.trim());
+  const valid = (options.length > 0 || column.type === 'tags') && options.every((o) => o.label.trim());
 
   return (
     <fieldset style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', padding: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
-      <legend className="label">תוויות עבור "{column.title}"</legend>
+      <legend className="label">{column.type === 'tags' ? 'תגיות' : 'תוויות'} עבור "{column.title}"</legend>
       <table className="data-table">
         <thead>
           <tr>
             <th scope="col">תווית</th>
             <th scope="col">צבע</th>
-            <th scope="col">נחשב "סגור"</th>
+            {column.type === 'status' && <th scope="col">נחשב "סגור"</th>}
             <th scope="col">
               <span className="sr-only">פעולות</span>
             </th>
@@ -117,11 +117,13 @@ function StatusOptionsEditor({ column, onSave, saving }: { column: Column; onSav
                   ))}
                 </select>
               </td>
+              {column.type === 'status' && (
               <td>
                 <input type="checkbox" checked={Boolean(o.done)} aria-label={`התווית ${o.label} מסמנת פריט סגור`} onChange={(e) => set(idx, { done: e.target.checked || undefined })} />
               </td>
+              )}
               <td>
-                <button type="button" className="icon-btn" aria-label={`הסרת התווית ${o.label}`} onClick={() => setOptions((x) => x.filter((_, i) => i !== idx))} disabled={options.length <= 1}>
+                <button type="button" className="icon-btn" aria-label={`הסרת התווית ${o.label}`} onClick={() => setOptions((x) => x.filter((_, i) => i !== idx))} disabled={column.type === 'status' && options.length <= 1}>
                   <Icon name="trash" size={16} />
                 </button>
               </td>
@@ -182,11 +184,12 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
                     הגדר כתאריך יעד
                   </button>
                 )}
-                {c.type === 'status' && (
+                {(c.type === 'status' || c.type === 'tags') && (
                   <button type="button" className="btn btn-sm" aria-expanded={editing === c.id} onClick={() => setEditing(editing === c.id ? null : c.id)}>
-                    עריכת תוויות
+                    {c.type === 'tags' ? 'עריכת תגיות' : 'עריכת תוויות'}
                   </button>
                 )}
+                {c.type === 'auto_id' && <PrefixInput column={c} onSave={(prefix) => update.mutate({ columnId: c.id, patch: { settings: { prefix } } }, { onError: onErr })} />}
                 <button
                   type="button"
                   className="icon-btn"
@@ -236,6 +239,24 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
         </button>
       </form>
     </section>
+  );
+}
+
+function PrefixInput({ column, onSave }: { column: Column; onSave: (prefix: string) => void }) {
+  const [draft, setDraft] = useState(column.settings.prefix ?? '');
+  return (
+    <input
+      className="input"
+      style={{ inlineSize: '7rem' }}
+      dir="ltr"
+      value={draft}
+      maxLength={10}
+      placeholder="INC"
+      aria-label={`תחילית למזהה בעמודה ${column.title}`}
+      onChange={(e) => setDraft(e.target.value.replace(/[^A-Za-z0-9]/g, ''))}
+      onBlur={() => draft !== (column.settings.prefix ?? '') && onSave(draft)}
+      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+    />
   );
 }
 

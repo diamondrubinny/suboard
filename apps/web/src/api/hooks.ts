@@ -1,4 +1,9 @@
 import type {
+  ImportResult,
+  SavedView,
+  SearchHit,
+  TrashedItem,
+  ViewConfig,
   AppNotification,
   Attachment,
   ActivityEntry,
@@ -36,6 +41,9 @@ export const qk = {
   meMeta: ['me-meta'] as const,
   notifications: ['notifications'] as const,
   attachments: (itemId: string) => ['attachments', itemId] as const,
+  views: (boardId: string) => ['views', boardId] as const,
+  trash: (boardId: string) => ['trash', boardId] as const,
+  search: (q: string) => ['search', q] as const,
 };
 
 // ------------------------------------------------------------------ phase 2
@@ -159,7 +167,7 @@ export function useArchiveBoard(boardId: string) {
 export function useCreateItem(boardId: string) {
   const { update, qc } = useBoardCache(boardId);
   return useMutation({
-    mutationFn: (input: { groupId: string; name: string; values?: Record<string, unknown> }) =>
+    mutationFn: (input: { groupId: string; name: string; parentId?: string; values?: Record<string, unknown> }) =>
       api<{ item: Item }>(`/boards/${boardId}/items`, 'POST', input).then((r) => r.item),
     onSuccess: (item) => {
       update((b) => ({ ...b, items: [...b.items, item] }));
@@ -168,6 +176,9 @@ export function useCreateItem(boardId: string) {
   });
 }
 
+/** In-flight edits per item: a response is applied only when it is the last one pending. */
+const pendingEdits = new Map<string, number>();
+
 export function useUpdateItem(boardId: string) {
   const { update, qc } = useBoardCache(boardId);
   return useMutation({
@@ -175,6 +186,7 @@ export function useUpdateItem(boardId: string) {
       api<{ item: Item }>(`/items/${itemId}`, 'PATCH', patch).then((r) => r.item),
     // Optimistic update; rolled back on error.
     onMutate: ({ itemId, patch }) => {
+      pendingEdits.set(itemId, (pendingEdits.get(itemId) ?? 0) + 1);
       // Cancel in-flight refetches without reverting, then patch the cache immediately so
       // controlled inputs reflect the new value without a visible flicker.
       void qc.cancelQueries({ queryKey: qk.board(boardId) }, { revert: false });
@@ -193,13 +205,21 @@ export function useUpdateItem(boardId: string) {
       }));
       return { previous };
     },
-    onError: (_e, _v, context) => {
-      if (context?.previous) qc.setQueryData(qk.board(boardId), context.previous);
+    onError: (_e, v, context) => {
+      // Roll back only if nothing else is pending for this item; otherwise resync from the server.
+      if ((pendingEdits.get(v.itemId) ?? 0) <= 1 && context?.previous) qc.setQueryData(qk.board(boardId), context.previous);
+      else void qc.invalidateQueries({ queryKey: qk.board(boardId) });
     },
     onSuccess: (item) => {
-      update((b) => ({ ...b, items: b.items.map((i) => (i.id === item.id ? item : i)) }));
+      // An earlier response must not overwrite a newer optimistic edit of the same item.
+      if ((pendingEdits.get(item.id) ?? 0) <= 1) update((b) => ({ ...b, items: b.items.map((i) => (i.id === item.id ? item : i)) }));
       void qc.invalidateQueries({ queryKey: qk.itemActivity(item.id) });
       void qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
+    onSettled: (_d, _e, v) => {
+      const n = (pendingEdits.get(v.itemId) ?? 1) - 1;
+      if (n <= 0) pendingEdits.delete(v.itemId);
+      else pendingEdits.set(v.itemId, n);
     },
   });
 }
@@ -209,11 +229,80 @@ export function useDeleteItem(boardId: string) {
   return useMutation({
     mutationFn: (itemId: string) => api(`/items/${itemId}`, 'DELETE').then(() => itemId),
     onSuccess: (itemId) => {
-      update((b) => ({ ...b, items: b.items.filter((i) => i.id !== itemId) }));
+      // Sub-items go to the trash with their parent.
+      update((b) => ({ ...b, items: b.items.filter((i) => i.id !== itemId && i.parentId !== itemId) }));
       void qc.invalidateQueries({ queryKey: qk.dashboard });
+      void qc.invalidateQueries({ queryKey: qk.trash(boardId) });
     },
   });
 }
+
+// ------------------------------------------------------------------ wave A
+export function useItemActions(boardId: string) {
+  const { refresh, qc } = useBoardCache(boardId);
+  const all = () => {
+    refresh();
+    void qc.invalidateQueries({ queryKey: qk.trash(boardId) });
+  };
+  return {
+    restore: useMutation({ mutationFn: (itemId: string) => api<{ item: Item }>(`/items/${itemId}/restore`, 'POST'), onSuccess: all }),
+    duplicate: useMutation({ mutationFn: (itemId: string) => api<{ item: Item }>(`/items/${itemId}/duplicate`, 'POST').then((r) => r.item), onSuccess: all }),
+    move: useMutation({
+      mutationFn: ({ itemId, target }: { itemId: string; target: { boardId: string; groupId: string } }) =>
+        api<{ item: Item; dropped: string[] }>(`/items/${itemId}/move`, 'POST', target),
+      onSuccess: (_r, v) => {
+        all();
+        void qc.invalidateQueries({ queryKey: qk.board(v.target.boardId) });
+      },
+    }),
+    bulk: useMutation({
+      mutationFn: (
+        input:
+          | { action: 'delete'; itemIds: string[] }
+          | { action: 'move_group'; itemIds: string[]; groupId: string }
+          | { action: 'set_value'; itemIds: string[]; columnId: string; value: unknown },
+      ) => api<{ affected: number }>(`/boards/${boardId}/items/bulk`, 'POST', input),
+      onSuccess: all,
+    }),
+    importRows: useMutation({
+      mutationFn: (input: { groupId: string; rows: { name: string; values?: Record<string, unknown> }[] }) =>
+        api<ImportResult>(`/boards/${boardId}/import`, 'POST', input),
+      onSuccess: all,
+    }),
+  };
+}
+
+export const useTrash = (boardId: string, enabled: boolean) =>
+  useQuery({ queryKey: qk.trash(boardId), queryFn: () => api<{ items: TrashedItem[] }>(`/boards/${boardId}/trash`).then((r) => r.items), enabled });
+
+export const useViews = (boardId: string) =>
+  useQuery({ queryKey: qk.views(boardId), queryFn: () => api<{ views: SavedView[] }>(`/boards/${boardId}/views`).then((r) => r.views) });
+
+export function useViewMutations(boardId: string) {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: qk.views(boardId) });
+  return {
+    create: useMutation({
+      mutationFn: (input: { name: string; config: ViewConfig; shared: boolean }) =>
+        api<{ view: SavedView }>(`/boards/${boardId}/views`, 'POST', input).then((r) => r.view),
+      onSuccess: refresh,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: { name?: string; config?: ViewConfig; shared?: boolean } }) =>
+        api<{ view: SavedView }>(`/views/${id}`, 'PATCH', patch).then((r) => r.view),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/views/${id}`, 'DELETE'), onSuccess: refresh }),
+  };
+}
+
+export const useSearch = (q: string) =>
+  useQuery({
+    queryKey: qk.search(q),
+    queryFn: () => api<{ hits: SearchHit[] }>(`/search?q=${encodeURIComponent(q)}`).then((r) => r.hits),
+    enabled: q.trim().length >= 2,
+    staleTime: 10_000,
+  });
 
 export function useGroupMutations(boardId: string) {
   const { update, refresh } = useBoardCache(boardId);
@@ -277,7 +366,10 @@ export function useUpdateMutations(itemId: string) {
     void qc.invalidateQueries({ queryKey: qk.itemActivity(itemId) });
   };
   return {
-    add: useMutation({ mutationFn: (body: string) => api(`/items/${itemId}/updates`, 'POST', { body }), onSuccess: refresh }),
+    add: useMutation({
+      mutationFn: (input: { body: string; mentions?: string[] }) => api(`/items/${itemId}/updates`, 'POST', input),
+      onSuccess: refresh,
+    }),
     remove: useMutation({ mutationFn: (updateId: string) => api(`/updates/${updateId}`, 'DELETE'), onSuccess: refresh }),
   };
 }

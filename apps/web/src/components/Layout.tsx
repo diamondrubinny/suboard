@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { A11yToolbar } from './A11yToolbar';
 import { LoadingState, useFeedback } from './Feedback';
 import { Icon } from './Icon';
+import { GlobalSearch } from './GlobalSearch';
 import { NotificationsBell } from './NotificationsBell';
 import { Avatar } from './StatusPill';
 
@@ -100,6 +101,7 @@ export function Layout() {
         </Link>
         <span className="header-spacer" />
         <div className="user-chip">
+          {!pending && <GlobalSearch />}
           {!pending && <NotificationsBell />}
           <Avatar name={user.name} />
           <Link to="/profile" className="nowrap">

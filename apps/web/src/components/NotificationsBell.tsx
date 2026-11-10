@@ -9,6 +9,7 @@ const TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
   assigned: (n) => `${n.actorName ?? 'מישהו'} שייך/ה אותך ל"${n.title}"`,
   overdue: (n) => `באיחור: "${n.title}"`,
   due_tomorrow: (n) => `תאריך יעד מחר: "${n.title}"`,
+  mentioned: (n) => `${n.actorName ?? 'מישהו'} הזכיר/ה אותך ב"${n.title}"`,
 };
 
 /** Header notifications: disclosure button + panel (Escape / outside click closes, focus returns). */

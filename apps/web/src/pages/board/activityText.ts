@@ -1,4 +1,4 @@
-import { formatDateHe, type ActivityEntry, type BoardDetail, type DirectoryUser } from '@suboard/shared';
+import { formatDateHe, formatDateRangeHe, type ActivityEntry, type BoardDetail, type DirectoryUser } from '@suboard/shared';
 import { personNames } from '../../components/cells/PersonPicker';
 
 function formatValue(entry: ActivityEntry, v: unknown, board: BoardDetail, users: DirectoryUser[]): string {
@@ -12,6 +12,14 @@ function formatValue(entry: ActivityEntry, v: unknown, board: BoardDetail, users
       return Array.isArray(v) ? personNames(v as string[], users) : 'ריק';
     case 'date':
       return formatDateHe(String(v));
+    case 'date_range':
+      return typeof v === 'object' && v && 'from' in v ? formatDateRangeHe(v as { from: string; to: string }) : 'ריק';
+    case 'tags':
+      return Array.isArray(v) ? (v as string[]).map((id) => column?.settings.options?.find((o) => o.id === id)?.label ?? '').filter(Boolean).join(', ') : 'ריק';
+    case 'progress':
+      return `${String(v)}%`;
+    case 'rating':
+      return `${String(v)}/5`;
     case 'checkbox':
       return v ? 'מסומן' : 'לא מסומן';
     default:
@@ -59,6 +67,16 @@ export function activityText(entry: ActivityEntry, board: BoardDetail, users: Di
       return 'עדכן/ה הרשאות חבר בלוח';
     case 'member_removed':
       return 'הסיר/ה חבר מהלוח';
+    case 'item_restored':
+      return `שחזר/ה את הפריט "${String(d.name ?? '')}" מסל המחזור`;
+    case 'item_duplicated':
+      return `שכפל/ה מהפריט "${String(d.name ?? '')}"`;
+    case 'item_moved_out':
+      return `העביר/ה את "${String(d.name ?? '')}" ללוח אחר`;
+    case 'item_moved_in':
+      return `העביר/ה את "${String(d.name ?? '')}" ללוח זה מלוח אחר`;
+    case 'items_imported':
+      return `ייבא/ה ${String(d.count ?? '')} פריטים`;
     case 'attachment_added':
       return `צירף/ה את הקובץ "${String(d.name ?? '')}"`;
     case 'attachment_removed':

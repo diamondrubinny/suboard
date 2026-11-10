@@ -1559,3 +1559,282 @@ table.data-table {
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
 }
+
+/* ==========================================================================
+   Wave A: sub-items, selection & bulk bar, sorting, new cell types, calendar, search
+   ========================================================================== */
+
+/* ---------- table: selection, sorting, sub-items ---------- */
+.board-table .col-select {
+  inline-size: 2.5rem;
+  min-width: 2.5rem;
+  text-align: center;
+  /* pinned with the name column so selection stays visible while scrolling sideways */
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 2;
+  background: var(--surface);
+}
+.board-table thead .col-select {
+  background: var(--surface-sunken);
+  z-index: 3;
+}
+.board-table .col-select + .col-name,
+.board-table .col-select + th.col-name {
+  inset-inline-start: 2.5rem;
+}
+.board-table .col-select input {
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+}
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.sort-ind {
+  font-size: 0.7rem;
+  opacity: 0.55;
+}
+th[aria-sort='ascending'] .sort-ind,
+th[aria-sort='descending'] .sort-ind {
+  opacity: 1;
+  color: var(--primary-ink);
+}
+.subitem-toggle {
+  min-width: 2rem;
+  min-height: 2rem;
+  gap: 2px;
+  display: inline-flex;
+  align-items: center;
+}
+.subitem-count {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+.board-table tr.sub-row th.col-name,
+.board-table tr.sub-row td {
+  background: var(--surface-sunken);
+}
+.board-table tr.sub-row .name-cell {
+  padding-inline-start: var(--space-6);
+}
+.group-name-input {
+  font-weight: 700;
+  font-size: 1.05rem;
+  min-width: 14rem;
+}
+
+/* ---------- bulk bar ---------- */
+.bulk-bar {
+  position: sticky;
+  inset-block-end: var(--space-4);
+  z-index: 25;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-4);
+  border: 2px solid var(--primary);
+  box-shadow: var(--shadow-overlay);
+}
+.bulk-bar .select {
+  inline-size: auto;
+  min-width: 10rem;
+}
+
+/* ---------- new cell types ---------- */
+.tag-list {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.range-cell,
+.contact-cell,
+.progress-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.range-cell .cell-input {
+  min-width: 8.5rem;
+}
+.progress-cell .cell-input {
+  inline-size: 4.2rem;
+}
+.progress-bar {
+  flex: 1;
+  min-inline-size: 3rem;
+  block-size: 0.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.progress-bar > span {
+  display: block;
+  block-size: 100%;
+  background: var(--hue-mint);
+}
+.rating {
+  display: inline-flex;
+  gap: 2px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.rating .star {
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--line-strong);
+  cursor: pointer;
+}
+.rating .star.on {
+  color: #b7791f; /* amber star, 3:1+ on surface */
+}
+.rating label:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.cell-action {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.75rem;
+  min-block-size: 1.75rem;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  font-weight: 700;
+}
+.cell-action:hover {
+  background: var(--primary-tint);
+}
+.auto-id {
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ink-muted);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- calendar ---------- */
+.calendar-title {
+  margin: 0;
+  font-size: 1.15rem;
+  min-inline-size: 9rem;
+  text-align: center;
+}
+table.calendar-grid {
+  inline-size: 100%;
+  min-width: 720px;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+.calendar-grid th {
+  padding: var(--space-2);
+  font-size: 0.82rem;
+  color: var(--ink-muted);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--line);
+}
+.calendar-grid th > [aria-hidden='true']:first-child {
+  display: none;
+}
+.calendar-grid td {
+  vertical-align: top;
+  block-size: 7.5rem;
+  padding: var(--space-1);
+  border-bottom: 1px solid var(--line);
+  border-inline-start: 1px solid var(--line);
+  background: var(--surface);
+}
+.calendar-grid td.cal-empty {
+  background: var(--ground);
+}
+.calendar-grid td.today {
+  background: var(--primary-tint);
+}
+.cal-num {
+  display: inline-block;
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: var(--space-1);
+}
+td.today .cal-num {
+  color: var(--on-primary);
+  background: var(--primary);
+  border-radius: var(--radius-pill);
+  padding: 0 var(--space-2);
+}
+.cal-chip {
+  display: block;
+  inline-size: 100%;
+  margin-bottom: 2px;
+  padding: 1px var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: start;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.cal-chip.late {
+  border-inline-start: 3px solid var(--danger);
+  font-weight: 700;
+}
+@media (max-width: 900px) {
+  .calendar-grid .day-long {
+    display: none;
+  }
+  .calendar-grid th > [aria-hidden='true']:first-child {
+    display: inline;
+  }
+}
+
+/* ---------- global search ---------- */
+.search-hit {
+  inline-size: 100%;
+  text-align: start;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: var(--ink);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.search-hit:hover {
+  background: var(--primary-tint);
+}
+.search-hit .badge {
+  margin-inline-start: var(--space-2);
+}
+
+/* Scroll frames must contain absolutely-positioned descendants (e.g. .sr-only text inside cells);
+   otherwise those escape the overflow clip and widen the page on phones. */
+.table-wrap {
+  position: relative;
+}
