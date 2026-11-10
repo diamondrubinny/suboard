@@ -20,6 +20,7 @@ import { workflowRoutes } from './routes/workflow.js';
 import { automationRoutes } from './routes/automations.js';
 import { fieldRoutes } from './routes/field.js';
 import { planningRoutes } from './routes/planning.js';
+import { moduleRoutes } from './routes/modules.js';
 import { createServices, type ServiceOverrides, type Services } from './services/index.js';
 
 declare module 'fastify' {
@@ -61,6 +62,8 @@ export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOver
   services.reports.setLogger(app.log);
   services.investigations.setLogger(app.log);
   services.monthly.setLogger(app.log);
+  services.trainings.setLogger(app.log);
+  services.permits.setLogger(app.log);
   app.decorate('services', services);
 
   await app.register(helmet, {
@@ -143,6 +146,7 @@ export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOver
       await api.register(automationRoutes, { services });
       await api.register(fieldRoutes, { services });
       await api.register(planningRoutes, { services });
+      await api.register(moduleRoutes, { services });
     },
     { prefix: '/api' },
   );

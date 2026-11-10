@@ -354,4 +354,115 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE INDEX idx_activity_action ON activity(board_id, action, created_at);
     `,
   },
+  {
+    version: 7,
+    name: 'trainings_permits_procedures_pins',
+    sql: /* sql */ `
+      CREATE TABLE trainings (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        validity_months INTEGER NOT NULL DEFAULT 12,
+        all_users INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE training_requirements (
+        training_id TEXT NOT NULL REFERENCES trainings(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (training_id, user_id)
+      );
+      CREATE TABLE training_records (
+        id TEXT PRIMARY KEY,
+        training_id TEXT NOT NULL REFERENCES trainings(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        completed_on TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        recorded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_training_records ON training_records(training_id, user_id, completed_on);
+
+      CREATE TABLE permits (
+        id TEXT PRIMARY KEY,
+        seq INTEGER NOT NULL UNIQUE,
+        type TEXT NOT NULL,
+        title TEXT NOT NULL,
+        location TEXT NOT NULL,
+        location_key TEXT NOT NULL,         -- normalized, for conflict detection
+        description TEXT NOT NULL DEFAULT '',
+        contractor TEXT NOT NULL DEFAULT '',
+        starts_at TEXT NOT NULL,
+        ends_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending','approved','rejected','cancelled','closed','expired')),
+        requester_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        precautions TEXT NOT NULL DEFAULT '[]',
+        conflict_note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_permits_window ON permits(location_key, status, starts_at, ends_at);
+      CREATE TABLE permit_approvals (
+        permit_id TEXT NOT NULL REFERENCES permits(id) ON DELETE CASCADE,
+        ord INTEGER NOT NULL,
+        user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        decision TEXT CHECK (decision IN ('approved','rejected')),
+        comment TEXT NOT NULL DEFAULT '',
+        decided_at TEXT,
+        PRIMARY KEY (permit_id, ord)
+      );
+      -- Append-only log of every permit action (who, when, what).
+      CREATE TABLE permit_events (
+        id TEXT PRIMARY KEY,
+        permit_id TEXT NOT NULL REFERENCES permits(id) ON DELETE CASCADE,
+        user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+        action TEXT NOT NULL,
+        comment TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_permit_events ON permit_events(permit_id, created_at);
+
+      CREATE TABLE procedures (
+        id TEXT PRIMARY KEY,
+        code TEXT NOT NULL UNIQUE,
+        title TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'כללי',
+        audience TEXT NOT NULL DEFAULT 'all',
+        current_version_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE procedure_audience (
+        procedure_id TEXT NOT NULL REFERENCES procedures(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (procedure_id, user_id)
+      );
+      CREATE TABLE procedure_versions (
+        id TEXT PRIMARY KEY,
+        procedure_id TEXT NOT NULL REFERENCES procedures(id) ON DELETE CASCADE,
+        version TEXT NOT NULL,
+        effective_on TEXT NOT NULL,
+        summary TEXT NOT NULL DEFAULT '',
+        body TEXT NOT NULL DEFAULT '',
+        link TEXT,
+        published_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        published_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_proc_versions ON procedure_versions(procedure_id, published_at);
+      CREATE TABLE procedure_acks (
+        version_id TEXT NOT NULL REFERENCES procedure_versions(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        acked_at TEXT NOT NULL,
+        PRIMARY KEY (version_id, user_id)
+      );
+
+      CREATE TABLE plan_pins (
+        attachment_id TEXT NOT NULL REFERENCES attachments(id) ON DELETE CASCADE,
+        item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        x REAL NOT NULL,
+        y REAL NOT NULL,
+        PRIMARY KEY (attachment_id, item_id)
+      );
+    `,
+  },
 ];

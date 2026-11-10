@@ -141,3 +141,60 @@ export const CAUSE_LABELS: Record<CauseCategory, string> = {
 export const FORM_FIELD_TYPES = ['text', 'long_text', 'number', 'status', 'tags', 'date', 'date_range', 'checkbox', 'progress', 'rating', 'link', 'email', 'phone', 'risk'] as const;
 /** Additional types allowed when the form is limited to board members. */
 export const MEMBER_FORM_FIELD_TYPES = [...FORM_FIELD_TYPES, 'person'] as const;
+
+// ---------------------------------------------------------------- wave E: work permits
+export const PERMIT_TYPES = ['hot_work', 'confined_space', 'height', 'electrical', 'excavation', 'chemical', 'other'] as const;
+export type PermitType = (typeof PERMIT_TYPES)[number];
+export const PERMIT_TYPE_LABELS: Record<PermitType, string> = {
+  hot_work: 'עבודה בחום',
+  confined_space: 'כניסה למקום מוקף',
+  height: 'עבודה בגובה',
+  electrical: 'עבודת חשמל',
+  excavation: 'חפירה',
+  chemical: 'עבודה עם חומרים מסוכנים',
+  other: 'אחר',
+};
+/**
+ * Precautions the requester must confirm, per type. Content is a starting point written for the
+ * unit — **requires review by a qualified safety officer** before production use.
+ */
+export const PERMIT_PRECAUTIONS: Record<PermitType, { id: string; label: string }[]> = {
+  hot_work: [
+    { id: 'clear_10m', label: 'פינוי חומרים דליקים ברדיוס 10 מ\' או כיסוי בבד חסין אש' },
+    { id: 'extinguisher', label: 'מטף תקין בהישג יד' },
+    { id: 'fire_watch', label: 'צופה אש במהלך העבודה ו-30 דקות אחריה' },
+    { id: 'detectors', label: 'נטרול גלאי עשן מתואם עם מוקד הביטחון' },
+  ],
+  confined_space: [
+    { id: 'gas_test', label: 'בדיקת אוויר (חמצן, נפיצות, רעילים) לפני כניסה' },
+    { id: 'ventilation', label: 'אוורור מאולץ' },
+    { id: 'standby', label: 'שומר בפתח עם אמצעי קשר' },
+    { id: 'rescue', label: 'ציוד חילוץ זמין' },
+  ],
+  height: [
+    { id: 'harness', label: 'רתמת בטיחות ונקודת עיגון' },
+    { id: 'scaffold', label: 'פיגום / במה מאושרים' },
+    { id: 'zone', label: 'גידור אזור מתחת לעבודה' },
+  ],
+  electrical: [
+    { id: 'loto', label: 'ניתוק, נעילה ותיוג (LOTO)' },
+    { id: 'test_dead', label: 'בדיקת היעדר מתח' },
+    { id: 'qualified', label: 'חשמלאי מוסמך בסוג העבודה' },
+  ],
+  excavation: [
+    { id: 'utilities', label: 'איתור תשתיות תת-קרקעיות' },
+    { id: 'shoring', label: 'דיפון / שיפוע דפנות' },
+    { id: 'barrier', label: 'גידור וסימון' },
+  ],
+  chemical: [
+    { id: 'sds', label: 'קריאת גיליון בטיחות (SDS)' },
+    { id: 'ppe', label: 'ציוד מגן אישי לפי ה-SDS' },
+    { id: 'spill_kit', label: 'ערכת טיפול בשפך זמינה' },
+  ],
+  other: [{ id: 'briefing', label: 'תדריך בטיחות לצוות' }],
+};
+/** Pairs of permit types that must not run at the same place and time without an explicit override. */
+export const PERMIT_BLOCKING_PAIRS: [PermitType, PermitType][] = [
+  ['hot_work', 'chemical'],
+  ['hot_work', 'confined_space'],
+];

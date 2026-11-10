@@ -38,6 +38,9 @@ const KIND_TEXT: Record<NotificationKind, string> = {
   report: 'דוח מתוזמן',
   effectiveness: 'בדיקת אפקטיביות',
   monthly: 'מבט מנהל חודשי',
+  training: 'הדרכה',
+  permit: 'היתר עבודה',
+  procedure: 'נוהל',
 };
 
 type Sender = { id: string | null; name: string };
@@ -118,6 +121,21 @@ export class NotificationService {
       });
     }
     return recipients.length;
+  }
+
+  /**
+   * Notification for a module outside boards (trainings, permits, procedures). `detail` carries the
+   * target id the UI links to; `href` is the in-app path used in the e-mail. Optional `dedupeKey`
+   * makes it once-only (same user, kind and key).
+   */
+  onModule(userId: string, kind: 'training' | 'permit' | 'procedure', title: string, detail: string, text: string, href: string, dedupeKey?: string): boolean {
+    if (dedupeKey && this.db.prepare('SELECT 1 FROM notifications WHERE user_id = ? AND kind = ? AND day = ?').get(userId, kind, dedupeKey)) return false;
+    const id = newId();
+    this.db
+      .prepare('INSERT INTO notifications (id, user_id, kind, board_id, item_id, title, actor_id, detail, created_at, day) VALUES (?, ?, ?, NULL, NULL, ?, NULL, ?, ?, ?)')
+      .run(id, userId, kind, title, detail, nowIso(), dedupeKey ?? todayIso(this.config.timeZone));
+    void this.emailMany(userId, [id], { subject: `SUBoard: ${text}`.slice(0, 150), lines: [{ text, boardId: '', href }] });
+    return true;
   }
 
   /** Monthly management report: in-app notification (title = month label) + e-mail. */

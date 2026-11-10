@@ -1,4 +1,4 @@
-import type { BoardRole, CauseCategory, ColorKey, ColumnType, GlobalRole } from './constants.js';
+import type { BoardRole, CauseCategory, ColorKey, ColumnType, GlobalRole, PermitType } from './constants.js';
 import type { ColumnSettings, ComplianceSettings, Widget, RecurrenceSchedule, RuleAction, RuleCondition, RuleTrigger } from './schemas.js';
 
 /** API data-transfer objects (JSON shapes returned by the server). */
@@ -184,7 +184,7 @@ export interface MfaSetup {
   qrSvg: string;
 }
 
-export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly';
+export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly' | 'training' | 'permit' | 'procedure';
 
 export interface AppNotification {
   id: string;
@@ -501,4 +501,114 @@ export interface MonthlyReport {
   compliance: { boardId: string; boardName: string; percent: number | null; overdue: number }[];
   risk: { level: 'low' | 'medium' | 'high' | 'critical'; count: number }[];
   topOverdue: { id: string; boardId: string; boardName: string; name: string; due: string; daysLate: number }[];
+}
+
+// ---------- Wave E ----------
+export interface Training {
+  id: string;
+  name: string;
+  description: string;
+  validityMonths: number;
+  allUsers: boolean;
+  requiredUserIds: string[];
+}
+
+export type TrainingState = 'valid' | 'expiring' | 'expired' | 'missing' | 'not_required';
+export interface TrainingCell {
+  state: TrainingState;
+  completedOn: string | null;
+  expiresOn: string | null;
+  recordId: string | null;
+}
+export interface TrainingMatrix {
+  trainings: Training[];
+  users: { id: string; name: string; cells: Record<string, TrainingCell> }[];
+  /** Per training: required / valid / expiring / expired / missing. */
+  totals: Record<string, { required: number; valid: number; expiring: number; expired: number; missing: number }>;
+}
+export interface MyTraining {
+  training: Training;
+  cell: TrainingCell;
+  history: { id: string; completedOn: string; note: string }[];
+}
+
+export type PermitStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'closed' | 'expired';
+export interface PermitApproval {
+  order: number;
+  userId: string;
+  userName: string;
+  decision: 'approved' | 'rejected' | null;
+  comment: string;
+  decidedAt: string | null;
+}
+export interface PermitConflict {
+  permitId: string;
+  number: string;
+  title: string;
+  type: PermitType;
+  startsAt: string;
+  endsAt: string;
+  status: PermitStatus;
+  severity: 'warn' | 'block';
+}
+export interface Permit {
+  id: string;
+  number: string;
+  type: PermitType;
+  title: string;
+  location: string;
+  description: string;
+  contractor: string;
+  startsAt: string;
+  endsAt: string;
+  status: PermitStatus;
+  /** Approved and inside its time window right now. */
+  active: boolean;
+  requesterId: string;
+  requesterName: string;
+  precautions: string[];
+  conflictNote: string;
+  approvals: PermitApproval[];
+  /** Whose turn it is to approve (null when not pending). */
+  nextApproverId: string | null;
+  events: { at: string; userName: string | null; action: string; comment: string }[];
+  conflicts: PermitConflict[];
+  createdAt: string;
+}
+
+export interface ProcedureVersion {
+  id: string;
+  version: string;
+  effectiveOn: string;
+  summary: string;
+  body: string;
+  link: string | null;
+  publishedAt: string;
+  publishedByName: string | null;
+}
+export interface Procedure {
+  id: string;
+  code: string;
+  title: string;
+  category: string;
+  audience: 'all' | 'users';
+  userIds: string[];
+  current: ProcedureVersion | null;
+  versions: { id: string; version: string; effectiveOn: string }[];
+  /** Acknowledgements of the current version (managers only; null for others). */
+  ackStats: { acked: number; total: number } | null;
+  myAckAt: string | null;
+  /** True when the current user is in the audience. */
+  forMe: boolean;
+}
+export interface ProcedureAckReport {
+  versionId: string;
+  acked: { userId: string; name: string; at: string }[];
+  pending: { userId: string; name: string }[];
+}
+
+export interface PlanPin {
+  itemId: string;
+  x: number;
+  y: number;
 }

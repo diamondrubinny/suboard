@@ -193,3 +193,12 @@ export function checklistStats(col: Column, v: unknown): { total: number; pass: 
 export function isDateRange(v: unknown): v is { from: string; to: string } {
   return typeof v === 'object' && v !== null && 'from' in v && 'to' in v;
 }
+
+/** YYYY-MM-DD plus whole months; the day clamps to the target month's last day (31 Jan + 1 → 28/29 Feb). */
+export function addMonthsIso(iso: string, months: number): string {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
+  const target = new Date(Date.UTC(y, m - 1 + months, 1));
+  const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(d, last));
+  return target.toISOString().slice(0, 10);
+}

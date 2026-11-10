@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BOARD_ROLES, CAUSE_CATEGORIES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, type ColorKey, type ColumnType } from './constants.js';
+import { BOARD_ROLES, CAUSE_CATEGORIES, PERMIT_TYPES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, type ColorKey, type ColumnType } from './constants.js';
 
 /** Trimmed, non-empty single-line string without control characters. */
 const line = (max: number) =>
@@ -536,6 +536,82 @@ export const trendQuerySchema = z.object({
 export const monthQuerySchema = z.object({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'חודש לא תקין').optional() });
 
 export const dependenciesSchema = z.object({ blockedBy: z.array(idSchema).max(20) });
+
+// ---------- Wave E ----------
+const isoDateTime = z
+  .string()
+  .max(40)
+  .refine((s) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s) && !Number.isNaN(Date.parse(s)), 'תאריך ושעה לא תקינים')
+  .transform((s) => new Date(s).toISOString());
+const httpUrl = z
+  .string()
+  .trim()
+  .max(2000)
+  .refine((u) => {
+    try {
+      const p = new URL(u);
+      return p.protocol === 'https:' || p.protocol === 'http:';
+    } catch {
+      return false;
+    }
+  }, 'קישור חייב להתחיל ב-http:// או https://');
+
+export const createTrainingSchema = z.object({
+  name: line(120),
+  description: multiline(1000).default(''),
+  /** 0 = no expiry (one-time training). */
+  validityMonths: z.number().int().min(0).max(120).default(12),
+  allUsers: z.boolean().default(false),
+});
+export const updateTrainingSchema = z
+  .object({ name: line(120).optional(), description: multiline(1000).optional(), validityMonths: z.number().int().min(0).max(120).optional(), allUsers: z.boolean().optional() })
+  .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+export const trainingRequirementsSchema = z.object({ userIds: z.array(idSchema).max(2000) });
+export const trainingRecordSchema = z.object({ userIds: z.array(idSchema).min(1).max(500), completedOn: isoDateSchema, note: z.string().trim().max(200).default('') });
+
+export const createPermitSchema = z
+  .object({
+    type: z.enum(PERMIT_TYPES),
+    title: line(160),
+    location: line(160),
+    description: multiline(2000).default(''),
+    contractor: z.string().trim().max(120).default(''),
+    startsAt: isoDateTime,
+    endsAt: isoDateTime,
+    approverIds: z.array(idSchema).min(1, 'יש לבחור לפחות מאשר/ת אחד/ת').max(5),
+    precautions: z.array(z.string().max(40)).max(20).default([]),
+    /** Required when the permit conflicts with a blocking permit at the same place and time. */
+    conflictNote: z.string().trim().max(500).default(''),
+  })
+  .refine((p) => p.endsAt > p.startsAt, { message: 'סיום חייב להיות אחרי ההתחלה', path: ['endsAt'] })
+  .refine((p) => Date.parse(p.endsAt) - Date.parse(p.startsAt) <= 14 * 86_400_000, { message: 'היתר יכול להיות עד 14 יום', path: ['endsAt'] })
+  .refine((p) => new Set(p.approverIds).size === p.approverIds.length, { message: 'מאשר/ת כפול/ה', path: ['approverIds'] });
+export type CreatePermitInput = z.input<typeof createPermitSchema>;
+export const permitCheckSchema = z.object({ location: line(160), type: z.enum(PERMIT_TYPES), startsAt: isoDateTime, endsAt: isoDateTime });
+export const permitActionSchema = z.object({ comment: z.string().trim().max(500).default('') });
+
+export const createProcedureSchema = z.object({
+  code: z.string().trim().regex(/^[A-Za-z0-9._-]{1,20}$/, 'קוד: אותיות לטיניות, ספרות ו-. _ - (עד 20)'),
+  title: line(160),
+  category: line(60).default('כללי'),
+  audience: z.enum(['all', 'users']).default('all'),
+  userIds: z.array(idSchema).max(2000).default([]),
+});
+export const updateProcedureSchema = z
+  .object({ title: line(160).optional(), category: line(60).optional(), audience: z.enum(['all', 'users']).optional(), userIds: z.array(idSchema).max(2000).optional() })
+  .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+export const procedureVersionSchema = z.object({
+  version: line(20),
+  effectiveOn: isoDateSchema,
+  summary: multiline(1000).default(''),
+  body: multiline(50_000).default(''),
+  link: httpUrl.nullable().default(null),
+});
+export type ProcedureVersionInput = z.input<typeof procedureVersionSchema>;
+
+export const pinsSchema = z.object({
+  pins: z.array(z.object({ itemId: idSchema, x: z.number().min(0).max(100), y: z.number().min(0).max(100) })).max(300),
+});
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
