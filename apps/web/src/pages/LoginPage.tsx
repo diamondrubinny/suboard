@@ -1,11 +1,23 @@
 import { loginSchema, mfaCodeSchema, type SessionUser } from '@suboard/shared';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { ApiError, errorMessage, safeNextPath } from '../api/client';
+import { api, ApiError, errorMessage, safeNextPath } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import unitLogo from '../assets/safety-unit-logo.webp';
+import { Icon } from '../components/Icon';
 import { A11yToolbar } from '../components/A11yToolbar';
 import { Footer, Logo, usePageTitle } from '../components/Layout';
+
+const SSO_ERRORS: Record<string, string> = {
+  state: 'פג תוקף ההתחברות הארגונית או שהיא נפתחה בחלון אחר. נסו שוב.',
+  exchange: 'ההתחברות הארגונית נכשלה. נסו שוב; אם הבעיה חוזרת — פנו למנהל המערכת.',
+  no_email: 'החשבון הארגוני אינו כולל כתובת דוא"ל. פנו למנהל המערכת.',
+  domain: 'הדומיין של החשבון הארגוני אינו מורשה במערכת.',
+  no_account: 'אין לך עדיין חשבון במערכת. פנו למנהל המערכת כדי שיוסיף אותך.',
+  inactive: 'החשבון שלך הושבת. פנו למנהל המערכת.',
+  mismatch: 'החשבון במערכת כבר מקושר לזהות ארגונית אחרת. פנו למנהל המערכת.',
+  unavailable: 'ההתחברות הארגונית אינה זמינה כרגע. אפשר להתחבר בסיסמה, אם הדבר מותר.',
+};
 
 export function LoginPage() {
   usePageTitle('התחברות');
@@ -14,10 +26,16 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [challenge, setChallenge] = useState<string | null>(null);
+  // An SSO login whose account has local TOTP comes back with the challenge in the URL fragment
+  // (never sent to servers or logs).
+  const [challenge, setChallenge] = useState<string | null>(() => {
+    const m = /(?:^#|&)mfa=([^&]+)/.exec(window.location.hash);
+    return m ? decodeURIComponent(m[1]!) : null;
+  });
+  const [sso, setSso] = useState<{ enabled: boolean; label: string; localLogin: 'enabled' | 'admins_only' | 'disabled' } | null>(null);
   const [code, setCode] = useState('');
   const [useRecovery, setUseRecovery] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => SSO_ERRORS[params.get('sso_error') ?? ''] ?? null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const errorRef = useRef<HTMLDivElement>(null);
@@ -27,6 +45,12 @@ export function LoginPage() {
   useEffect(() => {
     if (challenge) codeRef.current?.focus();
   }, [challenge, useRecovery]);
+  useEffect(() => {
+    if (window.location.hash.includes('mfa=')) history.replaceState(null, '', window.location.pathname + window.location.search);
+    api<{ enabled: boolean; label: string; localLogin: 'enabled' | 'admins_only' | 'disabled' }>('/auth/sso/config')
+      .then(setSso)
+      .catch(() => setSso({ enabled: false, label: '', localLogin: 'enabled' }));
+  }, []);
 
   if (user) return <Navigate to={user.mustChangePassword || user.mfaSetupRequired ? '/profile' : next} replace />;
 
@@ -111,6 +135,65 @@ export function LoginPage() {
           )}
 
           {!challenge ? (
+            <>
+              {sso?.enabled && (
+                <div className="sso-block">
+                  <a className="btn btn-primary sso-btn" href={`/api/auth/sso/start?next=${encodeURIComponent(next)}`}>
+                    <Icon name="shield" /> {sso.label}
+                  </a>
+                  {sso.localLogin !== 'disabled' && <p className="sso-or" aria-hidden="true"><span>או</span></p>}
+                </div>
+              )}
+              {sso?.localLogin === 'disabled' ? null : sso?.localLogin === 'admins_only' ? (
+                <details className="break-glass">
+                  <summary>כניסת חירום בסיסמה (מנהלי מערכת)</summary>
+            <form onSubmit={onPassword} noValidate>
+                  <div className="field">
+                    <label htmlFor="email">דוא"ל</label>
+                    <input
+                      id="email"
+                      className="input"
+                      type="email"
+                      autoComplete="username"
+                      dir="ltr"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      aria-invalid={Boolean(fieldErrors.email)}
+                      aria-describedby={fieldErrors.email ? 'email-error' : undefined}
+                    />
+                    {fieldErrors.email && (
+                      <span id="email-error" className="error">
+                        {fieldErrors.email}
+                      </span>
+                    )}
+                  </div>
+                  <div className="field">
+                    <label htmlFor="password">סיסמה</label>
+                    <input
+                      id="password"
+                      className="input"
+                      type="password"
+                      autoComplete="current-password"
+                      dir="ltr"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      aria-invalid={Boolean(fieldErrors.password)}
+                      aria-describedby={fieldErrors.password ? 'password-error' : undefined}
+                    />
+                    {fieldErrors.password && (
+                      <span id="password-error" className="error">
+                        {fieldErrors.password}
+                      </span>
+                    )}
+                  </div>
+                  <button type="submit" className="btn btn-primary" style={{ inlineSize: '100%' }} disabled={submitting} aria-busy={submitting}>
+                    {submitting ? 'מתחבר…' : 'התחברות'}
+                  </button>
+                </form>
+                </details>
+              ) : (
             <form onSubmit={onPassword} noValidate>
               <div className="field">
                 <label htmlFor="email">דוא"ל</label>
@@ -156,6 +239,8 @@ export function LoginPage() {
                 {submitting ? 'מתחבר…' : 'התחברות'}
               </button>
             </form>
+              )}
+            </>
           ) : (
             <form onSubmit={onCode} noValidate>
               <div className="field">

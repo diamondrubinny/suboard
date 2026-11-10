@@ -85,10 +85,13 @@ export function ProfilePage() {
             </dd>
             <dt className="muted">תפקיד במערכת</dt>
             <dd>{GLOBAL_ROLE_LABELS[user.role]}</dd>
+            <dt className="muted">התחברות</dt>
+            <dd>{user.authSource === 'local' ? 'סיסמה במערכת' : user.authSource === 'scim' ? 'חשבון ארגוני (מסונכרן מספק הזהות)' : 'חשבון ארגוני (SSO)'}</dd>
           </dl>
         </section>
         <section className="card" aria-labelledby="pw-h">
           <h2 id="pw-h">החלפת סיסמה</h2>
+          {user.authSource !== 'local' && <p className="hint">החשבון מחובר להתחברות הארגונית; הסיסמה כאן רלוונטית רק לכניסה בסיסמה, אם היא מותרת. סיסמת הארגון מנוהלת אצל ספק הזהות.</p>}
           {user.mustChangePassword && (
             <div className="draft-banner" role="alert">
               זוהי כניסה ראשונה עם סיסמה זמנית. יש לבחור סיסמה אישית חדשה כדי להמשיך.

@@ -35,6 +35,8 @@ export interface AdminUser {
   lockedUntil: string | null;
   lastLoginAt: string | null;
   createdAt: string;
+  /** local password / SSO-linked / provisioned by SCIM. */
+  authSource: 'local' | 'sso' | 'scim';
 }
 
 export interface BoardSummary {

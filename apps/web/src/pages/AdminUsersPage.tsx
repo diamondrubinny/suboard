@@ -168,6 +168,11 @@ function UserRow({ u, isSelf, onIssued }: { u: AdminUser; isSelf: boolean; onIss
       <td>
         {u.name}
         {isSelf && <span className="badge" style={{ marginInlineStart: '0.4rem' }}>את/ה</span>}
+        {u.authSource !== 'local' && (
+          <span className="badge" style={{ marginInlineStart: '0.4rem' }} title={u.authSource === 'scim' ? 'נוצר ומנוהל ע"י סנכרון SCIM מספק הזהות' : 'מקושר לחשבון הארגוני (SSO)'}>
+            {u.authSource === 'scim' ? 'SCIM' : 'SSO'}
+          </span>
+        )}
       </td>
       <td dir="ltr" style={{ textAlign: 'end' }}>
         {u.email}

@@ -65,6 +65,32 @@ sudo systemctl enable --now clamav-freshclam clamav-daemon
 - הכתובת צריכה להיות נגישה מהטלפון (Wi-Fi ארגוני / VPN). מחוץ לרשת — הסריקה תציג "אין חיבור".
 - `sw.js` מוגש עם `Cache-Control: no-cache` (כבר מוגדר); אחרי פריסה הדפדפנים יקבלו את הגרסה החדשה בטעינה הבאה.
 
+## 1ה. התחברות ארגונית (SSO) וסנכרון משתמשים (SCIM) — Microsoft Entra ID
+
+> עד שהשלבים האלה הושלמו, **ההתחברות הרגילה בסיסמה נשארת פעילה** (`LOCAL_LOGIN=enabled`). שמות התפריטים ב-Entra משתנים מעת לעת — **דורש אימות מול התיעוד הרשמי של Microsoft**.
+
+**א. רישום אפליקציה (SSO)**
+
+1. Entra admin center ← App registrations ← New registration: שם `SUBoard`, חשבונות בארגון בלבד (Single tenant).
+2. Redirect URI מסוג **Web**: `https://<הכתובת>/api/auth/sso/callback` (בדיוק כמו `PUBLIC_URL` + הנתיב).
+3. Certificates & secrets ← New client secret ← העתיקו את הערך ל-`OIDC_CLIENT_SECRET` (בכספת הסודות; לחדש לפני פקיעה).
+4. `OIDC_CLIENT_ID` = Application (client) ID; `OIDC_ISSUER` = `https://login.microsoftonline.com/<Directory (tenant) ID>/v2.0`.
+5. Token configuration ← Add optional claim (ID) ← `email` (אחרת המערכת משתמשת ב-`preferred_username`).
+6. **MFA:** הגדירו Conditional Access שמחייב MFA לאפליקציה, ואז `SSO_TRUST_IDP_MFA=true`. בלי זה, המערכת מסתמכת על הטענה `amr` בטוקן — ייתכן שאינה נשלחת בטוקן v2 (**לבדיקה**) — ומנהלי מערכת יידרשו להגדיר גם TOTP מקומי.
+7. מומלץ: Enterprise applications ← SUBoard ← Properties ← **Assignment required = Yes**, והקצאת קבוצת היחידה בלבד.
+8. אתחול השרת, ובעמוד הכניסה מופיע כפתור "התחברות ארגונית". **קודם לבדוק כניסה של מנהל מערכת ב-SSO**, ורק אז לשקול `LOCAL_LOGIN=admins_only` (חשבון חירום) — לא `disabled`, כדי שתקלה אצל ספק הזהות לא תנעל את כולם בחוץ.
+
+**ב. סנכרון משתמשים (SCIM)**
+
+1. צרו אסימון אקראי: `openssl rand -base64 48` ← `SCIM_TOKEN`, ואתחלו.
+2. Enterprise applications ← SUBoard ← Provisioning ← Automatic: Tenant URL `https://<הכתובת>/scim/v2`, Secret Token = הערך ← Test Connection.
+3. מיפוי מאפיינים (Users): `userPrincipalName → userName`, `displayName → displayName`, `mail → emails[type eq "work"].value`, `objectId → externalId`, `Switch([IsSoftDeleted], …) → active` (ברירת המחדל של Entra). **Groups — כבו** (לא נתמך בשלב זה).
+4. Scope: Sync only assigned users and groups ← Start provisioning.
+5. התוצאה: משתמש שהוקצה נוצר כ"משתמש" (member) בלי סיסמה ונכנס ב-SSO; הסרה / השבתה ב-Entra ← **השבתה** במערכת וניתוק מיידי של כל החיבורים. תפקידים (manager / admin) — נקבעים במערכת ע"י מנהל מערכת.
+6. SCIM לא ישבית לעולם את מנהל המערכת הפעיל האחרון.
+
+**נבדק** מול ספק OIDC מדומה (HTTPS, חתימת RS256, PKCE) ומול צורת הבקשות של Entra ל-SCIM (PATCH עם `Replace` ו-`"False"`). **לא נבדק מול Entra ID אמיתי** — יש לבצע בדיקת קבלה בסביבת הארגון.
+
 ## 2. systemd (`/etc/systemd/system/suboard.service`)
 
 ```ini

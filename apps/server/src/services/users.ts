@@ -17,6 +17,7 @@ interface Row {
   locked_until: string | null;
   last_login_at: string | null;
   created_at: string;
+  auth_source: 'local' | 'sso' | 'scim';
 }
 
 const toAdminUser = (r: Row): AdminUser => ({
@@ -28,6 +29,7 @@ const toAdminUser = (r: Row): AdminUser => ({
   mustChangePassword: r.must_change_password === 1,
   mfaEnabled: r.mfa_enabled === 1,
   lockedUntil: r.locked_until && Date.parse(r.locked_until) > Date.now() ? r.locked_until : null,
+  authSource: r.auth_source,
   lastLoginAt: r.last_login_at,
   createdAt: r.created_at,
 });
