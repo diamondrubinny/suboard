@@ -27,6 +27,8 @@ import { TrainingService } from './trainings.js';
 import { PermitService } from './permits.js';
 import { PlanService, ProcedureService } from './procedures.js';
 import { SsoService } from './sso.js';
+import { FavoriteService } from './favorites.js';
+import { FollowService } from './follow.js';
 import { ScimService } from './scim.js';
 import { DashboardService as CustomDashboardService, DependencyService, MonthlyReportJob } from './planning.js';
 import { ClamdScanner, UnsafeNoopScanner, type Scanner } from '../lib/clamav.js';
@@ -65,6 +67,8 @@ export interface Services {
   plans: PlanService;
   sso: SsoService;
   scim: ScimService;
+  favorites: FavoriteService;
+  follow: FollowService;
 }
 
 /** Infrastructure that tests (or alternative deployments) can substitute. */
@@ -114,8 +118,10 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const plans = new PlanService(db, access);
   const sso = new SsoService(db, config, auth, audit);
   const scim = new ScimService(db, config, auth, audit);
+  const favorites = new FavoriteService(db, access);
+  const follow = new FollowService(db, access, boards, items, notifications);
   return {
     audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
-    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, permits, procedures, plans, sso, scim,
+    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, permits, procedures, plans, sso, scim, favorites, follow,
   };
 }

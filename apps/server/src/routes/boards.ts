@@ -5,6 +5,7 @@ import {
   createItemSchema,
   createUpdateSchema,
   idSchema,
+  reactionSchema,
   setMemberSchema,
   updateBoardSchema,
   updateColumnSchema,
@@ -32,7 +33,22 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
     return reply.code(201).send({ board });
   });
 
-  app.get('/boards/:id', async (req) => ({ board: boards.get(actorOf(req), param(req, 'id')) }));
+  app.get('/boards/:id', async (req) => {
+    const actor = actorOf(req);
+    const board = boards.get(actor, param(req, 'id'));
+    services.favorites.recordVisit(actor.id, board.id);
+    return { board };
+  });
+  app.put('/boards/:id/favorite', async (req) => {
+    services.favorites.setFavorite(actorOf(req), param(req, 'id'), true);
+    return { favorite: true };
+  });
+  app.delete('/boards/:id/favorite', async (req) => {
+    services.favorites.setFavorite(actorOf(req), param(req, 'id'), false);
+    return { favorite: false };
+  });
+  app.get('/me/recent-boards', async (req) => ({ boards: services.favorites.recent(actorOf(req)) }));
+  app.get('/boards/:id/files', async (req) => ({ files: services.attachments.listForBoard(actorOf(req), param(req, 'id')) }));
 
   app.patch('/boards/:id', async (req) => ({
     board: boards.update(actorOf(req), param(req, 'id'), updateBoardSchema.parse(req.body)),
@@ -107,9 +123,23 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
   app.get('/items/:id/updates', async (req) => ({ updates: items.listUpdates(actorOf(req), param(req, 'id')) }));
   app.post('/items/:id/updates', async (req, reply) => {
     const input = createUpdateSchema.parse(req.body);
-    const update = items.addUpdate(actorOf(req), param(req, 'id'), input.body, input.mentions);
+    const update = items.addUpdate(actorOf(req), param(req, 'id'), input.body, input.mentions, input.parentId);
     return reply.code(201).send({ update });
   });
+  app.put('/updates/:id/reactions/:emoji', async (req) => {
+    items.react(actorOf(req), param(req, 'id'), reactionSchema.parse((req.params as { emoji: string }).emoji), true);
+    return { ok: true };
+  });
+  app.delete('/updates/:id/reactions/:emoji', async (req) => {
+    items.react(actorOf(req), param(req, 'id'), reactionSchema.parse((req.params as { emoji: string }).emoji), false);
+    return { ok: true };
+  });
+
+  // ---- following
+  app.get('/items/:id/follow', async (req) => ({ follow: services.follow.state(actorOf(req), param(req, 'id')) }));
+  app.put('/items/:id/follow', async (req) => ({ follow: services.follow.set(actorOf(req), param(req, 'id'), true) }));
+  app.delete('/items/:id/follow', async (req) => ({ follow: services.follow.set(actorOf(req), param(req, 'id'), false) }));
+
   app.delete('/updates/:id', async (req) => {
     items.deleteUpdate(actorOf(req), param(req, 'id'));
     return { ok: true };

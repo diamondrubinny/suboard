@@ -41,6 +41,8 @@ const KIND_TEXT: Record<NotificationKind, string> = {
   training: 'הדרכה',
   permit: 'היתר עבודה',
   procedure: 'נוהל',
+  followed: 'פריט במעקב',
+  reply: 'תשובה לעדכון',
 };
 
 type Sender = { id: string | null; name: string };
@@ -183,6 +185,42 @@ export class NotificationService {
         lines: [{ text: `${actor.name} הזכיר/ה אותך בעדכון על "${itemName}" בלוח "${boardName}".`, boardId, itemId }],
       });
     }
+  }
+
+  /** Someone replied to the user's update. */
+  onReply(actor: Sender, boardId: string, itemId: string, itemName: string, userId: string): void {
+    if (userId === actor.id || !this.usersWithAccess(boardId, [userId]).length) return;
+    const id = this.insert(userId, 'reply', boardId, itemId, itemName, actor.id);
+    void this.emailOne(userId, id, {
+      subject: 'SUBoard: תשובה לעדכון שלך',
+      lines: [{ text: `${actor.name} ענה/תה לעדכון שלך על "${itemName}" בלוח "${this.boardName(boardId)}".`, boardId, itemId }],
+    });
+  }
+
+  /**
+   * Activity on a followed item. Access is re-checked now (someone removed from the board stops
+   * hearing about it). While a previous notice for the same item is still unread it is refreshed in
+   * place (no second notice, no second e-mail) — following never floods the inbox.
+   */
+  onFollowed(actorId: string, boardId: string, itemId: string, itemName: string, what: 'update' | 'status' | 'moved', userIds: string[]): number {
+    const actorName = (this.db.prepare('SELECT name FROM users WHERE id = ?').get(actorId) as { name: string } | undefined)?.name ?? '';
+    const pending = this.db.prepare("SELECT id FROM notifications WHERE user_id = ? AND item_id = ? AND kind = 'followed' AND read_at IS NULL");
+    const refresh = this.db.prepare('UPDATE notifications SET title = ?, actor_id = ?, detail = ?, created_at = ?, day = ? WHERE id = ?');
+    const boardName = this.boardName(boardId);
+    const text = what === 'update' ? `${actorName} הוסיף/ה עדכון ל"${itemName}"` : what === 'status' ? `${actorName} שינה/תה סטטוס ב"${itemName}"` : `${actorName} העביר/ה את "${itemName}" לקבוצה אחרת`;
+    let sent = 0;
+    for (const userId of this.usersWithAccess(boardId, userIds)) {
+      if (userId === actorId) continue;
+      const existing = pending.get(userId, itemId) as { id: string } | undefined;
+      if (existing) {
+        refresh.run(itemName, actorId, what, nowIso(), todayIso(this.config.timeZone), existing.id);
+        continue;
+      }
+      const id = this.insert(userId, 'followed', boardId, itemId, itemName, actorId, what);
+      void this.emailOne(userId, id, { subject: 'SUBoard: עדכון בפריט שאחריו את/ה עוקב/ת', lines: [{ text: `${text} בלוח "${boardName}".`, boardId, itemId }] });
+      sent++;
+    }
+    return sent;
   }
 
   list(userId: string, limit = 50): { notifications: AppNotification[]; unread: number } {

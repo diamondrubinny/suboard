@@ -1,6 +1,6 @@
 import { createUserSchema, idSchema, updateUserSchema } from '@suboard/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { forbidden } from '../lib/errors.js';
+import { forbidden, notFound } from '../lib/errors.js';
 import { actorOf } from '../plugins/auth.js';
 import type { Services } from '../services/index.js';
 
@@ -30,6 +30,17 @@ export async function userRoutes(app: FastifyInstance, { services }: { services:
     const id = idSchema.parse((req.params as { id: string }).id);
     const input = updateUserSchema.parse(req.body);
     return { user: await services.users.update(actor, id, input) };
+  });
+
+  /** Signs a user out everywhere (lost device, suspected compromise). An admin keeps their own current session. */
+  app.post('/users/:id/revoke-sessions', { config: { rateLimit: { max: 30, timeWindow: 15 * 60_000 } } }, async (req) => {
+    const actor = requireAdmin(req);
+    const id = idSchema.parse((req.params as { id: string }).id);
+    if (!services.users.exists(id)) throw notFound('המשתמש לא נמצא');
+    if (id === actor.id) services.auth.revokeOtherSessions(id, req.sessionId!);
+    else services.auth.revokeAllSessions(id);
+    services.audit.log('sessions_revoked_by_admin', { userId: actor.id, ip: req.ip, meta: { targetUserId: id } });
+    return { ok: true };
   });
 
   app.get('/admin/audit', async (req) => {

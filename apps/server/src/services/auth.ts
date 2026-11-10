@@ -1,4 +1,5 @@
-import type { GlobalRole, SessionUser } from '@suboard/shared';
+import type { ActiveSession, GlobalRole, SessionUser } from '@suboard/shared';
+import { describeUserAgent } from '../lib/userAgent.js';
 import type { AppConfig } from '../config.js';
 import { nowIso, type DB } from '../db/index.js';
 import { getDummyHash, hashPassword, newSessionToken, sha256, verifyPassword } from '../lib/crypto.js';
@@ -183,6 +184,43 @@ export class AuthService {
 
   revokeAllSessions(userId: string): void {
     this.db.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+  }
+
+  /** One-way, stable handle for a session in the UI (never the cookie token or the stored hash itself). */
+  private static handle(sessionId: string): string {
+    return sha256(`session-handle:${sessionId}`).slice(0, 32);
+  }
+
+  /** The user's own live sessions, newest activity first. */
+  listSessions(userId: string, currentSessionId: string): ActiveSession[] {
+    const idleCutoff = Date.now() - this.config.sessionIdleMs;
+    const rows = this.db
+      .prepare('SELECT id, created_at, last_seen_at, expires_at, user_agent, via_sso FROM sessions WHERE user_id = ? ORDER BY last_seen_at DESC')
+      .all(userId) as { id: string; created_at: string; last_seen_at: string; expires_at: string; user_agent: string | null; via_sso: number }[];
+    return rows
+      .filter((r) => Date.parse(r.expires_at) > Date.now() && Date.parse(r.last_seen_at) > idleCutoff)
+      .map((r) => ({
+        handle: AuthService.handle(r.id),
+        device: describeUserAgent(r.user_agent),
+        createdAt: r.created_at,
+        lastSeenAt: r.last_seen_at,
+        current: r.id === currentSessionId,
+        viaSso: r.via_sso === 1,
+      }));
+  }
+
+  /** Ends one of the user's own sessions by handle. Ending the current one is a logout (done by the route). */
+  revokeSession(userId: string, handle: string, ip: string): boolean {
+    const ids = (this.db.prepare('SELECT id FROM sessions WHERE user_id = ?').all(userId) as { id: string }[]).map((r) => r.id);
+    const id = ids.find((x) => AuthService.handle(x) === handle);
+    if (!id) return false;
+    this.db.prepare('DELETE FROM sessions WHERE id = ? AND user_id = ?').run(id, userId);
+    this.audit.log('session_revoked', { userId, ip });
+    return true;
+  }
+
+  isCurrentHandle(sessionId: string, handle: string): boolean {
+    return AuthService.handle(sessionId) === handle;
   }
 
   /** Revoke every session of a user except the given one (e.g. after enabling MFA). */

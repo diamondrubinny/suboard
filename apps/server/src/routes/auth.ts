@@ -4,6 +4,7 @@ import type { AppConfig } from '../config.js';
 import { actorOf, clearSessionCookie, setSessionCookie } from '../plugins/auth.js';
 import type { LoginResult } from '../services/auth.js';
 import { safeNext, SsoError } from '../services/sso.js';
+import { notFound } from '../lib/errors.js';
 
 const escapeAttr = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 import type { Services } from '../services/index.js';
@@ -111,6 +112,26 @@ export async function authRoutes(app: FastifyInstance, { services, config }: { s
     const actor = actorOf(req);
     await services.mfa.disable(actor.id, input.password, input.code, req.ip);
     return { user: services.auth.getSessionUser(actor.id) };
+  });
+
+  // ---- active sessions (own devices)
+  app.get('/auth/sessions', async (req) => ({ sessions: services.auth.listSessions(actorOf(req).id, req.sessionId!) }));
+
+  app.post('/auth/sessions/revoke-others', { config: { rateLimit: { max: 20, timeWindow: 15 * 60_000 } } }, async (req) => {
+    const actor = actorOf(req);
+    services.auth.revokeOtherSessions(actor.id, req.sessionId!);
+    services.audit.log('sessions_revoked_others', { userId: actor.id, ip: req.ip });
+    return { sessions: services.auth.listSessions(actor.id, req.sessionId!) };
+  });
+
+  app.delete('/auth/sessions/:handle', { config: { rateLimit: { max: 30, timeWindow: 15 * 60_000 } } }, async (req, reply) => {
+    const actor = actorOf(req);
+    const handle = String((req.params as { handle: string }).handle);
+    if (!/^[0-9a-f]{32}$/.test(handle)) throw notFound('החיבור לא נמצא');
+    const current = services.auth.isCurrentHandle(req.sessionId!, handle);
+    if (!services.auth.revokeSession(actor.id, handle, req.ip)) throw notFound('החיבור לא נמצא');
+    if (current) clearSessionCookie(reply, config);
+    return { ok: true, signedOut: current };
   });
 
   app.patch('/auth/preferences', async (req) => {

@@ -489,4 +489,41 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       );
     `,
   },
+  {
+    version: 9,
+    name: 'everyday',
+    sql: /* sql */ `
+      CREATE TABLE board_favorites (
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (user_id, board_id)
+      );
+      -- Last time a user opened a board (one row per pair; trimmed to 20 per user).
+      CREATE TABLE board_visits (
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        visited_at TEXT NOT NULL,
+        PRIMARY KEY (user_id, board_id)
+      );
+      CREATE INDEX idx_board_visits_user ON board_visits(user_id, visited_at);
+      CREATE TABLE item_followers (
+        item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (item_id, user_id)
+      );
+      CREATE INDEX idx_item_followers_user ON item_followers(user_id);
+      -- One level of replies; deleting an update deletes its replies.
+      ALTER TABLE item_updates ADD COLUMN parent_id TEXT REFERENCES item_updates(id) ON DELETE CASCADE;
+      CREATE INDEX idx_updates_parent ON item_updates(parent_id);
+      CREATE TABLE update_reactions (
+        update_id TEXT NOT NULL REFERENCES item_updates(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        emoji TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (update_id, user_id, emoji)
+      );
+    `,
+  },
 ];

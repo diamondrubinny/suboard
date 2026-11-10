@@ -30,7 +30,10 @@ export type AuditEvent =
   | 'scim_user_created'
   | 'scim_user_updated'
   | 'scim_user_deactivated'
-  | 'scim_auth_failed';
+  | 'scim_auth_failed'
+  | 'session_revoked'
+  | 'sessions_revoked_others'
+  | 'sessions_revoked_by_admin';
 
 /**
  * Security audit trail. Stores an HMAC of the client IP (never the raw IP) and only

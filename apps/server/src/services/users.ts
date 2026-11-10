@@ -130,6 +130,10 @@ export class UserService {
     return this.get(id);
   }
 
+  exists(id: string): boolean {
+    return this.db.prepare('SELECT 1 FROM users WHERE id = ?').get(id) !== undefined;
+  }
+
   countUsers(): number {
     return (this.db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n;
   }

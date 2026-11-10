@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BOARD_ROLES, CAUSE_CATEGORIES, PERMIT_TYPES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, type ColorKey, type ColumnType } from './constants.js';
+import { BOARD_ROLES, CAUSE_CATEGORIES, PERMIT_TYPES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, REACTIONS, type ColorKey, type ColumnType } from './constants.js';
 
 /** Trimmed, non-empty single-line string without control characters. */
 const line = (max: number) =>
@@ -273,7 +273,11 @@ export const createUpdateSchema = z.object({
   body: multiline(LIMITS.updateBody).refine((s) => s.trim().length > 0, 'שדה חובה'),
   /** Users @mentioned in the body (must be members of the board). */
   mentions: z.array(idSchema).max(20).optional(),
+  /** Reply to this update (one level: replying to a reply attaches to its parent). */
+  parentId: idSchema.optional(),
 });
+
+export const reactionSchema = z.enum(REACTIONS);
 
 // ---------- Wave A ----------
 const sortSchema = z.object({ by: z.union([z.literal('name'), z.literal('seq'), idSchema]), dir: z.enum(['asc', 'desc']) });

@@ -1,4 +1,4 @@
-import { cellValueSchema, LIMITS, type CellValue, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
+import { cellValueSchema, LIMITS, REACTIONS, type CellValue, type Reaction, type UpdateReaction, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
 import { nowIso, type DB } from '../db/index.js';
 import { newId } from '../lib/crypto.js';
 import { AppError, badRequest, forbidden, notFound } from '../lib/errors.js';
@@ -25,8 +25,20 @@ export interface Doer {
 export interface ItemEvent {
   kind: 'created' | 'changed';
   boardId: string;
+  /** The signed-in user who made the change; null when a system rule created the item (e.g. CAPA). */
+  actorId: string | null;
   before: Item | null;
   after: Item;
+}
+
+/** Emitted after a user writes an update (comment) on an item. */
+export interface CommentEvent {
+  actor: Actor;
+  boardId: string;
+  itemId: string;
+  itemName: string;
+  /** Already notified as mentioned / replied-to: followers' notice skips them. */
+  notified: string[];
 }
 
 export class ItemService {
@@ -39,6 +51,12 @@ export class ItemService {
   ) {}
 
   private listeners: ((e: ItemEvent) => void)[] = [];
+  private commentListeners: ((e: CommentEvent) => void)[] = [];
+
+  /** Subscribe to new updates written by users (used by item following). */
+  onComment(fn: (e: CommentEvent) => void): void {
+    this.commentListeners.push(fn);
+  }
 
   /** Subscribe to committed user changes (used by the automation engine). */
   onItemEvent(fn: (e: ItemEvent) => void): void {
@@ -61,7 +79,8 @@ export class ItemService {
 
   // ---------------------------------------------------------------- helpers
   /** User ids present in `next` person columns but not in `prev` (newly assigned). */
-  private newAssignees(boardId: string, prev: Record<string, unknown>, next: Record<string, unknown>): string[] {
+  /** People newly added to person columns between two value sets. */
+  newAssignees(boardId: string, prev: Record<string, unknown>, next: Record<string, unknown>): string[] {
     const out: string[] = [];
     for (const c of this.boards.columns(boardId)) {
       if (c.type !== 'person' || !(c.id in next)) continue;
@@ -178,7 +197,7 @@ export class ItemService {
   create(actor: Actor, boardId: string, input: { groupId: string; parentId?: string; name: string; values?: Record<string, unknown> }): Item {
     this.access.requireBoard(actor, boardId, 'editor');
     const item = this.createAs(actor, boardId, input);
-    this.emit({ kind: 'created', boardId, before: null, after: item });
+    this.emit({ kind: 'created', boardId, actorId: actor.id, before: null, after: item });
     return item;
   }
 
@@ -190,7 +209,7 @@ export class ItemService {
     const item = this.createAs(actor, boardId, input);
     this.db.prepare('UPDATE items SET form_id = ? WHERE id = ?').run(formId, item.id);
     this.activity.record(boardId, actor.id, 'form_submitted', { form: formName }, item.id);
-    this.emit({ kind: 'created', boardId, before: null, after: item });
+    this.emit({ kind: 'created', boardId, actorId: actor.id, before: null, after: item });
     return item;
   }
 
@@ -227,7 +246,7 @@ export class ItemService {
     const before = this.getRow(itemId);
     const after = this.updateAs(actor, boardId, before, input);
     const changed = before.name !== after.name || before.groupId !== after.groupId || JSON.stringify(before.values) !== JSON.stringify(after.values);
-    if (changed) this.emit({ kind: 'changed', boardId, before, after });
+    if (changed) this.emit({ kind: 'changed', boardId, actorId: actor.id, before, after });
     return after;
   }
 
@@ -352,7 +371,7 @@ export class ItemService {
           .run(newId(), item.id, capa.id, nowIso());
         v[entry.id] = { r: 'fail', capa: capa.id };
         changed = true;
-        this.emit({ kind: 'created', boardId: target.id, before: null, after: capa });
+        this.emit({ kind: 'created', boardId: target.id, actorId: null, before: null, after: capa });
       }
       values[col.id] = v;
     }
@@ -444,7 +463,7 @@ export class ItemService {
       this.boards.touch(boardId);
     })();
     const copy = this.getRow(newIdValue);
-    this.emit({ kind: 'created', boardId, before: null, after: copy });
+    this.emit({ kind: 'created', boardId, actorId: actor.id, before: null, after: copy });
     return copy;
   }
 
@@ -569,7 +588,7 @@ export class ItemService {
           id = this.insertItem(actor, boardId, input.groupId, null, row.name, values);
         })();
         created++;
-        this.emit({ kind: 'created', boardId, before: null, after: this.getRow(id) });
+        this.emit({ kind: 'created', boardId, actorId: actor.id, before: null, after: this.getRow(id) });
       } catch (err) {
         errors.push({ row: idx + 1, message: err instanceof AppError ? err.message : 'שגיאה' });
       }
@@ -585,32 +604,92 @@ export class ItemService {
   listUpdates(actor: Actor, itemId: string): ItemUpdate[] {
     const boardId = this.access.boardIdForItem(itemId);
     this.access.requireBoard(actor, boardId, 'viewer');
-    return (
-      this.db
-        .prepare(
-          `SELECT up.id, up.item_id, up.user_id, COALESCE(u.name, 'משתמש שנמחק') AS user_name, up.body, up.created_at
-           FROM item_updates up LEFT JOIN users u ON u.id = up.user_id WHERE up.item_id = ? ORDER BY up.created_at DESC`,
-        )
-        .all(itemId) as { id: string; item_id: string; user_id: string; user_name: string; body: string; created_at: string }[]
-    ).map((r) => ({ id: r.id, itemId: r.item_id, userId: r.user_id, userName: r.user_name, body: r.body, createdAt: r.created_at }));
+    const rows = this.db
+      .prepare(
+        `SELECT up.id, up.item_id, up.user_id, COALESCE(u.name, 'משתמש שנמחק') AS user_name, up.body, up.created_at, up.parent_id
+         FROM item_updates up LEFT JOIN users u ON u.id = up.user_id WHERE up.item_id = ? ORDER BY up.created_at DESC`,
+      )
+      .all(itemId) as { id: string; item_id: string; user_id: string; user_name: string; body: string; created_at: string; parent_id: string | null }[];
+    const reactions = this.db
+      .prepare(
+        `SELECT r.update_id, r.emoji, r.user_id, COALESCE(u.name, 'משתמש שנמחק') AS user_name
+         FROM update_reactions r JOIN item_updates up ON up.id = r.update_id LEFT JOIN users u ON u.id = r.user_id
+         WHERE up.item_id = ? ORDER BY r.created_at`,
+      )
+      .all(itemId) as { update_id: string; emoji: Reaction; user_id: string; user_name: string }[];
+    const byUpdate = new Map<string, UpdateReaction[]>();
+    for (const r of reactions) {
+      const list = byUpdate.get(r.update_id) ?? [];
+      let entry = list.find((x) => x.emoji === r.emoji);
+      if (!entry) list.push((entry = { emoji: r.emoji, count: 0, mine: false, users: [] }));
+      entry.count++;
+      entry.users.push(r.user_name);
+      if (r.user_id === actor.id) entry.mine = true;
+      byUpdate.set(r.update_id, list);
+    }
+    const order = (list: UpdateReaction[]) => list.sort((a, b) => REACTIONS.indexOf(a.emoji) - REACTIONS.indexOf(b.emoji));
+    return rows.map((r) => ({
+      id: r.id,
+      itemId: r.item_id,
+      userId: r.user_id,
+      userName: r.user_name,
+      body: r.body,
+      createdAt: r.created_at,
+      parentId: r.parent_id,
+      reactions: order(byUpdate.get(r.id) ?? []),
+    }));
   }
 
-  addUpdate(actor: Actor, itemId: string, body: string, mentions: string[] = []): ItemUpdate {
+  addUpdate(actor: Actor, itemId: string, body: string, mentions: string[] = [], parentId?: string): ItemUpdate {
     const boardId = this.access.boardIdForItem(itemId);
     this.access.requireBoard(actor, boardId, 'editor');
     const mentioned = [...new Set(mentions)].filter((id) => id !== actor.id);
     this.assertUsersOnBoard(boardId, mentioned, 'אזכור', 'mentions');
+    let parent: { id: string; user_id: string | null } | undefined;
+    if (parentId) {
+      const p = this.db.prepare('SELECT id, user_id, parent_id FROM item_updates WHERE id = ? AND item_id = ?').get(parentId, itemId) as
+        | { id: string; user_id: string | null; parent_id: string | null }
+        | undefined;
+      if (!p) throw badRequest('העדכון שאליו עונים לא נמצא', { parentId: 'עדכון לא תקין' });
+      // One level only: a reply to a reply joins the same thread.
+      parent = p.parent_id ? (this.db.prepare('SELECT id, user_id FROM item_updates WHERE id = ?').get(p.parent_id) as { id: string; user_id: string | null }) : p;
+    }
     const item = this.getRow(itemId);
     const id = newId();
     const ts = nowIso();
     this.db.transaction(() => {
-      this.db.prepare('INSERT INTO item_updates (id, item_id, user_id, body, created_at) VALUES (?, ?, ?, ?, ?)').run(id, itemId, actor.id, body.trim(), ts);
+      this.db
+        .prepare('INSERT INTO item_updates (id, item_id, user_id, body, created_at, parent_id) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(id, itemId, actor.id, body.trim(), ts, parent?.id ?? null);
       this.db.prepare('UPDATE items SET updated_at = ? WHERE id = ?').run(ts, itemId);
       this.activity.record(boardId, actor.id, 'update_added', {}, itemId);
       this.boards.touch(boardId);
     })();
     this.notifications.onMentioned(actor, boardId, itemId, item.name, mentioned);
-    return { id, itemId, userId: actor.id, userName: actor.name, body: body.trim(), createdAt: ts };
+    const notified = [...mentioned];
+    if (parent?.user_id && parent.user_id !== actor.id && !mentioned.includes(parent.user_id)) {
+      this.notifications.onReply(actor, boardId, itemId, item.name, parent.user_id);
+      notified.push(parent.user_id);
+    }
+    for (const fn of this.commentListeners) {
+      try {
+        fn({ actor, boardId, itemId, itemName: item.name, notified });
+      } catch {
+        // Following is best-effort; never fails the user's request.
+      }
+    }
+    return { id, itemId, userId: actor.id, userName: actor.name, body: body.trim(), createdAt: ts, parentId: parent?.id ?? null, reactions: [] };
+  }
+
+  /** Toggle one reaction of the actor on an update (fixed emoji set). Same right as writing an update. */
+  react(actor: Actor, updateId: string, emoji: Reaction, on: boolean): void {
+    const row = this.db
+      .prepare('SELECT i.board_id FROM item_updates up JOIN items i ON i.id = up.item_id WHERE up.id = ? AND i.deleted_at IS NULL')
+      .get(updateId) as { board_id: string } | undefined;
+    if (!row) throw notFound('העדכון לא נמצא');
+    this.access.requireBoard(actor, row.board_id, 'editor');
+    if (on) this.db.prepare('INSERT OR IGNORE INTO update_reactions (update_id, user_id, emoji, created_at) VALUES (?, ?, ?, ?)').run(updateId, actor.id, emoji, nowIso());
+    else this.db.prepare('DELETE FROM update_reactions WHERE update_id = ? AND user_id = ? AND emoji = ?').run(updateId, actor.id, emoji);
   }
 
   /** Authors may delete their own update; board owners may delete any. */

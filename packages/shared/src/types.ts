@@ -1,4 +1,4 @@
-import type { BoardRole, CauseCategory, ColorKey, ColumnType, GlobalRole, PermitType } from './constants.js';
+import type { BoardRole, CauseCategory, ColorKey, ColumnType, GlobalRole, PermitType, Reaction } from './constants.js';
 import type { ColumnSettings, ComplianceSettings, Widget, RecurrenceSchedule, RuleAction, RuleCondition, RuleTrigger } from './schemas.js';
 
 /** API data-transfer objects (JSON shapes returned by the server). */
@@ -47,6 +47,8 @@ export interface BoardSummary {
   myRole: BoardRole;
   itemCount: number;
   updatedAt: string;
+  /** Starred by the current user. */
+  favorite: boolean;
 }
 
 export interface Group {
@@ -112,6 +114,7 @@ export interface BoardDetail {
   members: BoardMember[];
   createdAt: string;
   updatedAt: string;
+  favorite: boolean;
 }
 
 export interface ItemUpdate {
@@ -121,6 +124,18 @@ export interface ItemUpdate {
   userName: string;
   body: string;
   createdAt: string;
+  /** Set on a reply (one level deep). */
+  parentId: string | null;
+  reactions: UpdateReaction[];
+}
+
+export interface UpdateReaction {
+  emoji: Reaction;
+  count: number;
+  /** Whether the current user reacted with this emoji. */
+  mine: boolean;
+  /** Names of those who reacted (for the accessible tooltip / list). */
+  users: string[];
 }
 
 export interface ActivityEntry {
@@ -188,7 +203,7 @@ export interface MfaSetup {
   qrSvg: string;
 }
 
-export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly' | 'training' | 'permit' | 'procedure';
+export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly' | 'training' | 'permit' | 'procedure' | 'followed' | 'reply';
 
 export interface AppNotification {
   id: string;
@@ -615,4 +630,40 @@ export interface PlanPin {
   itemId: string;
   x: number;
   y: number;
+}
+
+// ---------- Wave H ----------
+export interface ActiveSession {
+  /** Opaque handle (one-way derived from the session id; never the token or its stored hash). */
+  handle: string;
+  /** e.g. "Chrome · Windows" — from the User-Agent; "דפדפן לא מזוהה" when unknown. */
+  device: string;
+  createdAt: string;
+  lastSeenAt: string;
+  current: boolean;
+  viaSso: boolean;
+}
+
+export interface RecentBoard {
+  id: string;
+  name: string;
+  visitedAt: string;
+  favorite: boolean;
+}
+
+export interface FollowState {
+  following: boolean;
+  count: number;
+}
+
+export interface BoardFile {
+  id: string;
+  itemId: string;
+  itemName: string;
+  groupId: string;
+  name: string;
+  mime: string;
+  size: number;
+  createdAt: string;
+  isImage: boolean;
 }

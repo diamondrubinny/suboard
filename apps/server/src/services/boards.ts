@@ -46,20 +46,22 @@ export class BoardService {
         ? this.db
             .prepare(
               `SELECT b.*, COALESCE(m.role, 'owner') AS my_role,
-                 (SELECT COUNT(*) FROM items i WHERE i.board_id = b.id AND i.deleted_at IS NULL AND i.parent_id IS NULL) AS item_count
+                 (SELECT COUNT(*) FROM items i WHERE i.board_id = b.id AND i.deleted_at IS NULL AND i.parent_id IS NULL) AS item_count,
+                 EXISTS (SELECT 1 FROM board_favorites f WHERE f.board_id = b.id AND f.user_id = ?) AS fav
                FROM boards b LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ?
                WHERE b.archived_at IS NULL ORDER BY b.updated_at DESC`,
             )
-            .all(actor.id)
+            .all(actor.id, actor.id)
         : this.db
             .prepare(
               `SELECT b.*, m.role AS my_role,
-                 (SELECT COUNT(*) FROM items i WHERE i.board_id = b.id AND i.deleted_at IS NULL AND i.parent_id IS NULL) AS item_count
+                 (SELECT COUNT(*) FROM items i WHERE i.board_id = b.id AND i.deleted_at IS NULL AND i.parent_id IS NULL) AS item_count,
+                 EXISTS (SELECT 1 FROM board_favorites f WHERE f.board_id = b.id AND f.user_id = ?) AS fav
                FROM boards b JOIN board_members m ON m.board_id = b.id AND m.user_id = ?
                WHERE b.archived_at IS NULL ORDER BY b.updated_at DESC`,
             )
-            .all(actor.id)
-    ) as (BoardRow & { my_role: BoardRole; item_count: number })[];
+            .all(actor.id, actor.id)
+    ) as (BoardRow & { my_role: BoardRole; item_count: number; fav: number })[];
     return rows.map((r) => ({
       id: r.id,
       name: r.name,
@@ -69,6 +71,7 @@ export class BoardService {
       myRole: actor.role === 'admin' ? 'owner' : r.my_role,
       itemCount: r.item_count,
       updatedAt: r.updated_at,
+      favorite: r.fav === 1,
     }));
   }
 
@@ -113,6 +116,7 @@ export class BoardService {
       members: this.members(boardId),
       createdAt: b.created_at,
       updatedAt: b.updated_at,
+      favorite: this.db.prepare('SELECT 1 FROM board_favorites WHERE user_id = ? AND board_id = ?').get(actor.id, boardId) !== undefined,
     };
   }
 

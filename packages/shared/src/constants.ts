@@ -198,3 +198,11 @@ export const PERMIT_BLOCKING_PAIRS: [PermitType, PermitType][] = [
   ['hot_work', 'chemical'],
   ['hot_work', 'confined_space'],
 ];
+
+/** Fixed reaction set for updates (no free input: nothing to sanitise, no hidden messages). */
+export const REACTIONS = ['👍', '✅', '👀', '❤️', '🙏'] as const;
+export type Reaction = (typeof REACTIONS)[number];
+export const REACTION_LABELS: Record<Reaction, string> = { '👍': 'אהבתי', '✅': 'בוצע', '👀': 'בבדיקה', '❤️': 'תודה', '🙏': 'בבקשה' };
+/** How many recently opened boards are kept / shown per user. */
+export const RECENT_BOARDS_KEEP = 20;
+export const RECENT_BOARDS_SHOW = 8;

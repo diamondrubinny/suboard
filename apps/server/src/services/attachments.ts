@@ -1,4 +1,4 @@
-import type { Attachment, AttachmentStatus } from '@suboard/shared';
+import type { Attachment, AttachmentStatus, BoardFile } from '@suboard/shared';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { readFile, rename, rm, writeFile } from 'node:fs/promises';
@@ -171,6 +171,30 @@ export class AttachmentService {
       }
     }
     return pending.length;
+  }
+
+  /** Gallery: every scanned-clean file on the board's live items, newest first. */
+  listForBoard(actor: Actor, boardId: string): BoardFile[] {
+    this.access.requireBoard(actor, boardId, 'viewer');
+    const rows = this.db
+      .prepare(
+        `SELECT a.id, a.item_id, i.name AS item_name, i.group_id, a.original_name, a.mime, a.size, a.created_at
+         FROM attachments a JOIN items i ON i.id = a.item_id
+         WHERE i.board_id = ? AND a.status = 'clean' AND i.deleted_at IS NULL
+         ORDER BY a.created_at DESC LIMIT 500`,
+      )
+      .all(boardId) as { id: string; item_id: string; item_name: string; group_id: string; original_name: string; mime: string; size: number; created_at: string }[];
+    return rows.map((r) => ({
+      id: r.id,
+      itemId: r.item_id,
+      itemName: r.item_name,
+      groupId: r.group_id,
+      name: r.original_name,
+      mime: r.mime,
+      size: r.size,
+      createdAt: r.created_at,
+      isImage: /^image\/(png|jpeg|webp)$/.test(r.mime),
+    }));
   }
 
   /** Returns file metadata + absolute path for a clean attachment the actor may view. */
