@@ -26,6 +26,8 @@ import { AnalyticsService } from './analytics.js';
 import { TrainingService } from './trainings.js';
 import { PermitService } from './permits.js';
 import { PlanService, ProcedureService } from './procedures.js';
+import { SsoService } from './sso.js';
+import { ScimService } from './scim.js';
 import { DashboardService as CustomDashboardService, DependencyService, MonthlyReportJob } from './planning.js';
 import { ClamdScanner, UnsafeNoopScanner, type Scanner } from '../lib/clamav.js';
 import { createMailer, type Mailer } from '../lib/mailer.js';
@@ -61,6 +63,8 @@ export interface Services {
   permits: PermitService;
   procedures: ProcedureService;
   plans: PlanService;
+  sso: SsoService;
+  scim: ScimService;
 }
 
 /** Infrastructure that tests (or alternative deployments) can substitute. */
@@ -108,8 +112,10 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const permits = new PermitService(db, notifications);
   const procedures = new ProcedureService(db, notifications);
   const plans = new PlanService(db, access);
+  const sso = new SsoService(db, config, auth, audit);
+  const scim = new ScimService(db, config, auth, audit);
   return {
     audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
-    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, permits, procedures, plans,
+    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, permits, procedures, plans, sso, scim,
   };
 }

@@ -21,6 +21,7 @@ import { automationRoutes } from './routes/automations.js';
 import { fieldRoutes } from './routes/field.js';
 import { planningRoutes } from './routes/planning.js';
 import { moduleRoutes } from './routes/modules.js';
+import { scimRoutes } from './routes/scim.js';
 import { createServices, type ServiceOverrides, type Services } from './services/index.js';
 
 declare module 'fastify' {
@@ -64,6 +65,7 @@ export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOver
   services.monthly.setLogger(app.log);
   services.trainings.setLogger(app.log);
   services.permits.setLogger(app.log);
+  services.sso.setLogger(app.log);
   app.decorate('services', services);
 
   await app.register(helmet, {
@@ -130,6 +132,9 @@ export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOver
     }
     return reply.code(status).send({ error: { code: err.code ?? 'BAD_REQUEST', message: GENERIC_BY_STATUS[status] ?? 'הבקשה נכשלה' } });
   });
+
+  // ---- SCIM 2.0 provisioning (bearer token; registered only when SCIM_TOKEN is set)
+  if (services.scim.enabled) await app.register(scimRoutes, { prefix: '/scim/v2', scim: services.scim });
 
   // ---- API
   await app.register(

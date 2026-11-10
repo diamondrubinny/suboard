@@ -18,6 +18,8 @@ interface UserRow {
   locked_until: string | null;
   mfa_enabled: number;
   email_notifications: number;
+  auth_source: 'local' | 'sso' | 'scim';
+  sso_subject: string | null;
   monthly_report: number;
 }
 
@@ -61,7 +63,13 @@ export class AuthService {
       throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
     }
 
-    // Password is correct. With MFA enrolled, a second factor is required before any session exists.
+    // Password is correct. Organisational policy may restrict password sign-in once SSO exists
+    // (checked only after a correct password, so the message reveals nothing to a guesser).
+    if (this.config.localLogin === 'disabled' || (this.config.localLogin === 'admins_only' && row.role !== 'admin')) {
+      this.audit.log('login_failed', { userId: row.id, ip: meta.ip, meta: { reason: 'local_login_disabled' } });
+      throw new AppError(403, 'USE_SSO', `התחברות בסיסמה אינה זמינה — יש להשתמש ב"${this.config.sso?.label ?? 'התחברות ארגונית'}"`);
+    }
+    // With MFA enrolled, a second factor is required before any session exists.
     if (row.mfa_enabled) {
       this.db.prepare('UPDATE users SET failed_logins = 0 WHERE id = ?').run(row.id);
       return { kind: 'mfa', challengeToken: this.mfa.createChallenge(row.id) };
@@ -76,18 +84,29 @@ export class AuthService {
     return this.startSession(row, meta);
   }
 
-  private startSession(row: UserRow, meta: { ip: string; userAgent?: string }): LoginResult {
+  /**
+   * After a successful OIDC login. `idpMfa`: the IdP reported (or is trusted to enforce) MFA. Without
+   * it, a user who enrolled local TOTP still has to enter a code.
+   */
+  ssoLogin(userId: string, idpMfa: boolean, meta: { ip: string; userAgent?: string }): LoginResult {
+    const row = this.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined;
+    if (!row || !row.is_active) throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
+    if (row.mfa_enabled && !idpMfa) return { kind: 'mfa', challengeToken: this.mfa.createChallenge(row.id) };
+    return this.startSession(row, meta, { sso: true, idpMfa });
+  }
+
+  private startSession(row: UserRow, meta: { ip: string; userAgent?: string }, via: { sso: boolean; idpMfa: boolean } = { sso: false, idpMfa: false }): LoginResult {
     const token = newSessionToken();
     const ts = nowIso();
     this.db.transaction(() => {
       this.db.prepare('UPDATE users SET failed_logins = 0, locked_until = NULL, last_login_at = ? WHERE id = ?').run(ts, row.id);
       this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND expires_at < ?').run(row.id, ts);
       this.db
-        .prepare('INSERT INTO sessions (id, user_id, created_at, expires_at, last_seen_at, user_agent) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(sha256(token), row.id, ts, new Date(Date.now() + this.config.sessionTtlMs).toISOString(), ts, meta.userAgent?.slice(0, 200) ?? null);
+        .prepare('INSERT INTO sessions (id, user_id, created_at, expires_at, last_seen_at, user_agent, via_sso, idp_mfa) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(sha256(token), row.id, ts, new Date(Date.now() + this.config.sessionTtlMs).toISOString(), ts, meta.userAgent?.slice(0, 200) ?? null, via.sso ? 1 : 0, via.idpMfa ? 1 : 0);
     })();
-    this.audit.log('login_success', { userId: row.id, ip: meta.ip, meta: { mfa: row.mfa_enabled === 1 } });
-    return { kind: 'session', token, user: this.toSessionUser(row) };
+    this.audit.log(via.sso ? 'sso_login_success' : 'login_success', { userId: row.id, ip: meta.ip, meta: { mfa: row.mfa_enabled === 1 || via.idpMfa, idpMfa: via.idpMfa } });
+    return { kind: 'session', token, user: this.toSessionUser(row, via.idpMfa) };
   }
 
   private registerFailure(row: UserRow, ip: string): void {
@@ -108,10 +127,10 @@ export class AuthService {
     const id = sha256(token);
     const row = this.db
       .prepare(
-        `SELECT s.id AS session_id, s.expires_at, s.last_seen_at, u.*
+        `SELECT s.id AS session_id, s.expires_at, s.last_seen_at, s.idp_mfa, u.*
          FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`,
       )
-      .get(id) as (UserRow & { session_id: string; expires_at: string; last_seen_at: string }) | undefined;
+      .get(id) as (UserRow & { session_id: string; expires_at: string; last_seen_at: string; idp_mfa: number }) | undefined;
     if (!row) return null;
 
     const now = Date.now();
@@ -124,7 +143,7 @@ export class AuthService {
     if (now - Date.parse(row.last_seen_at) > 60_000) {
       this.db.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?').run(new Date(now).toISOString(), id);
     }
-    return { sessionId: id, user: this.toSessionUser(row) };
+    return { sessionId: id, user: this.toSessionUser(row, row.idp_mfa === 1) };
   }
 
   logout(sessionId: string, userId: string, ip: string): void {
@@ -177,7 +196,7 @@ export class AuthService {
     return this.db.prepare('DELETE FROM sessions WHERE expires_at < ? OR last_seen_at < ?').run(nowIso(), idleCutoff).changes;
   }
 
-  private toSessionUser(row: UserRow): SessionUser {
+  private toSessionUser(row: UserRow, idpMfa = false): SessionUser {
     const mfaEnabled = row.mfa_enabled === 1;
     return {
       id: row.id,
@@ -186,7 +205,9 @@ export class AuthService {
       role: row.role,
       mustChangePassword: row.must_change_password === 1,
       mfaEnabled,
-      mfaSetupRequired: !mfaEnabled && this.config.mfaRequiredRoles.includes(row.role),
+      // MFA done at the identity provider satisfies the requirement for this session.
+      mfaSetupRequired: !mfaEnabled && !idpMfa && this.config.mfaRequiredRoles.includes(row.role),
+      authSource: row.auth_source,
       emailNotifications: row.email_notifications === 1,
       monthlyReport: row.monthly_report === 1,
     };

@@ -15,6 +15,8 @@ export interface SessionUser {
   emailNotifications: boolean;
   /** Monthly management e-mail (managers / admins). */
   monthlyReport: boolean;
+  /** How the account is managed: local password, SSO, or provisioned by SCIM. */
+  authSource: 'local' | 'sso' | 'scim';
 }
 
 export interface DirectoryUser {

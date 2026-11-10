@@ -48,6 +48,24 @@ const envSchema = z
     CLAMAV_TIMEOUT_MS: z.coerce.number().int().min(1000).default(30000),
     /** DEVELOPMENT ONLY: mark uploads clean without scanning. Rejected in production. */
     CLAMAV_SCAN_DISABLED_UNSAFE: bool.optional(),
+    /** OpenID Connect SSO (e.g. https://login.microsoftonline.com/<tenant-id>/v2.0). All three enable SSO. */
+    OIDC_ISSUER: z.string().url().optional(),
+    OIDC_CLIENT_ID: z.string().min(1).optional(),
+    OIDC_CLIENT_SECRET: z.string().min(1).optional(),
+    OIDC_SCOPES: z.string().default('openid profile email'),
+    /** TEST / DEV ONLY: allow an http:// issuer (a local stub). Rejected in production. */
+    OIDC_ALLOW_INSECURE: bool.optional(),
+    SSO_LABEL: z.string().min(1).max(60).default('התחברות ארגונית'),
+    /** Create a member account on first SSO login (otherwise the user must exist / be provisioned by SCIM). */
+    SSO_JIT_PROVISIONING: bool.optional(),
+    /** Comma-separated e-mail domains allowed to sign in via SSO ('' = any domain the IdP vouches for). */
+    SSO_ALLOWED_DOMAINS: z.string().default(''),
+    /** Trust the IdP's MFA policy without checking the `amr` claim. */
+    SSO_TRUST_IDP_MFA: bool.optional(),
+    /** Password login: enabled | admins_only (break-glass) | disabled. Restricting it requires SSO. */
+    LOCAL_LOGIN: z.enum(['enabled', 'admins_only', 'disabled']).default('enabled'),
+    /** SCIM 2.0 bearer token (min 32 chars); unset = SCIM disabled. */
+    SCIM_TOKEN: z.string().min(32, 'min 32 characters').optional(),
   })
   .superRefine((env, ctx) => {
     if (env.NODE_ENV === 'production' && (!env.AUDIT_IP_SECRET || env.AUDIT_IP_SECRET.length < 32)) {
@@ -58,6 +76,16 @@ const envSchema = z
     }
     if (env.NODE_ENV === 'production' && env.CLAMAV_SCAN_DISABLED_UNSAFE) {
       ctx.addIssue({ code: 'custom', path: ['CLAMAV_SCAN_DISABLED_UNSAFE'], message: 'not allowed in production' });
+    }
+    const ssoParts = [env.OIDC_ISSUER, env.OIDC_CLIENT_ID, env.OIDC_CLIENT_SECRET].filter(Boolean).length;
+    if (ssoParts !== 0 && ssoParts !== 3) {
+      ctx.addIssue({ code: 'custom', path: ['OIDC_ISSUER'], message: 'OIDC_ISSUER, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET must be set together' });
+    }
+    if (env.LOCAL_LOGIN !== 'enabled' && ssoParts !== 3) {
+      ctx.addIssue({ code: 'custom', path: ['LOCAL_LOGIN'], message: 'password login can only be restricted once SSO (OIDC_*) is configured' });
+    }
+    if (env.NODE_ENV === 'production' && env.OIDC_ALLOW_INSECURE) {
+      ctx.addIssue({ code: 'custom', path: ['OIDC_ALLOW_INSECURE'], message: 'not allowed in production' });
     }
     if (env.NODE_ENV === 'production' && env.COOKIE_SECURE === false) {
       ctx.addIssue({ code: 'custom', path: ['COOKIE_SECURE'], message: 'must not be false in production' });
@@ -94,6 +122,19 @@ export interface AppConfig {
   maxUploadBytes: number;
   clamav: { host?: string; port: number; socket?: string; timeoutMs: number } | null;
   scanDisabledUnsafe: boolean;
+  sso: {
+    issuer: string;
+    clientId: string;
+    clientSecret: string;
+    scopes: string;
+    allowInsecure: boolean;
+    label: string;
+    jit: boolean;
+    allowedDomains: string[];
+    trustIdpMfa: boolean;
+  } | null;
+  localLogin: 'enabled' | 'admins_only' | 'disabled';
+  scimToken: string | null;
 }
 
 export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -138,5 +179,21 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     maxUploadBytes: Math.round(e.MAX_UPLOAD_MB * 1024 * 1024),
     clamav: e.CLAMAV_HOST || e.CLAMAV_SOCKET ? { host: e.CLAMAV_HOST, port: e.CLAMAV_PORT, socket: e.CLAMAV_SOCKET, timeoutMs: e.CLAMAV_TIMEOUT_MS } : null,
     scanDisabledUnsafe: e.CLAMAV_SCAN_DISABLED_UNSAFE ?? false,
+    sso:
+      e.OIDC_ISSUER && e.OIDC_CLIENT_ID && e.OIDC_CLIENT_SECRET
+        ? {
+            issuer: e.OIDC_ISSUER,
+            clientId: e.OIDC_CLIENT_ID,
+            clientSecret: e.OIDC_CLIENT_SECRET,
+            scopes: e.OIDC_SCOPES,
+            allowInsecure: e.OIDC_ALLOW_INSECURE ?? false,
+            label: e.SSO_LABEL,
+            jit: e.SSO_JIT_PROVISIONING ?? false,
+            allowedDomains: e.SSO_ALLOWED_DOMAINS.split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
+            trustIdpMfa: e.SSO_TRUST_IDP_MFA ?? false,
+          }
+        : null,
+    localLogin: e.LOCAL_LOGIN,
+    scimToken: e.SCIM_TOKEN ?? null,
   };
 }

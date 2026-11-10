@@ -490,3 +490,26 @@ attachments(id, item_id, board_id, uploaded_by, original_name, mime, size, sha25
 | `GET/POST /permits`, `GET /permits/:id`, `POST /permits/:id/submit|approve|reject|close|cancel`, `POST /permits/check` (התנגשויות) | לפי תפקיד בהיתר |
 | `GET/POST /procedures`, `GET/PATCH /procedures/:id`, `POST /procedures/:id/versions`, `POST /procedure-versions/:id/ack`, `GET /me/procedures` | manager/admin · קהל |
 | `GET/PUT /attachments/:id/pins` (+ `GET /attachments/:id/view` לתצוגת תמונה) | צופה / עורך |
+
+## 19. התחברות ארגונית (SSO) וסנכרון משתמשים (SCIM) — אפיון
+
+**החלטה (10/11/2026):** SSO + SCIM בלבד מגל F. **התחברות רגילה (דוא"ל + סיסמה) נשארת פעילה עד שה-SSO יוגדר**; שאר גל F נדחה.
+
+| # | פיצ'ר | פירוט |
+|---|------|-------|
+| F1 | **SSO ב-OpenID Connect** | Microsoft Entra ID (או כל ספק OIDC): Authorization Code + PKCE, `state` + `nonce`, אימות חתימת ID Token, מנפיק וקהל (ספריית `openid-client`). כפתור "התחברות ארגונית" בעמוד הכניסה. קישור משתמש: מזהה ייחודי מהספק (`oid`/`sub`) → ובכניסה הראשונה לפי דוא"ל. משתמש שאין לו חשבון — נדחה (אלא אם הופעל יצירה אוטומטית, `SSO_JIT_PROVISIONING`), עם הגבלת דומיינים אופציונלית |
+| F2 | **מדיניות התחברות רגילה** | `LOCAL_LOGIN`: `enabled` (ברירת מחדל) / `admins_only` (חשבון חירום למנהלי מערכת) / `disabled`. **לא ניתן לחסום התחברות רגילה כל עוד SSO לא מוגדר** (השרת מסרב לעלות) |
+| F3 | **MFA עם SSO** | ברירת מחדל: ה-MFA נאכף אצל ספק הזהות (Conditional Access). אם הספק מדווח `amr` עם `mfa` — נחשב אימות דו-שלבי; אחרת, למי שהפעיל TOTP במערכת — נדרש גם קוד מקומי. `SSO_TRUST_IDP_MFA=true` סומך על מדיניות הספק בלי לבדוק `amr` |
+| F4 | **SCIM 2.0** | `/scim/v2/Users` (+ `ServiceProviderConfig`, `ResourceTypes`, `Schemas`): יצירה, עדכון (PUT/PATCH), השבתה (`active=false` או DELETE — **השבתה, לא מחיקה**, כדי לשמור היסטוריה), חיפוש `userName eq`. אסימון Bearer (`SCIM_TOKEN`, ≥ 32 תווים), rate-limit. משתמשים מ-SCIM נוצרים בתפקיד `member`, ללא סיסמה (כניסה ב-SSO בלבד); תפקידים נקבעים במערכת ע"י מנהל. השבתה מבטלת את כל הסשנים מיד. **קבוצות (Groups) — לא בשלב זה** |
+
+### אבטחה
+
+- קובץ ה-`client secret` ו-`SCIM_TOKEN` — משתני סביבה בלבד. ה-redirect URI מחושב מ-`PUBLIC_URL` (לא מהבקשה).
+- `state`/`nonce`/`code_verifier` נשמרים בשרת (טבלה, 10 דק', שימוש חד-פעמי); בדפדפן רק מזהה אקראי בעוגייה `sb_sso` (HttpOnly, Secure, SameSite=Lax — הכרחי כי החזרה מהספק היא ניווט מאתר אחר), נמחקת מיד.
+- אחרי הצלחה: הפניה דרך דף ביניים באותו מקור (כך שעוגיית הסשן `SameSite=Strict` נשלחת), ל-`next` שעבר בדיקת נתיב פנימי.
+- יומן אבטחה: `sso_login_success`, `sso_login_failed` (סיבה), `scim_user_created/updated/deactivated`.
+- נקודות SCIM מחוץ ל-`/api` (ללא עוגיות; CSRF לא רלוונטי), מאומתות באסימון בלבד בהשוואה בזמן קבוע.
+
+### נתונים (מיגרציה 8)
+
+`users.sso_subject` (ייחודי), `users.auth_source` (`local`/`sso`/`scim`), `users.scim_external_id`; טבלת `sso_states`.

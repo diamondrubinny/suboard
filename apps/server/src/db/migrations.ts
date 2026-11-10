@@ -465,4 +465,28 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       );
     `,
   },
+  {
+    version: 8,
+    name: 'sso_scim',
+    sql: /* sql */ `
+      ALTER TABLE users ADD COLUMN sso_subject TEXT;
+      CREATE UNIQUE INDEX idx_users_sso_subject ON users(sso_subject) WHERE sso_subject IS NOT NULL;
+      ALTER TABLE users ADD COLUMN auth_source TEXT NOT NULL DEFAULT 'local';
+      ALTER TABLE users ADD COLUMN scim_external_id TEXT;
+      CREATE UNIQUE INDEX idx_users_scim_external ON users(scim_external_id) WHERE scim_external_id IS NOT NULL;
+      -- Session established through the IdP with MFA (satisfies MFA_REQUIRED_ROLES without local TOTP).
+      ALTER TABLE sessions ADD COLUMN idp_mfa INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE sessions ADD COLUMN via_sso INTEGER NOT NULL DEFAULT 0;
+
+      -- Pending OIDC logins: state / nonce / PKCE verifier stay server-side, one use, 10 minutes.
+      CREATE TABLE sso_states (
+        id TEXT PRIMARY KEY,                -- sha256 of the random cookie value
+        state TEXT NOT NULL,
+        nonce TEXT NOT NULL,
+        code_verifier TEXT NOT NULL,
+        next_path TEXT NOT NULL DEFAULT '/',
+        expires_at TEXT NOT NULL
+      );
+    `,
+  },
 ];

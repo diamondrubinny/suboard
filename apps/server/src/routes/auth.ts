@@ -3,6 +3,9 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { AppConfig } from '../config.js';
 import { actorOf, clearSessionCookie, setSessionCookie } from '../plugins/auth.js';
 import type { LoginResult } from '../services/auth.js';
+import { safeNext, SsoError } from '../services/sso.js';
+
+const escapeAttr = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 import type { Services } from '../services/index.js';
 
 export async function authRoutes(app: FastifyInstance, { services, config }: { services: Services; config: AppConfig }) {
@@ -16,6 +19,51 @@ export async function authRoutes(app: FastifyInstance, { services, config }: { s
   app.post('/auth/login', { config: { public: true, rateLimit: loginLimit } }, async (req, reply) => {
     const input = loginSchema.parse(req.body);
     return respond(reply, await services.auth.login(input.email, input.password, { ip: req.ip, userAgent: req.headers['user-agent'] }));
+  });
+
+  // ---- SSO (OpenID Connect)
+  const SSO_COOKIE = 'sb_sso';
+  const ssoCookieOpts = { httpOnly: true, secure: config.cookieSecure, sameSite: 'lax' as const, path: '/api/auth/sso' };
+  /** Same-origin hop page: the next navigation starts on our site, so the SameSite=Strict session cookie is sent. */
+  const hop = (reply: FastifyReply, to: string) =>
+    reply
+      .header('Content-Type', 'text/html; charset=utf-8')
+      .header('Cache-Control', 'no-store')
+      .header('Referrer-Policy', 'no-referrer')
+      .send(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${escapeAttr(to)}"><title>מעביר…</title></head><body><p><a href="${escapeAttr(to)}">המשך</a></p></body></html>`);
+
+  app.get('/auth/sso/config', { config: { public: true } }, async () => services.sso.publicConfig());
+
+  app.get('/auth/sso/start', { config: { public: true, rateLimit: loginLimit } }, async (req, reply) => {
+    if (!services.sso.enabled) return hop(reply, '/login?sso_error=unavailable');
+    try {
+      const { url, cookie } = await services.sso.start((req.query as { next?: string }).next);
+      reply.setCookie(SSO_COOKIE, cookie, { ...ssoCookieOpts, maxAge: 600 });
+      return reply.redirect(url, 302);
+    } catch (err) {
+      return hop(reply, `/login?sso_error=${err instanceof SsoError ? err.code : 'unavailable'}`);
+    }
+  });
+
+  app.get('/auth/sso/callback', { config: { public: true, rateLimit: loginLimit } }, async (req, reply) => {
+    const cookie = req.cookies[SSO_COOKIE];
+    reply.clearCookie(SSO_COOKIE, ssoCookieOpts);
+    const q = req.query as { error?: string };
+    if (q.error) {
+      services.audit.log('sso_login_failed', { ip: req.ip, meta: { reason: 'idp_error', detail: String(q.error).slice(0, 60) } });
+      return hop(reply, '/login?sso_error=exchange');
+    }
+    try {
+      // The redirect URI is built from PUBLIC_URL, never from the request's Host header.
+      const callbackUrl = new URL(req.url, config.publicUrl);
+      const { result, next } = await services.sso.callback(cookie, callbackUrl, { ip: req.ip, userAgent: req.headers['user-agent'] });
+      if (result.kind === 'mfa') return hop(reply, `/login?next=${encodeURIComponent(next)}#mfa=${encodeURIComponent(result.challengeToken)}`);
+      setSessionCookie(reply, result.token, config);
+      return hop(reply, safeNext(next));
+    } catch (err) {
+      if (!(err instanceof SsoError)) req.log.error({ err }, 'SSO callback failed');
+      return hop(reply, `/login?sso_error=${err instanceof SsoError ? err.code : 'exchange'}`);
+    }
   });
 
   app.post('/auth/mfa/verify', { config: { public: true, rateLimit: loginLimit } }, async (req, reply) => {

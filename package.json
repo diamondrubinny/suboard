@@ -21,5 +21,9 @@
     "audit:deps": "npm audit --omit=dev",
     "backup": "npm run backup -w @suboard/server --",
     "sync-design": "node scripts/sync-design.mjs"
+  },
+  "overrides": {
+    "jose": "6.2.13",
+    "oauth4webapi": "3.8.8"
   }
 }

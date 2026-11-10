@@ -24,7 +24,13 @@ export type AuditEvent =
   | 'mfa_reset'
   | 'upload_rejected'
   | 'malware_detected'
-  | 'data_export';
+  | 'data_export'
+  | 'sso_login_success'
+  | 'sso_login_failed'
+  | 'scim_user_created'
+  | 'scim_user_updated'
+  | 'scim_user_deactivated'
+  | 'scim_auth_failed';
 
 /**
  * Security audit trail. Stores an HMAC of the client IP (never the raw IP) and only
