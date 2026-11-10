@@ -1,7 +1,7 @@
 # עיצוב — SUBoard Spectrum
 
 מקור האמת לעיצוב הוא מערכת העיצוב **SUBoard Spectrum** ב-claude.ai Design:
-https://claude.ai/artifact/ALsm6bLsE2AwqWCd6qvBQh (גרסה 9, 10/11/2026 — כולל רכיבי גל A).
+https://claude.ai/artifact/ALsm6bLsE2AwqWCd6qvBQh (גרסה 10, 10/11/2026 — כולל רכיבי גלים A–B: RuleBuilder, AutomationCard, StatusBars).
 
 ## איך הקוד מחובר למערכת העיצוב
 
