@@ -10,6 +10,25 @@ import type { NotificationService } from './notifications.js';
 
 const DAY = 86_400_000;
 
+/**
+ * Who performs a change: a signed-in user, or the system on behalf of an automation / recurring
+ * item (`id: null`, shown in history as "אוטומציה «name»").
+ */
+export interface Doer {
+  id: string | null;
+  name: string;
+  /** Set for system changes: the rule / recurrence label recorded in the activity log. */
+  automation?: string;
+}
+
+/** Emitted after a user's change is committed (never for system changes: no automation chaining). */
+export interface ItemEvent {
+  kind: 'created' | 'changed';
+  boardId: string;
+  before: Item | null;
+  after: Item;
+}
+
 export class ItemService {
   constructor(
     private readonly db: DB,
@@ -18,6 +37,27 @@ export class ItemService {
     private readonly activity: ActivityService,
     private readonly notifications: NotificationService,
   ) {}
+
+  private listeners: ((e: ItemEvent) => void)[] = [];
+
+  /** Subscribe to committed user changes (used by the automation engine). */
+  onItemEvent(fn: (e: ItemEvent) => void): void {
+    this.listeners.push(fn);
+  }
+
+  private emit(e: ItemEvent): void {
+    for (const fn of this.listeners) {
+      try {
+        fn(e);
+      } catch {
+        // Listeners record their own failures; a listener must never fail the user's request.
+      }
+    }
+  }
+
+  private record(doer: Doer, boardId: string, action: Parameters<ActivityService['record']>[2], detail: Record<string, unknown>, itemId?: string): void {
+    this.activity.record(boardId, doer.id, action, doer.automation ? { ...detail, automation: doer.automation } : detail, itemId);
+  }
 
   // ---------------------------------------------------------------- helpers
   /** User ids present in `next` person columns but not in `prev` (newly assigned). */
@@ -59,7 +99,7 @@ export class ItemService {
   }
 
   /** Users that may be assigned / mentioned on a board: active members, or system admins. */
-  private assertUsersOnBoard(boardId: string, ids: string[], label: string, field: string): void {
+  assertUsersOnBoard(boardId: string, ids: string[], label: string, field: string): void {
     if (!ids.length) return;
     const found = this.db
       .prepare(
@@ -75,7 +115,7 @@ export class ItemService {
    * Validates a partial `values` patch against the board's columns: shape by type, label options
    * exist, referenced users are board members, computed columns are never written.
    */
-  private validateValues(boardId: string, patch: Record<string, unknown>): Record<string, CellValue> {
+  validateValues(boardId: string, patch: Record<string, unknown>): Record<string, CellValue> {
     const columns = new Map<string, Column>(this.boards.columns(boardId).map((c) => [c.id, c]));
     const out: Record<string, CellValue> = {};
     for (const [columnId, raw] of Object.entries(patch)) {
@@ -109,7 +149,7 @@ export class ItemService {
   }
 
   private insertItem(
-    actor: Actor,
+    actor: Doer,
     boardId: string,
     groupId: string,
     parentId: string | null,
@@ -131,6 +171,17 @@ export class ItemService {
   // ---------------------------------------------------------------- CRUD
   create(actor: Actor, boardId: string, input: { groupId: string; parentId?: string; name: string; values?: Record<string, unknown> }): Item {
     this.access.requireBoard(actor, boardId, 'editor');
+    const item = this.createAs(actor, boardId, input);
+    this.emit({ kind: 'created', boardId, before: null, after: item });
+    return item;
+  }
+
+  /** System create (automation / recurring item): validated like a user's, but never emits events. */
+  systemCreate(doer: Doer, boardId: string, input: { groupId: string; parentId?: string; name: string; values?: Record<string, unknown> }): Item {
+    return this.createAs(doer, boardId, input);
+  }
+
+  private createAs(actor: Doer, boardId: string, input: { groupId: string; parentId?: string; name: string; values?: Record<string, unknown> }): Item {
     let groupId = input.groupId;
     if (input.parentId) {
       const parent = this.getRow(input.parentId);
@@ -144,7 +195,7 @@ export class ItemService {
     let id = '';
     this.db.transaction(() => {
       id = this.insertItem(actor, boardId, groupId, input.parentId ?? null, input.name, values);
-      this.activity.record(boardId, actor.id, 'item_created', { name: input.name, ...(input.parentId ? { parentId: input.parentId } : {}) }, id);
+      this.record(actor, boardId, 'item_created', { name: input.name, ...(input.parentId ? { parentId: input.parentId } : {}) }, id);
       this.boards.touch(boardId);
     })();
     this.notifications.onAssigned(actor, boardId, id, input.name, this.newAssignees(boardId, {}, values));
@@ -154,7 +205,31 @@ export class ItemService {
   update(actor: Actor, itemId: string, input: { name?: string; groupId?: string; position?: number; values?: Record<string, unknown> }): Item {
     const boardId = this.access.boardIdForItem(itemId);
     this.access.requireBoard(actor, boardId, 'editor');
-    const item = this.getRow(itemId);
+    const before = this.getRow(itemId);
+    const after = this.updateAs(actor, boardId, before, input);
+    const changed = before.name !== after.name || before.groupId !== after.groupId || JSON.stringify(before.values) !== JSON.stringify(after.values);
+    if (changed) this.emit({ kind: 'changed', boardId, before, after });
+    return after;
+  }
+
+  /** System update (automation): same validation and history as a user's, never emits events. */
+  systemUpdate(doer: Doer, itemId: string, input: { groupId?: string; values?: Record<string, unknown> }): Item {
+    const boardId = this.access.boardIdForItem(itemId);
+    return this.updateAs(doer, boardId, this.getRow(itemId), input);
+  }
+
+  /** A live item (internal use by trusted services that already checked access). */
+  getLive(itemId: string): Item {
+    return this.getRow(itemId);
+  }
+
+  private updateAs(
+    actor: Doer,
+    boardId: string,
+    item: Item,
+    input: { name?: string; groupId?: string; position?: number; values?: Record<string, unknown> },
+  ): Item {
+    const itemId = item.id;
     if (input.groupId) {
       this.assertGroupInBoard(input.groupId, boardId);
       if (item.parentId) throw badRequest('תת-פריט עובר קבוצה יחד עם פריט האב');
@@ -168,7 +243,7 @@ export class ItemService {
       if (input.name !== undefined && input.name !== item.name) {
         sets.push('name = ?');
         params.push(input.name);
-        this.activity.record(boardId, actor.id, 'item_renamed', { from: item.name, to: input.name }, itemId);
+        this.record(actor, boardId, 'item_renamed', { from: item.name, to: input.name }, itemId);
       }
       if (input.groupId !== undefined && input.groupId !== item.groupId) {
         sets.push('group_id = ?');
@@ -179,7 +254,7 @@ export class ItemService {
         }
         // Sub-items always live in their parent's group.
         this.db.prepare('UPDATE items SET group_id = ? WHERE parent_id = ?').run(input.groupId, itemId);
-        this.activity.record(boardId, actor.id, 'item_moved', { fromGroupId: item.groupId, toGroupId: input.groupId }, itemId);
+        this.record(actor, boardId, 'item_moved', { fromGroupId: item.groupId, toGroupId: input.groupId }, itemId);
       }
       if (input.position !== undefined) {
         sets.push('position = ?');
@@ -193,9 +268,9 @@ export class ItemService {
           if (v === null) delete values[columnId];
           else values[columnId] = v;
           const col = columns.get(columnId);
-          this.activity.record(
+          this.record(
+            actor,
             boardId,
-            actor.id,
             'item_value_changed',
             // Long text is not copied into history (may be long / sensitive); only the fact of change.
             col?.type === 'long_text'
@@ -297,7 +372,9 @@ export class ItemService {
       this.activity.record(boardId, actor.id, 'item_duplicated', { fromItemId: itemId, name: item.name }, newIdValue);
       this.boards.touch(boardId);
     })();
-    return this.getRow(newIdValue);
+    const copy = this.getRow(newIdValue);
+    this.emit({ kind: 'created', boardId, before: null, after: copy });
+    return copy;
   }
 
   /**
@@ -416,10 +493,12 @@ export class ItemService {
     input.rows.forEach((row, idx) => {
       try {
         const values = this.validateValues(boardId, row.values ?? {});
+        let id = '';
         this.db.transaction(() => {
-          this.insertItem(actor, boardId, input.groupId, null, row.name, values);
+          id = this.insertItem(actor, boardId, input.groupId, null, row.name, values);
         })();
         created++;
+        this.emit({ kind: 'created', boardId, before: null, after: this.getRow(id) });
       } catch (err) {
         errors.push({ row: idx + 1, message: err instanceof AppError ? err.message : 'שגיאה' });
       }

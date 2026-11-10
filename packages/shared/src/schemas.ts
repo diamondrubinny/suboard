@@ -287,6 +287,136 @@ export const importSchema = z.object({
 
 export const searchQuerySchema = z.object({ q: z.string().trim().min(2, 'לפחות 2 תווים').max(LIMITS.searchQuery) });
 
+// ---------- Wave B: automations ----------
+const days = (min: number, max: number) => z.number().int().min(min).max(max);
+
+export const ruleTriggerSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('item_created') }),
+  /** `to` omitted = any change of this status column. */
+  z.object({ type: z.literal('status_changed'), columnId: idSchema, to: z.string().max(40).optional() }),
+  z.object({ type: z.literal('checkbox_checked'), columnId: idSchema }),
+  z.object({ type: z.literal('person_assigned'), columnId: idSchema }),
+  /** Scheduled: fires on the day `date + offsetDays` (negative = before the date). */
+  z.object({ type: z.literal('date_reached'), columnId: idSchema, offsetDays: days(-365, 365) }),
+  /** Scheduled (SLA): the item has carried status `optionId` for at least `days` days. */
+  z.object({ type: z.literal('status_stale'), columnId: idSchema, optionId: z.string().min(1).max(40), days: days(1, 365) }),
+]);
+export type RuleTrigger = z.infer<typeof ruleTriggerSchema>;
+
+export const ruleConditionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('status_is'), columnId: idSchema, optionIds: z.array(z.string().min(1).max(40)).min(1).max(LIMITS.statusOptions) }),
+  z.object({ type: z.literal('status_is_not'), columnId: idSchema, optionIds: z.array(z.string().min(1).max(40)).min(1).max(LIMITS.statusOptions) }),
+  z.object({ type: z.literal('not_done') }),
+  z.object({ type: z.literal('group_is'), groupId: idSchema }),
+  z.object({ type: z.literal('person_empty'), columnId: idSchema }),
+]);
+export type RuleCondition = z.infer<typeof ruleConditionSchema>;
+
+export const notifyTargetSchema = z
+  .object({
+    userIds: z.array(idSchema).max(LIMITS.personsPerCell).default([]),
+    /** Notify whoever is assigned in this person column. */
+    columnId: idSchema.optional(),
+    owners: z.boolean().default(false),
+  })
+  .refine((t) => t.userIds.length > 0 || t.columnId || t.owners, 'יש לבחור למי לשלוח');
+
+export const ruleActionSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('set_status'), columnId: idSchema, optionId: z.string().min(1).max(40) }),
+  z.object({ type: z.literal('set_checkbox'), columnId: idSchema, value: z.boolean() }),
+  z.object({ type: z.literal('assign'), columnId: idSchema, userIds: z.array(idSchema).min(1).max(LIMITS.personsPerCell), mode: z.enum(['replace', 'add']).default('replace') }),
+  z.object({ type: z.literal('clear'), columnId: idSchema }),
+  /** Date = today + offsetDays (local time zone). */
+  z.object({ type: z.literal('set_date'), columnId: idSchema, offsetDays: days(-365, 3650) }),
+  z.object({ type: z.literal('move_group'), groupId: idSchema }),
+  z.object({ type: z.literal('notify'), to: notifyTargetSchema, message: line(LIMITS.ruleMessage) }),
+  z.object({ type: z.literal('create_subitem'), name: line(LIMITS.itemName) }),
+]);
+export type RuleAction = z.infer<typeof ruleActionSchema>;
+
+export const createAutomationSchema = z.object({
+  name: line(80),
+  enabled: z.boolean().default(true),
+  trigger: ruleTriggerSchema,
+  conditions: z.array(ruleConditionSchema).max(LIMITS.ruleConditions).default([]),
+  actions: z.array(ruleActionSchema).min(1, 'יש להוסיף לפחות פעולה אחת').max(LIMITS.ruleActions),
+});
+export type CreateAutomationInput = z.input<typeof createAutomationSchema>;
+export const updateAutomationSchema = z
+  .object({
+    name: line(80).optional(),
+    enabled: z.boolean().optional(),
+    trigger: ruleTriggerSchema.optional(),
+    conditions: z.array(ruleConditionSchema).max(LIMITS.ruleConditions).optional(),
+    actions: z.array(ruleActionSchema).min(1, 'יש להוסיף לפחות פעולה אחת').max(LIMITS.ruleActions).optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+
+// ---------- Wave B: recurring items ----------
+export const recurrenceScheduleSchema = z
+  .object({
+    frequency: z.enum(['daily', 'weekly', 'monthly', 'yearly']),
+    interval: z.number().int().min(1).max(36).default(1),
+    /** weekly: 0 = Sunday … 6 = Saturday. */
+    weekdays: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+    /** monthly: day of month 1–31 (clamped to the month's last day). */
+    monthDay: z.number().int().min(1).max(31).optional(),
+    startDate: isoDateSchema,
+    endDate: isoDateSchema.nullable().optional(),
+  })
+  .refine((s) => s.frequency !== 'weekly' || (s.weekdays?.length ?? 0) > 0, { message: 'יש לבחור לפחות יום אחד', path: ['weekdays'] })
+  .refine((s) => !s.endDate || s.endDate >= s.startDate, { message: 'תאריך הסיום לפני תאריך ההתחלה', path: ['endDate'] });
+export type RecurrenceSchedule = z.infer<typeof recurrenceScheduleSchema>;
+
+export const createRecurrenceSchema = z.object({
+  name: line(LIMITS.itemName),
+  groupId: idSchema,
+  values: valuesSchema.optional(),
+  schedule: recurrenceScheduleSchema,
+  /** Optional: set this date column to occurrence date + dueOffsetDays. */
+  dueColumnId: idSchema.nullable().optional(),
+  dueOffsetDays: z.number().int().min(0).max(365).default(0),
+  enabled: z.boolean().default(true),
+});
+export type CreateRecurrenceInput = z.input<typeof createRecurrenceSchema>;
+export const updateRecurrenceSchema = z
+  .object({
+    name: line(LIMITS.itemName).optional(),
+    groupId: idSchema.optional(),
+    values: valuesSchema.optional(),
+    schedule: recurrenceScheduleSchema.optional(),
+    dueColumnId: idSchema.nullable().optional(),
+    dueOffsetDays: z.number().int().min(0).max(365).optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+
+// ---------- Wave B: scheduled reports ----------
+export const createReportSchema = z
+  .object({
+    name: line(80),
+    frequency: z.enum(['daily', 'weekly', 'monthly']),
+    /** weekly: 0 = Sunday … 6 = Saturday. */
+    weekday: z.number().int().min(0).max(6).default(0),
+    /** monthly: 1–28 (exists in every month). */
+    monthDay: z.number().int().min(1).max(28).default(1),
+    recipients: z.array(idSchema).min(1, 'יש לבחור לפחות נמען אחד').max(LIMITS.reportRecipients),
+    enabled: z.boolean().default(true),
+  });
+export type CreateReportInput = z.input<typeof createReportSchema>;
+export const updateReportSchema = z
+  .object({
+    name: line(80).optional(),
+    frequency: z.enum(['daily', 'weekly', 'monthly']).optional(),
+    weekday: z.number().int().min(0).max(6).optional(),
+    monthDay: z.number().int().min(1).max(28).optional(),
+    recipients: z.array(idSchema).min(1, 'יש לבחור לפחות נמען אחד').max(LIMITS.reportRecipients).optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+
+export const icsQuerySchema = z.object({ columnId: idSchema.optional() });
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;

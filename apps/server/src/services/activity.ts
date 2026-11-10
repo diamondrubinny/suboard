@@ -27,7 +27,16 @@ export type ActivityAction =
   | 'item_moved_out'
   | 'item_moved_in'
   | 'items_imported'
-  | 'view_shared';
+  | 'view_shared'
+  | 'automation_created'
+  | 'automation_updated'
+  | 'automation_deleted'
+  | 'recurrence_created'
+  | 'recurrence_updated'
+  | 'recurrence_deleted'
+  | 'report_created'
+  | 'report_updated'
+  | 'report_deleted';
 
 /** Business-level change history shown to board members (distinct from the security audit log). */
 export class ActivityService {

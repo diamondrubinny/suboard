@@ -21,7 +21,8 @@ async function main() {
       const notifications = app.services.notifications.purgeOlderThan(config.notificationRetentionDays);
       const trash = app.services.items.purgeTrash();
       const orphans = app.services.attachments.sweepOrphans();
-      if (sessions || audit || notifications || trash || orphans) app.log.info({ sessions, audit, notifications, trash, orphans }, 'housekeeping purge');
+      const runs = app.services.automations.purgeRunsOlderThan();
+      if (sessions || audit || notifications || trash || orphans || runs) app.log.info({ sessions, audit, notifications, trash, orphans, runs }, 'housekeeping purge');
     } catch (err) {
       app.log.error({ err }, 'housekeeping failed');
     }
@@ -29,14 +30,23 @@ async function main() {
   housekeeping();
   setInterval(housekeeping, 60 * 60_000).unref();
 
-  // Frequent jobs: daily reminders (self-gated to once per day after DIGEST_HOUR) and
-  // re-scanning of quarantined uploads left pending while the scanner was unavailable.
+  // Frequent jobs (every 5 minutes). Each is self-gated and independent, so one failing job never
+  // blocks the others: daily reminders, scheduled automations and reports (once per day after
+  // DIGEST_HOUR), recurring items (as soon as their date arrives), re-scan of quarantined uploads.
+  const jobs: [string, () => unknown][] = [
+    ['daily reminders', () => app.services.notifications.runDailyReminders()],
+    ['recurring items', () => app.services.recurrences.runDue()],
+    ['scheduled automations', () => app.services.automations.runScheduled()],
+    ['scheduled reports', () => app.services.reports.runDue()],
+    ['rescan uploads', () => app.services.attachments.rescanPending()],
+  ];
   const frequent = async () => {
-    try {
-      await app.services.notifications.runDailyReminders();
-      await app.services.attachments.rescanPending();
-    } catch (err) {
-      app.log.error({ err }, 'scheduled job failed');
+    for (const [name, job] of jobs) {
+      try {
+        await job();
+      } catch (err) {
+        app.log.error({ err, job: name }, 'scheduled job failed');
+      }
     }
   };
   void frequent();

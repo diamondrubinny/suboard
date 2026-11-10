@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDaysIso,
+  createAutomationSchema,
+  nextOccurrence,
+  recurrenceScheduleSchema,
+  ruleActionSchema,
+  upcomingOccurrences,
   cellValueSchema,
   changePasswordSchema,
   columnSettingsSchema,
@@ -140,5 +145,38 @@ describe('logic', () => {
     expect(formatDateHe('2026-11-10')).toBe('10/11/2026');
     expect(addDaysIso('2026-12-30', 3)).toBe('2027-01-02');
     expect(todayIso('Asia/Jerusalem', new Date('2026-11-09T22:30:00Z'))).toBe('2026-11-10');
+  });
+});
+
+describe('recurrence (wave B)', () => {
+  it('daily with interval, never before start', () => {
+    const s = { frequency: 'daily' as const, interval: 3, startDate: '2026-01-01' };
+    expect(nextOccurrence(s, '2025-12-01')).toBe('2026-01-01');
+    expect(nextOccurrence(s, '2026-01-02')).toBe('2026-01-04');
+    expect(nextOccurrence(s, '2026-01-04')).toBe('2026-01-04');
+  });
+  it('weekly on several weekdays, every second week', () => {
+    // 2026-11-01 is a Sunday.
+    const s = { frequency: 'weekly' as const, interval: 2, weekdays: [0, 3], startDate: '2026-11-01' };
+    expect(upcomingOccurrences(s, '2026-11-01', 4)).toEqual(['2026-11-01', '2026-11-04', '2026-11-15', '2026-11-18']);
+  });
+  it('monthly clamps to the last day of short months', () => {
+    const s = { frequency: 'monthly' as const, monthDay: 31, startDate: '2026-01-31' };
+    expect(upcomingOccurrences(s, '2026-01-01', 3)).toEqual(['2026-01-31', '2026-02-28', '2026-03-31']);
+  });
+  it('quarterly and yearly (29 Feb → 28 Feb)', () => {
+    expect(upcomingOccurrences({ frequency: 'monthly', interval: 3, monthDay: 15, startDate: '2026-01-15' }, '2026-02-01', 2)).toEqual(['2026-04-15', '2026-07-15']);
+    expect(upcomingOccurrences({ frequency: 'yearly', startDate: '2028-02-29' }, '2028-03-01', 2)).toEqual(['2029-02-28', '2030-02-28']);
+  });
+  it('stops at the end date', () => {
+    const s = { frequency: 'daily' as const, startDate: '2026-01-01', endDate: '2026-01-02' };
+    expect(upcomingOccurrences(s, '2026-01-01', 5)).toEqual(['2026-01-01', '2026-01-02']);
+    expect(nextOccurrence(s, '2026-01-03')).toBeNull();
+  });
+  it('rule schemas reject unknown shapes', () => {
+    expect(createAutomationSchema.safeParse({ name: 'x', trigger: { type: 'item_created' }, actions: [] }).success).toBe(false);
+    expect(createAutomationSchema.safeParse({ name: 'x', trigger: { type: 'exec' }, actions: [{ type: 'move_group', groupId: crypto.randomUUID() }] }).success).toBe(false);
+    expect(ruleActionSchema.safeParse({ type: 'notify', to: { userIds: [] }, message: 'hi' }).success).toBe(false);
+    expect(recurrenceScheduleSchema.safeParse({ frequency: 'weekly', startDate: '2026-01-01' }).success).toBe(false);
   });
 });

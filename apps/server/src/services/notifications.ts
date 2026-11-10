@@ -24,6 +24,7 @@ interface NotificationRow {
   item_id: string | null;
   title: string;
   actor_name: string | null;
+  detail: string | null;
   read_at: string | null;
   created_at: string;
 }
@@ -33,7 +34,13 @@ const KIND_TEXT: Record<NotificationKind, string> = {
   overdue: 'פריט באיחור',
   due_tomorrow: 'תאריך יעד מחר',
   mentioned: 'הוזכרת',
+  automation: 'אוטומציה',
+  report: 'דוח מתוזמן',
 };
+
+type Sender = { id: string | null; name: string };
+/** `plain` lines are rendered without a link (e.g. report totals). */
+export type MailLine = { text: string; boardId: string; itemId?: string | null; plain?: boolean };
 
 /**
  * In-app notifications plus optional e-mail. E-mails carry only the item name, board name and a
@@ -57,16 +64,62 @@ export class NotificationService {
     return this.mailer !== null;
   }
 
-  private insert(userId: string, kind: NotificationKind, boardId: string, itemId: string, title: string, actorId: string | null): string {
+  private insert(userId: string, kind: NotificationKind, boardId: string, itemId: string | null, title: string, actorId: string | null, detail: string | null = null): string {
     const id = newId();
     this.db
-      .prepare('INSERT INTO notifications (id, user_id, kind, board_id, item_id, title, actor_id, created_at, day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(id, userId, kind, boardId, itemId, title, actorId, nowIso(), todayIso(this.config.timeZone));
+      .prepare('INSERT INTO notifications (id, user_id, kind, board_id, item_id, title, actor_id, detail, created_at, day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(id, userId, kind, boardId, itemId, title, actorId, detail, nowIso(), todayIso(this.config.timeZone));
     return id;
   }
 
+  private boardName(boardId: string): string {
+    return (this.db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string } | undefined)?.name ?? '';
+  }
+
+  /**
+   * Of the given users, those that are active and can still see the board right now (re-checked at
+   * send time: someone removed from the board after a rule / report was configured gets nothing).
+   */
+  usersWithAccess(boardId: string, userIds: Iterable<string>): string[] {
+    const out: string[] = [];
+    const get = this.db.prepare('SELECT id, name, role FROM users WHERE id = ? AND is_active = 1');
+    for (const id of new Set(userIds)) {
+      const u = get.get(id) as Actor | undefined;
+      if (u && this.access.boardRole(u, boardId)) out.push(id);
+    }
+    return out;
+  }
+
+  /** Automation "notify" action. The message is written by a board owner (not item content). */
+  onAutomation(boardId: string, itemId: string, itemName: string, ruleName: string, message: string, userIds: string[]): number {
+    const boardName = this.boardName(boardId);
+    const recipients = this.usersWithAccess(boardId, userIds);
+    for (const userId of recipients) {
+      const id = this.insert(userId, 'automation', boardId, itemId, itemName, null, message);
+      void this.emailOne(userId, id, {
+        subject: `SUBoard: ${ruleName}`.slice(0, 150),
+        lines: [{ text: `${message} — "${itemName}" (${boardName})`, boardId, itemId }],
+      });
+    }
+    return recipients.length;
+  }
+
+  /** Scheduled report delivery: in-app notification (links to the board summary) + optional e-mail. */
+  async onReport(boardId: string, reportName: string, userIds: string[], lines: MailLine[]): Promise<number> {
+    const boardName = this.boardName(boardId);
+    const recipients = this.usersWithAccess(boardId, userIds);
+    for (const userId of recipients) {
+      const id = this.insert(userId, 'report', boardId, null, boardName, null, reportName);
+      await this.emailMany(userId, [id], {
+        subject: `SUBoard: ${reportName} — ${boardName}`.slice(0, 150),
+        lines,
+      });
+    }
+    return recipients.length;
+  }
+
   /** Called after an item's person columns change: notifies newly-added assignees (not the actor). */
-  onAssigned(actor: Actor, boardId: string, itemId: string, itemName: string, newAssignees: string[]): void {
+  onAssigned(actor: Sender, boardId: string, itemId: string, itemName: string, newAssignees: string[]): void {
     const boardName = (this.db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string } | undefined)?.name ?? '';
     for (const userId of new Set(newAssignees)) {
       if (userId === actor.id) continue;
@@ -79,7 +132,7 @@ export class NotificationService {
   }
 
   /** Called after an update mentions people (already validated as board members). */
-  onMentioned(actor: Actor, boardId: string, itemId: string, itemName: string, userIds: string[]): void {
+  onMentioned(actor: Sender, boardId: string, itemId: string, itemName: string, userIds: string[]): void {
     const boardName = (this.db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string } | undefined)?.name ?? '';
     for (const userId of new Set(userIds)) {
       if (userId === actor.id) continue;
@@ -94,7 +147,7 @@ export class NotificationService {
   list(userId: string, limit = 50): { notifications: AppNotification[]; unread: number } {
     const rows = this.db
       .prepare(
-        `SELECT n.id, n.kind, n.board_id, n.item_id, n.title, a.name AS actor_name, n.read_at, n.created_at
+        `SELECT n.id, n.kind, n.board_id, n.item_id, n.title, a.name AS actor_name, n.detail, n.read_at, n.created_at
          FROM notifications n LEFT JOIN users a ON a.id = n.actor_id
          WHERE n.user_id = ? ORDER BY n.created_at DESC LIMIT ?`,
       )
@@ -109,6 +162,7 @@ export class NotificationService {
         itemId: r.item_id,
         title: r.title,
         actorName: r.actor_name,
+        detail: r.detail,
         read: r.read_at !== null,
         createdAt: r.created_at,
       })),
@@ -149,7 +203,7 @@ export class NotificationService {
     let created = 0;
 
     for (const user of users) {
-      const lines: { text: string; boardId: string; itemId: string }[] = [];
+      const lines: MailLine[] = [];
       const ids: string[] = [];
       for (const boardId of this.access.accessibleBoardIds(user)) {
         const boardName = (this.db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string }).name;
@@ -194,19 +248,19 @@ export class NotificationService {
     return r && r.is_active && r.email_notifications ? r.email : null;
   }
 
-  private async emailOne(userId: string, notificationId: string, msg: { subject: string; lines: { text: string; boardId: string; itemId: string }[] }) {
+  private async emailOne(userId: string, notificationId: string, msg: { subject: string; lines: MailLine[] }) {
     await this.emailMany(userId, [notificationId], msg);
   }
 
-  private async emailMany(userId: string, notificationIds: string[], msg: { subject: string; lines: { text: string; boardId: string; itemId: string }[] }) {
+  private async emailMany(userId: string, notificationIds: string[], msg: { subject: string; lines: MailLine[] }) {
     if (!this.mailer) return;
     const to = this.recipient(userId);
     if (!to) return;
-    const link = (l: { boardId: string; itemId: string }) => `${this.config.publicUrl}/boards/${l.boardId}?item=${l.itemId}`;
-    const text = [...msg.lines.map((l) => `• ${l.text}\n  ${link(l)}`), '', 'ניתן לכבות התראות דוא"ל בעמוד הפרופיל במערכת.'].join('\n');
+    const link = (l: MailLine) => `${this.config.publicUrl}/boards/${l.boardId}${l.itemId ? `?item=${l.itemId}` : ''}`;
+    const text = [...msg.lines.map((l) => (l.plain ? `• ${l.text}` : `• ${l.text}\n  ${link(l)}`)), '', 'ניתן לכבות התראות דוא"ל בעמוד הפרופיל במערכת.'].join('\n');
     const html =
       `<div dir="rtl" lang="he" style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6">` +
-      `<ul>${msg.lines.map((l) => `<li>${escapeHtml(l.text)} — <a href="${escapeHtml(link(l))}">פתיחה</a></li>`).join('')}</ul>` +
+      `<ul>${msg.lines.map((l) => (l.plain ? `<li>${escapeHtml(l.text)}</li>` : `<li>${escapeHtml(l.text)} — <a href="${escapeHtml(link(l))}">פתיחה</a></li>`)).join('')}</ul>` +
       `<p style="color:#555;font-size:13px">ניתן לכבות התראות דוא"ל בעמוד הפרופיל במערכת.</p></div>`;
     try {
       await this.mailer.send({ to, subject: msg.subject, text, html });

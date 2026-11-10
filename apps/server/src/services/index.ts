@@ -14,6 +14,10 @@ import { MfaService } from './mfa.js';
 import { NotificationService } from './notifications.js';
 import { SearchService } from './search.js';
 import { ViewService } from './views.js';
+import { AutomationService } from './automations.js';
+import { CalendarService } from './calendar.js';
+import { RecurrenceService } from './recurrences.js';
+import { ReportService } from './reports.js';
 import { ClamdScanner, UnsafeNoopScanner, type Scanner } from '../lib/clamav.js';
 import { createMailer, type Mailer } from '../lib/mailer.js';
 
@@ -32,6 +36,10 @@ export interface Services {
   exports: ExportService;
   views: ViewService;
   search: SearchService;
+  automations: AutomationService;
+  recurrences: RecurrenceService;
+  reports: ReportService;
+  calendar: CalendarService;
 }
 
 /** Infrastructure that tests (or alternative deployments) can substitute. */
@@ -63,5 +71,12 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const exports = new ExportService(db, access, boards, audit);
   const views = new ViewService(db, access);
   const search = new SearchService(db, access);
-  return { audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search };
+  const automations = new AutomationService(db, config, access, boards, items, activity, notifications);
+  const recurrences = new RecurrenceService(db, config, access, boards, items, activity);
+  const reports = new ReportService(db, config, access, boards, items, activity, notifications);
+  const calendar = new CalendarService(db, config, access, boards, audit);
+  return {
+    audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
+    automations, recurrences, reports, calendar,
+  };
 }

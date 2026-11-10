@@ -1,5 +1,5 @@
 import type { BoardRole, ColorKey, ColumnType, GlobalRole } from './constants.js';
-import type { ColumnSettings } from './schemas.js';
+import type { ColumnSettings, RecurrenceSchedule, RuleAction, RuleCondition, RuleTrigger } from './schemas.js';
 
 /** API data-transfer objects (JSON shapes returned by the server). */
 
@@ -173,7 +173,7 @@ export interface MfaSetup {
   qrSvg: string;
 }
 
-export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned';
+export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report';
 
 export interface AppNotification {
   id: string;
@@ -182,6 +182,8 @@ export interface AppNotification {
   itemId: string | null;
   title: string;
   actorName: string | null;
+  /** Extra text: automation message or report name (written by board owners, never item content). */
+  detail: string | null;
   read: boolean;
   createdAt: string;
 }
@@ -231,4 +233,85 @@ export interface SearchHit {
 export interface ImportResult {
   created: number;
   errors: { row: number; message: string }[];
+}
+
+// ---------- Wave B ----------
+export interface Automation {
+  id: string;
+  boardId: string;
+  name: string;
+  enabled: boolean;
+  trigger: RuleTrigger;
+  conditions: RuleCondition[];
+  actions: RuleAction[];
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastRunAt: string | null;
+  runCount: number;
+  errorCount: number;
+}
+
+export interface AutomationRun {
+  id: string;
+  automationId: string;
+  automationName: string;
+  itemId: string | null;
+  itemName: string | null;
+  status: 'ok' | 'error';
+  detail: string | null;
+  createdAt: string;
+}
+
+export interface Recurrence {
+  id: string;
+  boardId: string;
+  groupId: string;
+  name: string;
+  values: Record<string, CellValue>;
+  schedule: RecurrenceSchedule;
+  dueColumnId: string | null;
+  dueOffsetDays: number;
+  enabled: boolean;
+  /** Next date an item will be created (null when the schedule has ended). */
+  nextDate: string | null;
+  lastItemId: string | null;
+  lastCreatedAt: string | null;
+  createdByName: string | null;
+}
+
+export type ReportFrequency = 'daily' | 'weekly' | 'monthly';
+
+export interface ScheduledReport {
+  id: string;
+  boardId: string;
+  name: string;
+  frequency: ReportFrequency;
+  weekday: number;
+  monthDay: number;
+  recipients: string[];
+  enabled: boolean;
+  lastSentDay: string | null;
+  createdByName: string | null;
+}
+
+export interface ReportItemRef {
+  id: string;
+  name: string;
+  date: string;
+}
+
+export interface BoardReportSummary {
+  boardId: string;
+  boardName: string;
+  generatedAt: string;
+  periodDays: number;
+  total: number;
+  open: number;
+  byStatus: { optionId: string | null; label: string; color: string | null; count: number }[];
+  overdue: ReportItemRef[];
+  upcoming: ReportItemRef[];
+  createdInPeriod: number;
+  closedInPeriod: number;
 }

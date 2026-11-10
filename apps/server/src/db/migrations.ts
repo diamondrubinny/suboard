@@ -211,4 +211,76 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE INDEX idx_views_board ON saved_views(board_id);
     `,
   },
+  {
+    version: 4,
+    name: 'automations_recurrences_reports',
+    sql: /* sql */ `
+      CREATE TABLE automations (
+        id TEXT PRIMARY KEY,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        trigger_type TEXT NOT NULL,
+        rule TEXT NOT NULL,                -- JSON {trigger, conditions, actions}, validated by Zod on write
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        last_run_at TEXT,
+        run_count INTEGER NOT NULL DEFAULT 0,
+        error_count INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX idx_automations_board ON automations(board_id, trigger_type);
+
+      CREATE TABLE automation_runs (
+        id TEXT PRIMARY KEY,
+        automation_id TEXT NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        item_id TEXT,
+        status TEXT NOT NULL CHECK (status IN ('ok','error')),
+        detail TEXT,
+        dedupe_key TEXT,                   -- scheduled triggers: fire once per key
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_runs_board ON automation_runs(board_id, created_at);
+      CREATE UNIQUE INDEX idx_runs_dedupe ON automation_runs(automation_id, item_id, dedupe_key) WHERE dedupe_key IS NOT NULL;
+
+      CREATE TABLE recurrences (
+        id TEXT PRIMARY KEY,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        group_id TEXT NOT NULL REFERENCES board_groups(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        cell_values TEXT NOT NULL DEFAULT '{}',
+        schedule TEXT NOT NULL,
+        due_column_id TEXT,
+        due_offset_days INTEGER NOT NULL DEFAULT 0,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        next_date TEXT,
+        last_item_id TEXT,
+        last_created_at TEXT,
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_recurrences_due ON recurrences(enabled, next_date);
+      CREATE INDEX idx_recurrences_board ON recurrences(board_id);
+
+      CREATE TABLE scheduled_reports (
+        id TEXT PRIMARY KEY,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        frequency TEXT NOT NULL CHECK (frequency IN ('daily','weekly','monthly')),
+        weekday INTEGER NOT NULL DEFAULT 0,
+        month_day INTEGER NOT NULL DEFAULT 1,
+        recipients TEXT NOT NULL DEFAULT '[]',
+        enabled INTEGER NOT NULL DEFAULT 1,
+        last_sent_day TEXT,
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_reports_board ON scheduled_reports(board_id);
+
+      ALTER TABLE notifications ADD COLUMN detail TEXT;
+    `,
+  },
 ];

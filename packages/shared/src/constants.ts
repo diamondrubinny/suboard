@@ -103,4 +103,12 @@ export const LIMITS = {
   trashDays: 30,
   savedViewsPerUser: 30,
   searchQuery: 100,
+  automationsPerBoard: 50,
+  ruleConditions: 5,
+  ruleActions: 5,
+  ruleMessage: 200,
+  recurrencesPerBoard: 100,
+  reportsPerBoard: 20,
+  reportRecipients: 30,
+  automationRunRetentionDays: 90,
 } as const;
