@@ -22,6 +22,8 @@ import { ComplianceService } from './compliance.js';
 import { FormService } from './forms.js';
 import { InvestigationService } from './investigations.js';
 import { LinkService } from './links.js';
+import { AnalyticsService } from './analytics.js';
+import { DashboardService as CustomDashboardService, DependencyService, MonthlyReportJob } from './planning.js';
 import { ClamdScanner, UnsafeNoopScanner, type Scanner } from '../lib/clamav.js';
 import { createMailer, type Mailer } from '../lib/mailer.js';
 
@@ -48,6 +50,10 @@ export interface Services {
   investigations: InvestigationService;
   compliance: ComplianceService;
   forms: FormService;
+  analytics: AnalyticsService;
+  dashboards: CustomDashboardService;
+  dependencies: DependencyService;
+  monthly: MonthlyReportJob;
 }
 
 /** Infrastructure that tests (or alternative deployments) can substitute. */
@@ -87,8 +93,12 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const investigations = new InvestigationService(db, config, access, boards, items, activity, notifications);
   const compliance = new ComplianceService(db, config, access, boards, activity);
   const forms = new FormService(db, access, boards, items, attachments, activity);
+  const analytics = new AnalyticsService(db, config, access, boards, compliance);
+  const dashboards = new CustomDashboardService(db, access, analytics);
+  const dependencies = new DependencyService(db, access, boards, activity);
+  const monthly = new MonthlyReportJob(db, config, analytics, notifications);
   return {
     audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
-    automations, recurrences, reports, calendar, links, investigations, compliance, forms,
+    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly,
   };
 }

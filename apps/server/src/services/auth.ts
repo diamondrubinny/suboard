@@ -2,7 +2,7 @@ import type { GlobalRole, SessionUser } from '@suboard/shared';
 import type { AppConfig } from '../config.js';
 import { nowIso, type DB } from '../db/index.js';
 import { getDummyHash, hashPassword, newSessionToken, sha256, verifyPassword } from '../lib/crypto.js';
-import { AppError, badRequest } from '../lib/errors.js';
+import { AppError, badRequest, forbidden } from '../lib/errors.js';
 import type { AuditService } from './audit.js';
 import type { MfaService } from './mfa.js';
 
@@ -18,6 +18,7 @@ interface UserRow {
   locked_until: string | null;
   mfa_enabled: number;
   email_notifications: number;
+  monthly_report: number;
 }
 
 export interface ResolvedSession {
@@ -146,8 +147,15 @@ export class AuthService {
     this.audit.log('password_changed', { userId, ip });
   }
 
-  setPreferences(userId: string, prefs: { emailNotifications: boolean }): void {
-    this.db.prepare('UPDATE users SET email_notifications = ?, updated_at = ? WHERE id = ?').run(prefs.emailNotifications ? 1 : 0, nowIso(), userId);
+  setPreferences(userId: string, prefs: { emailNotifications?: boolean; monthlyReport?: boolean }): void {
+    if (prefs.emailNotifications !== undefined) {
+      this.db.prepare('UPDATE users SET email_notifications = ?, updated_at = ? WHERE id = ?').run(prefs.emailNotifications ? 1 : 0, nowIso(), userId);
+    }
+    if (prefs.monthlyReport !== undefined) {
+      const role = (this.db.prepare('SELECT role FROM users WHERE id = ?').get(userId) as { role: string } | undefined)?.role;
+      if (prefs.monthlyReport && role !== 'admin' && role !== 'manager') throw forbidden('הדוח החודשי מיועד למנהלים');
+      this.db.prepare('UPDATE users SET monthly_report = ?, updated_at = ? WHERE id = ?').run(prefs.monthlyReport ? 1 : 0, nowIso(), userId);
+    }
   }
 
   getSessionUser(userId: string): SessionUser {
@@ -180,6 +188,7 @@ export class AuthService {
       mfaEnabled,
       mfaSetupRequired: !mfaEnabled && this.config.mfaRequiredRoles.includes(row.role),
       emailNotifications: row.email_notifications === 1,
+      monthlyReport: row.monthly_report === 1,
     };
   }
 }

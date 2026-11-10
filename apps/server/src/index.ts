@@ -39,6 +39,7 @@ async function main() {
     ['scheduled automations', () => app.services.automations.runScheduled()],
     ['scheduled reports', () => app.services.reports.runDue()],
     ['effectiveness checks', () => app.services.investigations.runDue()],
+    ['monthly management report', () => app.services.monthly.run()],
     ['rescan uploads', () => app.services.attachments.rescanPending()],
   ];
   const frequent = async () => {

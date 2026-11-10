@@ -1,5 +1,5 @@
 import type { BoardRole, CauseCategory, ColorKey, ColumnType, GlobalRole } from './constants.js';
-import type { ColumnSettings, ComplianceSettings, RecurrenceSchedule, RuleAction, RuleCondition, RuleTrigger } from './schemas.js';
+import type { ColumnSettings, ComplianceSettings, Widget, RecurrenceSchedule, RuleAction, RuleCondition, RuleTrigger } from './schemas.js';
 
 /** API data-transfer objects (JSON shapes returned by the server). */
 
@@ -13,6 +13,8 @@ export interface SessionUser {
   /** The user's role requires MFA and it is not enrolled yet. */
   mfaSetupRequired: boolean;
   emailNotifications: boolean;
+  /** Monthly management e-mail (managers / admins). */
+  monthlyReport: boolean;
 }
 
 export interface DirectoryUser {
@@ -182,7 +184,7 @@ export interface MfaSetup {
   qrSvg: string;
 }
 
-export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness';
+export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly';
 
 export interface AppNotification {
   id: string;
@@ -429,3 +431,74 @@ export interface ItemCard {
 }
 
 export type { ComplianceSettings };
+
+// ---------- Wave D ----------
+export interface CustomDashboard {
+  id: string;
+  name: string;
+  shared: boolean;
+  ownerId: string;
+  ownerName: string | null;
+  isOwner: boolean;
+  widgets: Widget[];
+  updatedAt: string;
+}
+
+export interface TrendPoint {
+  /** Period start, YYYY-MM-DD. */
+  start: string;
+  label: string;
+  created: number;
+  closed: number;
+  /** Average days from creation to first close, for items closed in this period. */
+  avgCloseDays: number | null;
+}
+
+export interface WorkloadRow {
+  userId: string;
+  name: string;
+  open: number;
+  overdue: number;
+  dueWeek: number;
+  noDue: number;
+  boards: { boardId: string; boardName: string; open: number; overdue: number }[];
+}
+
+export type WidgetData =
+  | { type: 'count'; value: number; boards: number }
+  | { type: 'status'; boardName: string; rows: { label: string; color: ColorKey | null; count: number }[] }
+  | { type: 'trend'; points: TrendPoint[] }
+  | { type: 'overdue'; items: { id: string; boardId: string; boardName: string; name: string; due: string; daysLate: number }[] }
+  | { type: 'workload'; rows: WorkloadRow[] }
+  | { type: 'compliance'; rows: { boardId: string; boardName: string; percent: number | null; overdue: number; total: number }[] }
+  | { type: 'risk'; levels: { level: 'low' | 'medium' | 'high' | 'critical'; count: number }[]; unassessed: number }
+  /** The widget points only at boards the viewer cannot see (or that no longer exist). */
+  | { type: 'empty'; reason: string };
+
+export interface DependencyInfo {
+  itemId: string;
+  blockedBy: { id: string; name: string; done: boolean; end: string | null }[];
+  blocks: { id: string; name: string }[];
+}
+
+export interface MonthlyBoardRow {
+  boardId: string;
+  boardName: string;
+  created: number;
+  closed: number;
+  openAtEnd: number;
+  overdueAtEnd: number;
+  avgCloseDays: number | null;
+  prev: { created: number; closed: number; avgCloseDays: number | null };
+}
+
+export interface MonthlyReport {
+  month: string;
+  label: string;
+  generatedAt: string;
+  boards: MonthlyBoardRow[];
+  totals: { created: number; closed: number; overdueAtEnd: number; prevCreated: number; prevClosed: number };
+  compliance: { boardId: string; boardName: string; percent: number | null; overdue: number }[];
+  risk: { level: 'low' | 'medium' | 'high' | 'critical'; count: number }[];
+  topOverdue: { id: string; boardId: string; boardName: string; name: string; due: string; daysLate: number }[];
+}

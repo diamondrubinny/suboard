@@ -326,4 +326,32 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       ALTER TABLE boards ADD COLUMN compliance TEXT;
     `,
   },
+  {
+    version: 6,
+    name: 'dashboards_dependencies_monthly',
+    sql: /* sql */ `
+      CREATE TABLE dashboards (
+        id TEXT PRIMARY KEY,
+        owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        shared INTEGER NOT NULL DEFAULT 0,
+        widgets TEXT NOT NULL DEFAULT '[]',   -- JSON, validated by Zod on write
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_dashboards_owner ON dashboards(owner_id);
+
+      CREATE TABLE item_dependencies (
+        blocker_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        blocked_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (blocker_id, blocked_id)
+      );
+      CREATE INDEX idx_deps_blocked ON item_dependencies(blocked_id);
+
+      ALTER TABLE users ADD COLUMN monthly_report INTEGER NOT NULL DEFAULT 0;
+      CREATE INDEX idx_activity_action ON activity(board_id, action, created_at);
+    `,
+  },
 ];

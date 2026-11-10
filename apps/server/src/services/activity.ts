@@ -43,7 +43,8 @@ export type ActivityAction =
   | 'form_created'
   | 'form_updated'
   | 'form_deleted'
-  | 'form_submitted';
+  | 'form_submitted'
+  | 'dependencies_updated';
 
 /** Business-level change history shown to board members (distinct from the security audit log). */
 export class ActivityService {

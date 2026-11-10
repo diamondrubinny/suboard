@@ -56,6 +56,11 @@ export class ComplianceService {
     return this.compute(boardId);
   }
 
+  /** Compliance of the given boards (the caller has already limited them to accessible boards). */
+  computeMany(boardIds: string[]): BoardCompliance[] {
+    return boardIds.map((id) => this.compute(id)).filter((x): x is BoardCompliance => x !== null);
+  }
+
   /** All boards the actor can see that have compliance configured. */
   overview(actor: Actor): BoardCompliance[] {
     return this.access

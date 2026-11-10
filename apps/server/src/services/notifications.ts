@@ -37,11 +37,12 @@ const KIND_TEXT: Record<NotificationKind, string> = {
   automation: 'אוטומציה',
   report: 'דוח מתוזמן',
   effectiveness: 'בדיקת אפקטיביות',
+  monthly: 'מבט מנהל חודשי',
 };
 
 type Sender = { id: string | null; name: string };
 /** `plain` lines are rendered without a link (e.g. report totals). */
-export type MailLine = { text: string; boardId: string; itemId?: string | null; plain?: boolean };
+export type MailLine = { text: string; boardId: string; itemId?: string | null; plain?: boolean; /** Absolute path inside the app, overrides the board/item link. */ href?: string };
 
 /**
  * In-app notifications plus optional e-mail. E-mails carry only the item name, board name and a
@@ -65,7 +66,7 @@ export class NotificationService {
     return this.mailer !== null;
   }
 
-  private insert(userId: string, kind: NotificationKind, boardId: string, itemId: string | null, title: string, actorId: string | null, detail: string | null = null): string {
+  private insert(userId: string, kind: NotificationKind, boardId: string | null, itemId: string | null, title: string, actorId: string | null, detail: string | null = null): string {
     const id = newId();
     this.db
       .prepare('INSERT INTO notifications (id, user_id, kind, board_id, item_id, title, actor_id, detail, created_at, day) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -117,6 +118,13 @@ export class NotificationService {
       });
     }
     return recipients.length;
+  }
+
+  /** Monthly management report: in-app notification (title = month label) + e-mail. */
+  async onMonthly(userId: string, month: string, title: string, lines: MailLine[]): Promise<number> {
+    const id = this.insert(userId, 'monthly', null, null, title, null, month);
+    await this.emailMany(userId, [id], { subject: `SUBoard: ${title}`, lines: [...lines, { text: 'לדוח המלא במערכת', boardId: '', href: `/reports/monthly?month=${month}` }] });
+    return 1;
   }
 
   /** Scheduled report delivery: in-app notification (links to the board summary) + optional e-mail. */
@@ -271,7 +279,7 @@ export class NotificationService {
     if (!this.mailer) return;
     const to = this.recipient(userId);
     if (!to) return;
-    const link = (l: MailLine) => `${this.config.publicUrl}/boards/${l.boardId}${l.itemId ? `?item=${l.itemId}` : ''}`;
+    const link = (l: MailLine) => (l.href ? `${this.config.publicUrl}${l.href}` : `${this.config.publicUrl}/boards/${l.boardId}${l.itemId ? `?item=${l.itemId}` : ''}`);
     const text = [...msg.lines.map((l) => (l.plain ? `• ${l.text}` : `• ${l.text}\n  ${link(l)}`)), '', 'ניתן לכבות התראות דוא"ל בעמוד הפרופיל במערכת.'].join('\n');
     const html =
       `<div dir="rtl" lang="he" style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6">` +

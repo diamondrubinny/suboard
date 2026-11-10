@@ -68,7 +68,13 @@ export const mfaDisableSchema = z.object({
   code: mfaCodeSchema,
 });
 
-export const preferencesSchema = z.object({ emailNotifications: z.boolean() });
+export const preferencesSchema = z
+  .object({
+    emailNotifications: z.boolean().optional(),
+    /** Monthly management e-mail (managers / admins only). */
+    monthlyReport: z.boolean().optional(),
+  })
+  .refine((v) => v.emailNotifications !== undefined || v.monthlyReport !== undefined, 'אין שינויים');
 
 export const markNotificationsReadSchema = z.union([z.object({ all: z.literal(true) }), z.object({ ids: z.array(idSchema).min(1).max(200) })]);
 
@@ -490,6 +496,45 @@ export const updateFormSchema = z
   })
   .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
 export const submitFormSchema = z.object({ name: line(LIMITS.itemName), values: z.record(idSchema, z.unknown()).default({}) });
+
+// ---------- Wave D ----------
+const boardIds = z.array(idSchema).max(50).default([]);
+const widgetBase = { id: z.string().regex(/^[a-z0-9]{4,16}$/), title: z.string().trim().max(60).optional(), size: z.enum(['s', 'm', 'l']).default('m') };
+export const widgetSchema = z.discriminatedUnion('type', [
+  z.object({ ...widgetBase, type: z.literal('count'), boardIds, metric: z.enum(['open', 'overdue', 'due_week', 'created_month', 'closed_month']) }),
+  z.object({ ...widgetBase, type: z.literal('status'), boardId: idSchema }),
+  z.object({ ...widgetBase, type: z.literal('trend'), boardIds, period: z.enum(['week', 'month']).default('month'), count: z.number().int().min(3).max(24).default(6) }),
+  z.object({ ...widgetBase, type: z.literal('overdue'), boardIds, limit: z.number().int().min(3).max(30).default(10) }),
+  z.object({ ...widgetBase, type: z.literal('workload'), boardIds }),
+  z.object({ ...widgetBase, type: z.literal('compliance'), boardIds }),
+  z.object({ ...widgetBase, type: z.literal('risk'), boardIds }),
+]);
+export type Widget = z.infer<typeof widgetSchema>;
+export type WidgetInput = z.input<typeof widgetSchema>;
+
+export const createDashboardSchema = z.object({
+  name: line(80),
+  shared: z.boolean().default(false),
+  widgets: z.array(widgetSchema).max(24).default([]),
+});
+export const updateDashboardSchema = z
+  .object({ name: line(80).optional(), shared: z.boolean().optional(), widgets: z.array(widgetSchema).max(24).optional() })
+  .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+
+export const trendQuerySchema = z.object({
+  boards: z
+    .string()
+    .max(2000)
+    .optional()
+    .transform((s) => (s ? s.split(',').filter(Boolean) : []))
+    .pipe(z.array(idSchema).max(50)),
+  period: z.enum(['week', 'month']).default('month'),
+  count: z.coerce.number().int().min(3).max(24).default(6),
+});
+
+export const monthQuerySchema = z.object({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'חודש לא תקין').optional() });
+
+export const dependenciesSchema = z.object({ blockedBy: z.array(idSchema).max(20) });
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
