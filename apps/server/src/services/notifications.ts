@@ -32,6 +32,7 @@ const KIND_TEXT: Record<NotificationKind, string> = {
   assigned: 'שויכת לפריט',
   overdue: 'פריט באיחור',
   due_tomorrow: 'תאריך יעד מחר',
+  mentioned: 'הוזכרת',
 };
 
 /**
@@ -73,6 +74,19 @@ export class NotificationService {
       void this.emailOne(userId, id, {
         subject: 'SUBoard: שויכת לפריט',
         lines: [{ text: `${actor.name} שייך/ה אותך לפריט "${itemName}" בלוח "${boardName}".`, boardId, itemId }],
+      });
+    }
+  }
+
+  /** Called after an update mentions people (already validated as board members). */
+  onMentioned(actor: Actor, boardId: string, itemId: string, itemName: string, userIds: string[]): void {
+    const boardName = (this.db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string } | undefined)?.name ?? '';
+    for (const userId of new Set(userIds)) {
+      if (userId === actor.id) continue;
+      const id = this.insert(userId, 'mentioned', boardId, itemId, itemName, actor.id);
+      void this.emailOne(userId, id, {
+        subject: 'SUBoard: הוזכרת בעדכון',
+        lines: [{ text: `${actor.name} הזכיר/ה אותך בעדכון על "${itemName}" בלוח "${boardName}".`, boardId, itemId }],
       });
     }
   }
@@ -144,7 +158,7 @@ export class NotificationService {
         if (!due) continue;
         const status = findPrimaryStatusColumn(columns);
         const persons = columns.filter((c) => c.type === 'person');
-        const items = (this.db.prepare('SELECT * FROM items WHERE board_id = ?').all(boardId) as ItemRow[]).map(toItem);
+        const items = (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL').all(boardId) as ItemRow[]).map(toItem);
         for (const item of items) {
           const dueDate = item.values[due.id];
           if (typeof dueDate !== 'string' || isItemDone(item, status)) continue;

@@ -19,8 +19,9 @@ async function main() {
       const sessions = app.services.auth.purgeExpiredSessions();
       const audit = app.services.audit.purgeOlderThan(AUDIT_RETENTION_DAYS);
       const notifications = app.services.notifications.purgeOlderThan(config.notificationRetentionDays);
+      const trash = app.services.items.purgeTrash();
       const orphans = app.services.attachments.sweepOrphans();
-      if (sessions || audit || notifications || orphans) app.log.info({ sessions, audit, notifications, orphans }, 'housekeeping purge');
+      if (sessions || audit || notifications || trash || orphans) app.log.info({ sessions, audit, notifications, trash, orphans }, 'housekeeping purge');
     } catch (err) {
       app.log.error({ err }, 'housekeeping failed');
     }

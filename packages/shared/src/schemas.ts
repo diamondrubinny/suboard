@@ -108,6 +108,8 @@ export const columnSettingsSchema = z
   .object({
     options: z.array(statusOptionSchema).max(LIMITS.statusOptions).optional(),
     role: z.enum(['due']).optional(),
+    /** auto_id: prefix shown before the running number, e.g. "INC". */
+    prefix: z.string().regex(/^[A-Za-z0-9]{0,10}$/, 'אותיות לטיניות וספרות בלבד, עד 10').optional(),
   })
   .refine(
     (s) => !s.options || new Set(s.options.map((o) => o.id)).size === s.options.length,
@@ -150,6 +152,42 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
       return isoDateSchema.nullable();
     case 'checkbox':
       return z.boolean().nullable();
+    case 'tags':
+      return z.array(z.string().min(1).max(40)).max(LIMITS.tagsPerCell).nullable();
+    case 'date_range':
+      return z
+        .object({ from: isoDateSchema, to: isoDateSchema })
+        .refine((r) => r.from <= r.to, 'תאריך הסיום לפני תאריך ההתחלה')
+        .nullable();
+    case 'progress':
+      return z.number().int('מספר שלם').min(0).max(100).nullable();
+    case 'rating':
+      return z.number().int().min(1).max(5).nullable();
+    case 'link':
+      return z
+        .string()
+        .trim()
+        .max(2000)
+        .refine((u) => {
+          try {
+            const p = new URL(u);
+            return p.protocol === 'https:' || p.protocol === 'http:';
+          } catch {
+            return false;
+          }
+        }, 'קישור חייב להתחיל ב-http:// או https://')
+        .nullable();
+    case 'email':
+      return z.string().trim().toLowerCase().max(254).pipe(z.email('כתובת דוא"ל לא תקינה')).nullable();
+    case 'phone':
+      return z
+        .string()
+        .trim()
+        .regex(/^\+?[0-9][0-9 ()-]{2,19}$/, 'מספר טלפון לא תקין')
+        .nullable();
+    case 'auto_id':
+      // Computed by the server; any client value is rejected.
+      return z.never();
   }
 }
 
@@ -190,6 +228,8 @@ export const updateGroupSchema = z
 // ---------- Items ----------
 export const createItemSchema = z.object({
   groupId: idSchema,
+  /** Create as a sub-item of this (top-level) item. */
+  parentId: idSchema.optional(),
   name: line(LIMITS.itemName),
   values: valuesSchema.optional(),
 });
@@ -205,7 +245,47 @@ export const updateItemSchema = z
 
 export const createUpdateSchema = z.object({
   body: multiline(LIMITS.updateBody).refine((s) => s.trim().length > 0, 'שדה חובה'),
+  /** Users @mentioned in the body (must be members of the board). */
+  mentions: z.array(idSchema).max(20).optional(),
 });
+
+// ---------- Wave A ----------
+const sortSchema = z.object({ by: z.union([z.literal('name'), z.literal('seq'), idSchema]), dir: z.enum(['asc', 'desc']) });
+
+export const viewConfigSchema = z.object({
+  view: z.enum(['table', 'kanban', 'calendar']).default('table'),
+  search: z.string().max(LIMITS.searchQuery).optional(),
+  statusFilter: z.string().max(40).optional(),
+  mine: z.boolean().optional(),
+  sort: sortSchema.optional(),
+  hidden: z.array(idSchema).max(LIMITS.columnsPerBoard).optional(),
+  kanbanColumnId: idSchema.optional(),
+  calendarColumnId: idSchema.optional(),
+});
+export type ViewConfig = z.infer<typeof viewConfigSchema>;
+
+export const createViewSchema = z.object({ name: line(60), config: viewConfigSchema, shared: z.boolean().default(false) });
+export const updateViewSchema = z
+  .object({ name: line(60).optional(), config: viewConfigSchema.optional(), shared: z.boolean().optional() })
+  .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+
+export const bulkSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('delete'), itemIds: z.array(idSchema).min(1).max(LIMITS.bulkItems) }),
+  z.object({ action: z.literal('move_group'), itemIds: z.array(idSchema).min(1).max(LIMITS.bulkItems), groupId: idSchema }),
+  z.object({ action: z.literal('set_value'), itemIds: z.array(idSchema).min(1).max(LIMITS.bulkItems), columnId: idSchema, value: z.unknown() }),
+]);
+
+export const moveItemSchema = z.object({ boardId: idSchema, groupId: idSchema });
+
+export const importSchema = z.object({
+  groupId: idSchema,
+  rows: z
+    .array(z.object({ name: line(LIMITS.itemName), values: z.record(idSchema, z.unknown()).optional() }))
+    .min(1)
+    .max(LIMITS.importRows),
+});
+
+export const searchQuerySchema = z.object({ q: z.string().trim().min(2, 'לפחות 2 תווים').max(LIMITS.searchQuery) });
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
@@ -215,3 +295,4 @@ export type CreateColumnInput = z.infer<typeof createColumnSchema>;
 export type UpdateColumnInput = z.infer<typeof updateColumnSchema>;
 export type CreateItemInput = z.infer<typeof createItemSchema>;
 export type UpdateItemInput = z.infer<typeof updateItemSchema>;
+export type BulkInput = z.infer<typeof bulkSchema>;

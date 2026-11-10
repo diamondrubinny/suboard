@@ -26,6 +26,7 @@
     "fastify-plugin": "^6.0.1",
     "nodemailer": "^10.5.0",
     "qrcode": "^1.5.4",
+    "write-excel-file": "^4.1.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {

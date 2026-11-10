@@ -43,3 +43,12 @@ export function formatDateHe(iso: string | null | undefined): string {
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
 }
+
+/** "INC-0042" for an auto_id column with prefix "INC"; "#42" without a prefix. */
+export function formatAutoId(seq: number, prefix?: string): string {
+  return prefix ? `${prefix}-${String(seq).padStart(4, '0')}` : `#${seq}`;
+}
+
+export function formatDateRangeHe(v: { from: string; to: string } | null | undefined): string {
+  return v ? `${formatDateHe(v.from)} – ${formatDateHe(v.to)}` : '';
+}

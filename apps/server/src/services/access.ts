@@ -41,7 +41,7 @@ export class AccessService {
   }
 
   boardIdForItem(itemId: string): string {
-    const r = this.db.prepare('SELECT board_id FROM items WHERE id = ?').get(itemId) as { board_id: string } | undefined;
+    const r = this.db.prepare('SELECT board_id FROM items WHERE id = ? AND deleted_at IS NULL').get(itemId) as { board_id: string } | undefined;
     if (!r) throw notFound('הפריט לא נמצא');
     return r.board_id;
   }

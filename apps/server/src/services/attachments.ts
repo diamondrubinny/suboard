@@ -167,7 +167,9 @@ export class AttachmentService {
 
   /** Returns file metadata + absolute path for a clean attachment the actor may view. */
   resolveDownload(actor: Actor, id: string): { path: string; name: string; mime: string; size: number } {
-    const r = this.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as Row | undefined;
+    const r = this.db
+      .prepare('SELECT a.* FROM attachments a JOIN items i ON i.id = a.item_id WHERE a.id = ? AND i.deleted_at IS NULL')
+      .get(id) as Row | undefined;
     if (!r) throw notFound('הקובץ לא נמצא');
     this.access.requireBoard(actor, r.board_id, 'viewer');
     if (r.status !== 'clean') throw new AppError(409, 'NOT_SCANNED', 'הקובץ עדיין לא אושר בסריקת אבטחה ואינו זמין להורדה');
@@ -175,7 +177,9 @@ export class AttachmentService {
   }
 
   async remove(actor: Actor, id: string): Promise<void> {
-    const r = this.db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as Row | undefined;
+    const r = this.db
+      .prepare('SELECT a.* FROM attachments a JOIN items i ON i.id = a.item_id WHERE a.id = ? AND i.deleted_at IS NULL')
+      .get(id) as Row | undefined;
     if (!r) throw notFound('הקובץ לא נמצא');
     const role = this.access.requireBoard(actor, r.board_id, 'editor');
     if (r.uploaded_by !== actor.id && role !== 'owner') throw forbidden('ניתן למחוק רק קבצים שהעלית');

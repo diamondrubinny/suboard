@@ -9,7 +9,28 @@ export type GlobalRole = (typeof GLOBAL_ROLES)[number];
 export const BOARD_ROLES = ['owner', 'editor', 'viewer'] as const;
 export type BoardRole = (typeof BOARD_ROLES)[number];
 
-export const COLUMN_TYPES = ['text', 'long_text', 'number', 'status', 'person', 'date', 'checkbox'] as const;
+export const COLUMN_TYPES = [
+  'text',
+  'long_text',
+  'number',
+  'status',
+  'tags',
+  'person',
+  'date',
+  'date_range',
+  'checkbox',
+  'progress',
+  'rating',
+  'link',
+  'email',
+  'phone',
+  'auto_id',
+] as const;
+
+/** Column types that hold a list of label options in their settings. */
+export const OPTION_COLUMN_TYPES = ['status', 'tags'] as const;
+/** Column types computed by the server (not editable by users). */
+export const READONLY_COLUMN_TYPES = ['auto_id'] as const;
 export type ColumnType = (typeof COLUMN_TYPES)[number];
 
 /**
@@ -51,6 +72,14 @@ export const COLUMN_TYPE_LABELS: Record<ColumnType, string> = {
   person: 'אנשים',
   date: 'תאריך',
   checkbox: 'תיבת סימון',
+  tags: 'תגיות (בחירה מרובה)',
+  date_range: 'טווח תאריכים',
+  progress: 'התקדמות %',
+  rating: 'דירוג (1–5)',
+  link: 'קישור',
+  email: 'דוא"ל',
+  phone: 'טלפון',
+  auto_id: 'מזהה רץ',
 };
 
 export const LIMITS = {
@@ -68,4 +97,10 @@ export const LIMITS = {
   passwordMin: 12,
   passwordMax: 128,
   columnsPerBoard: 40,
+  tagsPerCell: 20,
+  importRows: 1000,
+  bulkItems: 500,
+  trashDays: 30,
+  savedViewsPerUser: 30,
+  searchQuery: 100,
 } as const;

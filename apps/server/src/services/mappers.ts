@@ -20,6 +20,9 @@ export interface ItemRow {
   id: string;
   board_id: string;
   group_id: string;
+  parent_id: string | null;
+  seq: number | null;
+  deleted_at?: string | null;
   name: string;
   cell_values: string;
   position: number;
@@ -49,6 +52,8 @@ export const toItem = (r: ItemRow): Item => ({
   id: r.id,
   boardId: r.board_id,
   groupId: r.group_id,
+  parentId: r.parent_id ?? null,
+  seq: r.seq ?? 0,
   name: r.name,
   values: parseJson<Record<string, CellValue>>(r.cell_values, {}),
   position: r.position,

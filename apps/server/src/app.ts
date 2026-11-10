@@ -16,6 +16,7 @@ import { authRoutes } from './routes/auth.js';
 import { boardRoutes } from './routes/boards.js';
 import { operationsRoutes } from './routes/operations.js';
 import { userRoutes } from './routes/users.js';
+import { workflowRoutes } from './routes/workflow.js';
 import { createServices, type ServiceOverrides, type Services } from './services/index.js';
 
 declare module 'fastify' {
@@ -130,6 +131,7 @@ export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOver
       await api.register(userRoutes, { services });
       await api.register(boardRoutes, { services });
       await api.register(operationsRoutes, { services, config });
+      await api.register(workflowRoutes, { services });
     },
     { prefix: '/api' },
   );

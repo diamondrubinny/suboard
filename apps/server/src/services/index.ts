@@ -12,6 +12,8 @@ import { AttachmentService } from './attachments.js';
 import { ExportService } from './export.js';
 import { MfaService } from './mfa.js';
 import { NotificationService } from './notifications.js';
+import { SearchService } from './search.js';
+import { ViewService } from './views.js';
 import { ClamdScanner, UnsafeNoopScanner, type Scanner } from '../lib/clamav.js';
 import { createMailer, type Mailer } from '../lib/mailer.js';
 
@@ -28,6 +30,8 @@ export interface Services {
   notifications: NotificationService;
   attachments: AttachmentService;
   exports: ExportService;
+  views: ViewService;
+  search: SearchService;
 }
 
 /** Infrastructure that tests (or alternative deployments) can substitute. */
@@ -57,5 +61,7 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const scanner = 'scanner' in overrides ? (overrides.scanner ?? null) : createScanner(config);
   const attachments = new AttachmentService(db, config, access, activity, audit, scanner);
   const exports = new ExportService(db, access, boards, audit);
-  return { audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports };
+  const views = new ViewService(db, access);
+  const search = new SearchService(db, access);
+  return { audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search };
 }

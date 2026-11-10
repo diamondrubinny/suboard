@@ -46,7 +46,7 @@ export class BoardService {
         ? this.db
             .prepare(
               `SELECT b.*, COALESCE(m.role, 'owner') AS my_role,
-                 (SELECT COUNT(*) FROM items i WHERE i.board_id = b.id) AS item_count
+                 (SELECT COUNT(*) FROM items i WHERE i.board_id = b.id AND i.deleted_at IS NULL AND i.parent_id IS NULL) AS item_count
                FROM boards b LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ?
                WHERE b.archived_at IS NULL ORDER BY b.updated_at DESC`,
             )
@@ -54,7 +54,7 @@ export class BoardService {
         : this.db
             .prepare(
               `SELECT b.*, m.role AS my_role,
-                 (SELECT COUNT(*) FROM items i WHERE i.board_id = b.id) AS item_count
+                 (SELECT COUNT(*) FROM items i WHERE i.board_id = b.id AND i.deleted_at IS NULL AND i.parent_id IS NULL) AS item_count
                FROM boards b JOIN board_members m ON m.board_id = b.id AND m.user_id = ?
                WHERE b.archived_at IS NULL ORDER BY b.updated_at DESC`,
             )
@@ -109,7 +109,7 @@ export class BoardService {
       myRole,
       groups: this.groups(boardId),
       columns: this.columns(boardId),
-      items: (this.db.prepare('SELECT * FROM items WHERE board_id = ? ORDER BY position, created_at').all(boardId) as ItemRow[]).map(toItem),
+      items: (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL ORDER BY position, created_at').all(boardId) as ItemRow[]).map(toItem),
       members: this.members(boardId),
       createdAt: b.created_at,
       updatedAt: b.updated_at,
@@ -244,8 +244,14 @@ export class BoardService {
     const s: ColumnSettings = {};
     if (type === 'status') {
       s.options = settings?.options?.length ? settings.options : [{ id: 'default', label: 'חדש', color: 'gray' }];
+    } else if (type === 'tags') {
+      s.options = settings?.options ?? [];
     } else if (settings?.options) {
-      throw badRequest('תוויות מותרות רק בעמודת סטטוס');
+      throw badRequest('תוויות מותרות רק בעמודות סטטוס ותגיות');
+    }
+    if (settings?.prefix !== undefined) {
+      if (type !== 'auto_id') throw badRequest('תחילית מותרת רק בעמודת מזהה רץ');
+      if (settings.prefix) s.prefix = settings.prefix;
     }
     if (settings?.role === 'due') {
       if (type !== 'date') throw badRequest('רק עמודת תאריך יכולה לשמש כתאריך יעד');
@@ -295,10 +301,16 @@ export class BoardService {
         this.db.prepare('UPDATE board_columns SET settings = ? WHERE id = ?').run(JSON.stringify(settings), columnId);
         if (settings.role === 'due') this.clearOtherDueColumns(boardId, columnId);
         // Clear cell values that point to status options which no longer exist.
-        if (col.type === 'status') {
+        if (col.type === 'status' || col.type === 'tags') {
           const valid = new Set(settings.options?.map((o) => o.id));
-          const stale = (old: unknown) => typeof old === 'string' && !valid.has(old);
-          this.rewriteColumnValues(boardId, columnId, (v) => (stale(v) ? undefined : v));
+          this.rewriteColumnValues(boardId, columnId, (v) => {
+            if (typeof v === 'string') return valid.has(v) ? v : undefined;
+            if (Array.isArray(v)) {
+              const kept = (v as string[]).filter((id) => valid.has(id));
+              return kept.length ? kept : undefined;
+            }
+            return v;
+          });
         }
       }
       this.activity.record(boardId, actor.id, 'column_updated', { columnId, title: input.title ?? col.title });

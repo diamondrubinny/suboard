@@ -179,4 +179,36 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       );
     `,
   },
+  {
+    version: 3,
+    name: 'subitems_trash_seq_views',
+    sql: /* sql */ `
+      ALTER TABLE items ADD COLUMN parent_id TEXT REFERENCES items(id) ON DELETE CASCADE;
+      ALTER TABLE items ADD COLUMN deleted_at TEXT;
+      ALTER TABLE items ADD COLUMN seq INTEGER;
+      ALTER TABLE boards ADD COLUMN item_seq INTEGER NOT NULL DEFAULT 0;
+      CREATE INDEX idx_items_parent ON items(parent_id);
+      CREATE INDEX idx_items_deleted ON items(board_id, deleted_at);
+
+      -- Running number per board for existing items, in creation order.
+      UPDATE items SET seq = (
+        SELECT rn FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY board_id ORDER BY created_at, rowid) AS rn FROM items) x
+        WHERE x.id = items.id
+      );
+      UPDATE boards SET item_seq = COALESCE((SELECT MAX(seq) FROM items WHERE items.board_id = boards.id), 0);
+      CREATE UNIQUE INDEX idx_items_board_seq ON items(board_id, seq);
+
+      CREATE TABLE saved_views (
+        id TEXT PRIMARY KEY,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        config TEXT NOT NULL DEFAULT '{}',
+        shared INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_views_board ON saved_views(board_id);
+    `,
+  },
 ];

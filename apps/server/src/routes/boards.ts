@@ -106,7 +106,8 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
   // ---- updates (comments)
   app.get('/items/:id/updates', async (req) => ({ updates: items.listUpdates(actorOf(req), param(req, 'id')) }));
   app.post('/items/:id/updates', async (req, reply) => {
-    const update = items.addUpdate(actorOf(req), param(req, 'id'), createUpdateSchema.parse(req.body).body);
+    const input = createUpdateSchema.parse(req.body);
+    const update = items.addUpdate(actorOf(req), param(req, 'id'), input.body, input.mentions);
     return reply.code(201).send({ update });
   });
   app.delete('/updates/:id', async (req) => {

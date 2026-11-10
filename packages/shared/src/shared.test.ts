@@ -4,7 +4,9 @@ import {
   cellValueSchema,
   changePasswordSchema,
   columnSettingsSchema,
+  formatAutoId,
   formatDateHe,
+  formatDateRangeHe,
   isOverdue,
   isoDateSchema,
   loginSchema,
@@ -70,6 +72,33 @@ describe('schemas', () => {
   });
 });
 
+describe('wave A column types', () => {
+  it('validates new cell types strictly', () => {
+    const ok = (t: Parameters<typeof cellValueSchema>[0], v: unknown) => cellValueSchema(t).safeParse(v).success;
+    expect(ok('link', 'https://example.org/a')).toBe(true);
+    expect(ok('link', 'javascript:alert(1)')).toBe(false);
+    expect(ok('link', 'data:text/html,x')).toBe(false);
+    expect(ok('email', 'A@B.org')).toBe(true);
+    expect(ok('email', 'nope')).toBe(false);
+    expect(ok('phone', '+972 4-829-0000')).toBe(true);
+    expect(ok('phone', 'call me')).toBe(false);
+    expect(ok('progress', 50)).toBe(true);
+    expect(ok('progress', 101)).toBe(false);
+    expect(ok('progress', 5.5)).toBe(false);
+    expect(ok('rating', 0)).toBe(false);
+    expect(ok('date_range', { from: '2026-01-01', to: '2026-01-05' })).toBe(true);
+    expect(ok('date_range', { from: '2026-01-05', to: '2026-01-01' })).toBe(false);
+    expect(ok('tags', ['a', 'b'])).toBe(true);
+    expect(ok('auto_id', 'INC-1')).toBe(false); // computed by the server only
+  });
+
+  it('formats running ids and ranges', () => {
+    expect(formatAutoId(42, 'INC')).toBe('INC-0042');
+    expect(formatAutoId(7)).toBe('#7');
+    expect(formatDateRangeHe({ from: '2026-01-01', to: '2026-01-05' })).toBe('01/01/2026 – 05/01/2026');
+  });
+});
+
 describe('logic', () => {
   const columns: Column[] = [
     {
@@ -91,6 +120,8 @@ describe('logic', () => {
     id: 'i',
     boardId: 'b',
     groupId: 'g',
+    parentId: null,
+    seq: 1,
     name: 'x',
     values: { s: status, d: due },
     position: 0,

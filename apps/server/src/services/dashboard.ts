@@ -36,7 +36,7 @@ export class DashboardService {
     for (const boardId of this.access.accessibleBoardIds(actor)) {
       const { name: boardName } = this.db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string };
       const columns = this.boards.columns(boardId);
-      const items = (this.db.prepare('SELECT * FROM items WHERE board_id = ?').all(boardId) as ItemRow[]).map(toItem);
+      const items = (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL').all(boardId) as ItemRow[]).map(toItem);
       const statusCol = findPrimaryStatusColumn(columns);
       const dueCol = findDueColumn(columns);
       const personCols = columns.filter((c) => c.type === 'person');

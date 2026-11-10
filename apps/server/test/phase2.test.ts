@@ -266,11 +266,14 @@ describe('attachments', () => {
     expect(readdirSync(join(ctx.uploadDir, 'store'))).toHaveLength(0);
   });
 
-  it('removes orphaned files after an item is deleted', async () => {
+  it('keeps files of a trashed item until the trash is purged, then removes them', async () => {
     await withScanner();
     const { m, item } = await boardFixture();
-    await m.client.upload(`/api/items/${item.id}/attachments`, 'a.png', files.png);
+    const att = (await m.client.upload(`/api/items/${item.id}/attachments`, 'a.png', files.png)).json().attachment;
     await m.client.del(`/api/items/${item.id}`);
+    expect(ctx.app.services.attachments.sweepOrphans()).toBe(0); // restorable
+    expect((await m.client.get(`/api/attachments/${att.id}/download`)).statusCode).toBe(404); // but not reachable
+    expect(ctx.app.services.items.purgeTrash(-1)).toBe(1); // -1 day: everything in the trash
     expect(ctx.app.services.attachments.sweepOrphans()).toBe(1);
     expect(readdirSync(join(ctx.uploadDir, 'store'))).toHaveLength(0);
   });

@@ -60,12 +60,16 @@ export interface Column {
   position: number;
 }
 
-export type CellValue = string | number | boolean | string[] | null;
+export type CellValue = string | number | boolean | string[] | { from: string; to: string } | null;
 
 export interface Item {
   id: string;
   boardId: string;
   groupId: string;
+  /** Set for sub-items (one level). */
+  parentId: string | null;
+  /** Running number within the board (shown by an `auto_id` column). */
+  seq: number;
   name: string;
   values: Record<string, CellValue>;
   position: number;
@@ -169,7 +173,7 @@ export interface MfaSetup {
   qrSvg: string;
 }
 
-export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow';
+export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned';
 
 export interface AppNotification {
   id: string;
@@ -194,4 +198,37 @@ export interface Attachment {
   uploadedBy: string | null;
   uploaderName: string | null;
   createdAt: string;
+}
+
+export interface TrashedItem {
+  id: string;
+  name: string;
+  parentId: string | null;
+  deletedAt: string;
+  purgeAt: string;
+}
+
+export interface SavedView {
+  id: string;
+  boardId: string;
+  userId: string;
+  ownerName: string;
+  name: string;
+  shared: boolean;
+  config: import('./schemas.js').ViewConfig;
+  mine: boolean;
+}
+
+export interface SearchHit {
+  kind: 'item' | 'update';
+  itemId: string;
+  itemName: string;
+  boardId: string;
+  boardName: string;
+  snippet: string;
+}
+
+export interface ImportResult {
+  created: number;
+  errors: { row: number; message: string }[];
 }
