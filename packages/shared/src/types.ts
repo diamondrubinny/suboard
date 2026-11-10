@@ -1,5 +1,5 @@
-import type { BoardRole, ColorKey, ColumnType, GlobalRole } from './constants.js';
-import type { ColumnSettings, RecurrenceSchedule, RuleAction, RuleCondition, RuleTrigger } from './schemas.js';
+import type { BoardRole, CauseCategory, ColorKey, ColumnType, GlobalRole } from './constants.js';
+import type { ColumnSettings, ComplianceSettings, RecurrenceSchedule, RuleAction, RuleCondition, RuleTrigger } from './schemas.js';
 
 /** API data-transfer objects (JSON shapes returned by the server). */
 
@@ -60,7 +60,16 @@ export interface Column {
   position: number;
 }
 
-export type CellValue = string | number | boolean | string[] | { from: string; to: string } | null;
+export interface RiskValue {
+  /** Likelihood 1–5. */
+  l: number;
+  /** Severity 1–5. */
+  s: number;
+}
+export type ChecklistResult = 'pass' | 'fail' | 'na';
+/** Per checklist entry: the result and (server-maintained) the corrective action opened for a failure. */
+export type ChecklistValue = Record<string, { r: ChecklistResult; capa?: string }>;
+export type CellValue = string | number | boolean | string[] | { from: string; to: string } | RiskValue | ChecklistValue | null;
 
 export interface Item {
   id: string;
@@ -173,7 +182,7 @@ export interface MfaSetup {
   qrSvg: string;
 }
 
-export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report';
+export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness';
 
 export interface AppNotification {
   id: string;
@@ -315,3 +324,108 @@ export interface BoardReportSummary {
   createdInPeriod: number;
   closedInPeriod: number;
 }
+
+// ---------- Wave C ----------
+export interface ItemLink {
+  id: string;
+  kind: 'checklist_capa' | 'investigation_action';
+  direction: 'out' | 'in';
+  /** null when the linked item is on a board the viewer cannot see (name hidden). */
+  item: { id: string; name: string; boardId: string; boardName: string; statusLabel: string | null; statusColor: ColorKey | null; done: boolean } | null;
+  createdAt: string;
+}
+
+export interface Investigation {
+  itemId: string;
+  whys: string[];
+  rootCause: string;
+  categories: CauseCategory[];
+  effectivenessDue: string | null;
+  effectivenessResult: 'effective' | 'not_effective' | null;
+  effectivenessNote: string;
+  updatedAt: string | null;
+  updatedByName: string | null;
+}
+
+export interface ComplianceBucket {
+  key: string;
+  label: string;
+  total: number;
+  ok: number;
+  dueSoon: number;
+  overdue: number;
+  missing: number;
+  /** (ok + dueSoon) / total × 100, rounded; null when total is 0. */
+  percent: number | null;
+}
+
+export interface BoardCompliance {
+  boardId: string;
+  boardName: string;
+  settings: NonNullable<ComplianceSettings>;
+  dateColumnTitle: string;
+  groupByTitle: string | null;
+  summary: ComplianceBucket;
+  groups: ComplianceBucket[];
+  overdueItems: { id: string; name: string; date: string; group: string | null }[];
+}
+
+export interface FormField {
+  columnId: string;
+  label?: string;
+  help?: string;
+  required: boolean;
+}
+
+export interface BoardForm {
+  id: string;
+  boardId: string;
+  boardName: string;
+  name: string;
+  description: string;
+  groupId: string;
+  nameLabel: string;
+  fields: FormField[];
+  audience: 'members' | 'all_users';
+  allowPhotos: boolean;
+  enabled: boolean;
+  createdByName: string | null;
+  submissions: number;
+}
+
+/** What a person filling the form receives: only the columns of its fields. */
+export interface FormForFill {
+  id: string;
+  name: string;
+  description: string;
+  boardName: string;
+  nameLabel: string;
+  allowPhotos: boolean;
+  fields: (FormField & { column: Column })[];
+  /** Board members (only for member forms with a person field). */
+  members: DirectoryUser[];
+}
+
+export interface MySubmission {
+  itemId: string;
+  formName: string;
+  boardName: string;
+  name: string;
+  ref: string;
+  createdAt: string;
+  statusLabel: string | null;
+  statusColor: ColorKey | null;
+  done: boolean;
+}
+
+export interface ItemCard {
+  boardId: string;
+  boardName: string;
+  myRole: BoardRole;
+  item: Item;
+  columns: Column[];
+  members: DirectoryUser[];
+  updates: ItemUpdate[];
+}
+
+export type { ComplianceSettings };

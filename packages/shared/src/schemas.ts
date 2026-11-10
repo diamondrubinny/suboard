@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BOARD_ROLES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, type ColorKey, type ColumnType } from './constants.js';
+import { BOARD_ROLES, CAUSE_CATEGORIES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, type ColorKey, type ColumnType } from './constants.js';
 
 /** Trimmed, non-empty single-line string without control characters. */
 const line = (max: number) =>
@@ -110,6 +110,18 @@ export const columnSettingsSchema = z
     role: z.enum(['due']).optional(),
     /** auto_id: prefix shown before the running number, e.g. "INC". */
     prefix: z.string().regex(/^[A-Za-z0-9]{0,10}$/, 'אותיות לטיניות וספרות בלבד, עד 10').optional(),
+    /** checklist: the inspection items and (optionally) where failed items open a corrective action. */
+    checklist: z
+      .object({
+        items: z
+          .array(z.object({ id: z.string().regex(/^[a-z0-9_-]{1,40}$/i, 'מזהה לא תקין'), label: line(200) }))
+          .min(1, 'יש להוסיף לפחות סעיף אחד')
+          .max(LIMITS.checklistItems)
+          .refine((a) => new Set(a.map((x) => x.id)).size === a.length, 'מזהי סעיפים כפולים'),
+        capaBoardId: idSchema.nullable().optional(),
+        capaGroupId: idSchema.nullable().optional(),
+      })
+      .optional(),
   })
   .refine(
     (s) => !s.options || new Set(s.options.map((o) => o.id)).size === s.options.length,
@@ -188,6 +200,14 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
     case 'auto_id':
       // Computed by the server; any client value is rejected.
       return z.never();
+    case 'risk':
+      return z.object({ l: z.number().int().min(1).max(5), s: z.number().int().min(1).max(5) }).nullable();
+    case 'checklist':
+      // Clients send results only; linked corrective-action ids are maintained by the server.
+      return z
+        .record(z.string().regex(/^[a-z0-9_-]{1,40}$/i), z.object({ r: z.enum(['pass', 'fail', 'na']) }))
+        .refine((v) => Object.keys(v).length <= LIMITS.checklistItems, 'יותר מדי סעיפים')
+        .nullable();
   }
 }
 
@@ -416,6 +436,59 @@ export const updateReportSchema = z
   .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
 
 export const icsQuerySchema = z.object({ columnId: idSchema.optional() });
+
+// ---------- Wave C ----------
+export const investigationSchema = z.object({
+  whys: z.array(multiline(LIMITS.why)).max(5).default([]),
+  rootCause: multiline(LIMITS.rootCause).default(''),
+  categories: z.array(z.enum(CAUSE_CATEGORIES)).max(CAUSE_CATEGORIES.length).default([]),
+  effectivenessDue: isoDateSchema.nullable().default(null),
+  effectivenessResult: z.enum(['effective', 'not_effective']).nullable().default(null),
+  effectivenessNote: multiline(LIMITS.why).default(''),
+});
+export type InvestigationInput = z.input<typeof investigationSchema>;
+
+export const linkedActionSchema = z.object({ boardId: idSchema, groupId: idSchema, name: line(LIMITS.itemName) });
+
+export const complianceSettingsSchema = z
+  .object({
+    dateColumnId: idSchema,
+    groupByColumnId: idSchema.nullable().optional(),
+    windowDays: z.number().int().min(1).max(180).default(30),
+  })
+  .nullable();
+export type ComplianceSettings = z.infer<typeof complianceSettingsSchema>;
+
+export const formFieldSchema = z.object({
+  columnId: idSchema,
+  label: line(LIMITS.columnTitle).optional(),
+  help: z.string().max(300).optional(),
+  required: z.boolean().default(false),
+});
+export const createFormSchema = z.object({
+  name: line(80),
+  description: multiline(1000).default(''),
+  groupId: idSchema,
+  nameLabel: line(80).default('כותרת'),
+  fields: z.array(formFieldSchema).max(LIMITS.formFields).refine((f) => new Set(f.map((x) => x.columnId)).size === f.length, 'שדה כפול'),
+  audience: z.enum(['members', 'all_users']).default('members'),
+  allowPhotos: z.boolean().default(false),
+  enabled: z.boolean().default(true),
+});
+export type CreateFormInput = z.input<typeof createFormSchema>;
+export const updateFormSchema = z
+  .object({
+    name: line(80).optional(),
+    description: multiline(1000).optional(),
+    groupId: idSchema.optional(),
+    nameLabel: line(80).optional(),
+    fields: z.array(formFieldSchema).max(LIMITS.formFields).optional(),
+    audience: z.enum(['members', 'all_users']).optional(),
+    allowPhotos: z.boolean().optional(),
+    enabled: z.boolean().optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+export const submitFormSchema = z.object({ name: line(LIMITS.itemName), values: z.record(idSchema, z.unknown()).default({}) });
 
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;

@@ -18,6 +18,10 @@ import { AutomationService } from './automations.js';
 import { CalendarService } from './calendar.js';
 import { RecurrenceService } from './recurrences.js';
 import { ReportService } from './reports.js';
+import { ComplianceService } from './compliance.js';
+import { FormService } from './forms.js';
+import { InvestigationService } from './investigations.js';
+import { LinkService } from './links.js';
 import { ClamdScanner, UnsafeNoopScanner, type Scanner } from '../lib/clamav.js';
 import { createMailer, type Mailer } from '../lib/mailer.js';
 
@@ -40,6 +44,10 @@ export interface Services {
   recurrences: RecurrenceService;
   reports: ReportService;
   calendar: CalendarService;
+  links: LinkService;
+  investigations: InvestigationService;
+  compliance: ComplianceService;
+  forms: FormService;
 }
 
 /** Infrastructure that tests (or alternative deployments) can substitute. */
@@ -75,8 +83,12 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const recurrences = new RecurrenceService(db, config, access, boards, items, activity);
   const reports = new ReportService(db, config, access, boards, items, activity, notifications);
   const calendar = new CalendarService(db, config, access, boards, audit);
+  const links = new LinkService(db, access, boards, items);
+  const investigations = new InvestigationService(db, config, access, boards, items, activity, notifications);
+  const compliance = new ComplianceService(db, config, access, boards, activity);
+  const forms = new FormService(db, access, boards, items, attachments, activity);
   return {
     audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
-    automations, recurrences, reports, calendar,
+    automations, recurrences, reports, calendar, links, investigations, compliance, forms,
   };
 }

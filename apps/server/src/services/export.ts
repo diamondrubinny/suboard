@@ -1,4 +1,4 @@
-import { formatAutoId, formatDateHe, formatDateRangeHe, type CellValue, type Column, type Item } from '@suboard/shared';
+import { checklistStats, formatRisk, isDateRange, formatAutoId, formatDateHe, formatDateRangeHe, type CellValue, type Column, type Item } from '@suboard/shared';
 import writeXlsxFile from 'write-excel-file/node';
 import type { DB } from '../db/index.js';
 import type { AccessService, Actor } from './access.js';
@@ -33,11 +33,17 @@ export function formatCell(c: Column, v: CellValue | undefined, item: Item, user
     case 'date':
       return formatDateHe(String(v));
     case 'date_range':
-      return typeof v === 'object' && !Array.isArray(v) ? formatDateRangeHe(v) : '';
+      return isDateRange(v) ? formatDateRangeHe(v) : '';
     case 'checkbox':
       return v ? 'כן' : 'לא';
     case 'progress':
       return `${String(v)}%`;
+    case 'risk':
+      return formatRisk(v);
+    case 'checklist': {
+      const st = checklistStats(c, v);
+      return `${st.pass} תקין, ${st.fail} לא תקין, ${st.na} לא רלוונטי, ${st.open} לא נבדק`;
+    }
     default:
       return String(v);
   }

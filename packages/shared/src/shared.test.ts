@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDaysIso,
+  checklistStats,
+  formatRisk,
+  riskLevel,
   createAutomationSchema,
   nextOccurrence,
   recurrenceScheduleSchema,
@@ -178,5 +181,19 @@ describe('recurrence (wave B)', () => {
     expect(createAutomationSchema.safeParse({ name: 'x', trigger: { type: 'exec' }, actions: [{ type: 'move_group', groupId: crypto.randomUUID() }] }).success).toBe(false);
     expect(ruleActionSchema.safeParse({ type: 'notify', to: { userIds: [] }, message: 'hi' }).success).toBe(false);
     expect(recurrenceScheduleSchema.safeParse({ frequency: 'weekly', startDate: '2026-01-01' }).success).toBe(false);
+  });
+});
+
+describe('risk matrix and checklist (wave C)', () => {
+  it('maps the 5×5 matrix to four bands', () => {
+    expect([1, 4, 5, 9, 10, 16, 20, 25].map(riskLevel)).toEqual(['low', 'low', 'medium', 'medium', 'high', 'high', 'critical', 'critical']);
+    expect(formatRisk({ l: 3, s: 4 })).toBe('12 · גבוה');
+    expect(formatRisk(null)).toBe('');
+    expect(cellValueSchema('risk').safeParse({ l: 0, s: 3 }).success).toBe(false);
+  });
+  it('counts checklist results, ignoring unknown entries', () => {
+    const col = { id: 'c', boardId: 'b', title: 'x', type: 'checklist' as const, position: 0, settings: { checklist: { items: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }, { id: 'c', label: 'C' }] } } };
+    expect(checklistStats(col, { a: { r: 'pass' }, b: { r: 'fail' }, zz: { r: 'pass' } })).toEqual({ total: 3, pass: 1, fail: 1, na: 0, open: 1 });
+    expect(cellValueSchema('checklist').safeParse({ a: { r: 'maybe' } }).success).toBe(false);
   });
 });

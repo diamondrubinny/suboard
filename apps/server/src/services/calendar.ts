@@ -1,4 +1,4 @@
-import { addDaysIso, findDueColumn, findPrimaryStatusColumn, isItemDone, type Column, type Item } from '@suboard/shared';
+import { isDateRange, addDaysIso, findDueColumn, findPrimaryStatusColumn, isItemDone, type Column, type Item } from '@suboard/shared';
 import type { AppConfig } from '../config.js';
 import type { DB } from '../db/index.js';
 import { badRequest } from '../lib/errors.js';
@@ -93,7 +93,7 @@ export class CalendarService {
     const v = item.values[col.id];
     const url = `${this.config.publicUrl}/boards/${boardId}?item=${item.id}`;
     if (col.type === 'date' && typeof v === 'string') return { uid: `${item.id}-${col.id}`, summary: item.name, start: v, end: v, url };
-    if (col.type === 'date_range' && v && typeof v === 'object' && !Array.isArray(v)) {
+    if (col.type === 'date_range' && isDateRange(v)) {
       return { uid: `${item.id}-${col.id}`, summary: item.name, start: v.from, end: v.to, url };
     }
     return null;

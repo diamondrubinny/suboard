@@ -84,9 +84,17 @@ export class AttachmentService {
     return (this.db.prepare(`${this.select('a.item_id = ?')} ORDER BY a.created_at DESC`).all(itemId) as Row[]).map(toAttachment);
   }
 
-  async upload(actor: Actor, itemId: string, file: { filename: string; data: Buffer }, ip: string): Promise<Attachment> {
+  /**
+   * `asSubmitter`: the caller (FormService) already verified that the actor submitted this item through
+   * a form that allows photos, within the time window — board membership is then not required.
+   */
+  async upload(actor: Actor, itemId: string, file: { filename: string; data: Buffer }, ip: string, opts: { asSubmitter?: true; maxFiles?: number } = {}): Promise<Attachment> {
     const boardId = this.access.boardIdForItem(itemId);
-    this.access.requireBoard(actor, boardId, 'editor');
+    if (!opts.asSubmitter) this.access.requireBoard(actor, boardId, 'editor');
+    if (opts.maxFiles !== undefined) {
+      const mine = (this.db.prepare('SELECT COUNT(*) AS n FROM attachments WHERE item_id = ? AND uploaded_by = ?').get(itemId, actor.id) as { n: number }).n;
+      if (mine >= opts.maxFiles) throw badRequest(`ניתן לצרף עד ${opts.maxFiles} תמונות לדיווח`);
+    }
 
     const count = (this.db.prepare('SELECT COUNT(*) AS n FROM attachments WHERE item_id = ?').get(itemId) as { n: number }).n;
     if (count >= MAX_ATTACHMENTS_PER_ITEM) throw badRequest(`ניתן לצרף עד ${MAX_ATTACHMENTS_PER_ITEM} קבצים לפריט`);

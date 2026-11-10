@@ -36,6 +36,7 @@ const KIND_TEXT: Record<NotificationKind, string> = {
   mentioned: 'הוזכרת',
   automation: 'אוטומציה',
   report: 'דוח מתוזמן',
+  effectiveness: 'בדיקת אפקטיביות',
 };
 
 type Sender = { id: string | null; name: string };
@@ -99,6 +100,20 @@ export class NotificationService {
       void this.emailOne(userId, id, {
         subject: `SUBoard: ${ruleName}`.slice(0, 150),
         lines: [{ text: `${message} — "${itemName}" (${boardName})`, boardId, itemId }],
+      });
+    }
+    return recipients.length;
+  }
+
+  /** Effectiveness check of an investigation is due (once per due date). */
+  onEffectivenessDue(boardId: string, itemId: string, itemName: string, userIds: string[]): number {
+    const recipients = this.usersWithAccess(boardId, userIds);
+    const boardName = this.boardName(boardId);
+    for (const userId of recipients) {
+      const id = this.insert(userId, 'effectiveness', boardId, itemId, itemName, null, null);
+      void this.emailOne(userId, id, {
+        subject: 'SUBoard: הגיע מועד בדיקת אפקטיביות',
+        lines: [{ text: `הגיע מועד בדיקת האפקטיביות של הפעולות בתחקיר "${itemName}" (${boardName})`, boardId, itemId }],
       });
     }
     return recipients.length;

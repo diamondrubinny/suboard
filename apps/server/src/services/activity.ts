@@ -36,7 +36,14 @@ export type ActivityAction =
   | 'recurrence_deleted'
   | 'report_created'
   | 'report_updated'
-  | 'report_deleted';
+  | 'report_deleted'
+  | 'investigation_updated'
+  | 'action_linked'
+  | 'compliance_updated'
+  | 'form_created'
+  | 'form_updated'
+  | 'form_deleted'
+  | 'form_submitted';
 
 /** Business-level change history shown to board members (distinct from the security audit log). */
 export class ActivityService {

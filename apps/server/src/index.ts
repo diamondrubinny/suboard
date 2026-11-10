@@ -38,6 +38,7 @@ async function main() {
     ['recurring items', () => app.services.recurrences.runDue()],
     ['scheduled automations', () => app.services.automations.runScheduled()],
     ['scheduled reports', () => app.services.reports.runDue()],
+    ['effectiveness checks', () => app.services.investigations.runDue()],
     ['rescan uploads', () => app.services.attachments.rescanPending()],
   ];
   const frequent = async () => {

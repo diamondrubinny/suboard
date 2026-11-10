@@ -240,8 +240,26 @@ export class BoardService {
     return (this.db.prepare('SELECT * FROM board_columns WHERE board_id = ? ORDER BY position').all(boardId) as ColumnRow[]).map(toColumn);
   }
 
-  private normalizeSettings(type: ColumnType, settings: ColumnSettings | undefined): ColumnSettings {
+  private normalizeSettings(type: ColumnType, settings: ColumnSettings | undefined, actor?: Actor, boardId?: string): ColumnSettings {
     const s: ColumnSettings = {};
+    if (type === 'checklist') {
+      const cl = settings?.checklist ?? { items: [{ id: 'item1', label: 'סעיף 1' }] };
+      if (cl.capaBoardId) {
+        // The owner wiring a checklist to a corrective-action board must be able to edit that board,
+        // because failed items will be created there on their behalf.
+        if (!actor) throw badRequest('לוח יעד לא תקין');
+        if (cl.capaBoardId === boardId) throw badRequest('לוח הפעולות המתקנות חייב להיות לוח אחר');
+        const role = this.access.boardRole(actor, cl.capaBoardId);
+        if (!role || role === 'viewer') throw badRequest('יש לבחור לוח פעולות מתקנות שבו יש לך הרשאת עריכה', { capaBoardId: 'אין הרשאה' });
+        const groups = this.db.prepare('SELECT id FROM board_groups WHERE board_id = ? ORDER BY position').all(cl.capaBoardId) as { id: string }[];
+        if (cl.capaGroupId && !groups.some((g) => g.id === cl.capaGroupId)) throw badRequest('הקבוצה אינה שייכת ללוח היעד', { capaGroupId: 'קבוצה לא תקינה' });
+        s.checklist = { items: cl.items, capaBoardId: cl.capaBoardId, capaGroupId: cl.capaGroupId ?? groups[0]?.id ?? null };
+      } else {
+        s.checklist = { items: cl.items, capaBoardId: null, capaGroupId: null };
+      }
+    } else if (settings?.checklist) {
+      throw badRequest('סעיפי בדיקה מותרים רק בעמודת צ\'קליסט');
+    }
     if (type === 'status') {
       s.options = settings?.options?.length ? settings.options : [{ id: 'default', label: 'חדש', color: 'gray' }];
     } else if (type === 'tags') {
@@ -274,7 +292,7 @@ export class BoardService {
     this.access.requireBoard(actor, boardId, 'owner');
     const count = (this.db.prepare('SELECT COUNT(*) AS n FROM board_columns WHERE board_id = ?').get(boardId) as { n: number }).n;
     if (count >= LIMITS.columnsPerBoard) throw badRequest(`עד ${LIMITS.columnsPerBoard} עמודות בלוח`);
-    const settings = this.normalizeSettings(input.type, input.settings);
+    const settings = this.normalizeSettings(input.type, input.settings, actor, boardId);
     const max = (this.db.prepare('SELECT COALESCE(MAX(position), -1) AS p FROM board_columns WHERE board_id = ?').get(boardId) as { p: number }).p;
     const id = newId();
     this.db.transaction(() => {
@@ -297,7 +315,7 @@ export class BoardService {
       if (input.title !== undefined) this.db.prepare('UPDATE board_columns SET title = ? WHERE id = ?').run(input.title, columnId);
       if (input.position !== undefined) this.db.prepare('UPDATE board_columns SET position = ? WHERE id = ?').run(input.position, columnId);
       if (input.settings !== undefined) {
-        const settings = this.normalizeSettings(col.type, input.settings);
+        const settings = this.normalizeSettings(col.type, input.settings, actor, boardId);
         this.db.prepare('UPDATE board_columns SET settings = ? WHERE id = ?').run(JSON.stringify(settings), columnId);
         if (settings.role === 'due') this.clearOtherDueColumns(boardId, columnId);
         // Clear cell values that point to status options which no longer exist.
@@ -310,6 +328,15 @@ export class BoardService {
               return kept.length ? kept : undefined;
             }
             return v;
+          });
+        }
+        // Drop results for checklist entries that were removed (corrective-action links stay in item_links).
+        if (col.type === 'checklist') {
+          const valid = new Set(settings.checklist?.items.map((i) => i.id));
+          this.rewriteColumnValues(boardId, columnId, (v) => {
+            if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+            const kept = Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([k]) => valid.has(k)));
+            return Object.keys(kept).length ? kept : undefined;
           });
         }
       }

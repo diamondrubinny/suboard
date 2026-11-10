@@ -1,4 +1,4 @@
-import { cellValueSchema, LIMITS, type CellValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
+import { cellValueSchema, LIMITS, type CellValue, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
 import { nowIso, type DB } from '../db/index.js';
 import { newId } from '../lib/crypto.js';
 import { AppError, badRequest, forbidden, notFound } from '../lib/errors.js';
@@ -143,6 +143,12 @@ export class ItemService {
         v = ids.length ? ids : null;
       }
       if (col.type === 'long_text' && typeof v === 'string' && v.trim() === '') v = null;
+      if (col.type === 'checklist' && v && typeof v === 'object') {
+        const allowed = new Set(col.settings.checklist?.items.map((i) => i.id));
+        const entries = Object.entries(v as Record<string, { r: ChecklistResult }>);
+        if (entries.some(([k]) => !allowed.has(k))) throw badRequest(`סעיף לא קיים בעמודה "${col.title}"`, { [columnId]: 'סעיף לא קיים' });
+        v = entries.length ? (Object.fromEntries(entries.map(([k, e]) => [k, { r: e.r }])) as ChecklistValue) : null;
+      }
       out[columnId] = v;
     }
     return out;
@@ -176,6 +182,18 @@ export class ItemService {
     return item;
   }
 
+  /**
+   * Item from a form submission. The FormService has already checked that the actor may submit this
+   * form (audience) and which columns it may fill; values get the same validation as a manual edit.
+   */
+  createFromForm(actor: Actor, boardId: string, formId: string, formName: string, input: { groupId: string; name: string; values: Record<string, unknown> }): Item {
+    const item = this.createAs(actor, boardId, input);
+    this.db.prepare('UPDATE items SET form_id = ? WHERE id = ?').run(formId, item.id);
+    this.activity.record(boardId, actor.id, 'form_submitted', { form: formName }, item.id);
+    this.emit({ kind: 'created', boardId, before: null, after: item });
+    return item;
+  }
+
   /** System create (automation / recurring item): validated like a user's, but never emits events. */
   systemCreate(doer: Doer, boardId: string, input: { groupId: string; parentId?: string; name: string; values?: Record<string, unknown> }): Item {
     return this.createAs(doer, boardId, input);
@@ -199,6 +217,7 @@ export class ItemService {
       this.boards.touch(boardId);
     })();
     this.notifications.onAssigned(actor, boardId, id, input.name, this.newAssignees(boardId, {}, values));
+    this.openCorrectiveActions(id);
     return this.getRow(id);
   }
 
@@ -262,8 +281,14 @@ export class ItemService {
       }
       if (Object.keys(patch).length) {
         const values = { ...item.values };
-        for (const [columnId, v] of Object.entries(patch)) {
+        for (const [columnId, raw] of Object.entries(patch)) {
           const before = values[columnId] ?? null;
+          let v = raw;
+          if (columns.get(columnId)?.type === 'checklist' && v && before && typeof before === 'object') {
+            // Corrective-action links are server-maintained: carry them over from the stored value.
+            const prev = before as ChecklistValue;
+            v = Object.fromEntries(Object.entries(v as ChecklistValue).map(([k, e]) => [k, prev[k]?.capa ? { r: e.r, capa: prev[k]!.capa } : e])) as ChecklistValue;
+          }
           if (JSON.stringify(before) === JSON.stringify(v)) continue;
           if (v === null) delete values[columnId];
           else values[columnId] = v;
@@ -288,9 +313,55 @@ export class ItemService {
       this.db.prepare(`UPDATE items SET ${sets.join(', ')} WHERE id = ?`).run(...params, itemId);
       this.boards.touch(boardId);
     })();
-    const updated = this.getRow(itemId);
-    if (Object.keys(patch).length) this.notifications.onAssigned(actor, boardId, itemId, updated.name, this.newAssignees(boardId, item.values, patch));
-    return updated;
+    if (Object.keys(patch).length) {
+      this.notifications.onAssigned(actor, boardId, itemId, this.getRow(itemId).name, this.newAssignees(boardId, item.values, patch));
+      this.openCorrectiveActions(itemId);
+    }
+    return this.getRow(itemId);
+  }
+
+  // ---------------------------------------------------------------- checklist → corrective action (wave C)
+  /**
+   * For every checklist entry marked "fail" without a corrective action yet, opens one on the
+   * column's corrective-action board (on behalf of the system — wired by a board owner who could
+   * edit that board), links both items and records the new item's id in the checklist value.
+   */
+  private openCorrectiveActions(itemId: string): void {
+    const item = this.getRow(itemId);
+    const cols = this.boards.columns(item.boardId).filter((c) => c.type === 'checklist' && c.settings.checklist?.capaBoardId);
+    if (!cols.length) return;
+    const values = { ...item.values };
+    let changed = false;
+    for (const col of cols) {
+      const cl = col.settings.checklist!;
+      const v = values[col.id] as ChecklistValue | undefined;
+      if (!v) continue;
+      const target = this.db.prepare('SELECT id FROM boards WHERE id = ? AND archived_at IS NULL').get(cl.capaBoardId) as { id: string } | undefined;
+      if (!target) continue;
+      const groupId =
+        (cl.capaGroupId && (this.db.prepare('SELECT id FROM board_groups WHERE id = ? AND board_id = ?').get(cl.capaGroupId, target.id) as { id: string } | undefined)?.id) ||
+        (this.db.prepare('SELECT id FROM board_groups WHERE board_id = ? ORDER BY position LIMIT 1').get(target.id) as { id: string } | undefined)?.id;
+      if (!groupId) continue;
+      for (const entry of cl.items) {
+        const e = v[entry.id];
+        if (e?.r !== 'fail' || e.capa) continue;
+        const doer: Doer = { id: null, name: `צ'קליסט «${col.title}»`, automation: `צ'קליסט «${col.title}»` };
+        const capa = this.createAs(doer, target.id, { groupId, name: `${entry.label} — ${item.name}`.slice(0, LIMITS.itemName) });
+        this.db
+          .prepare("INSERT INTO item_links (id, from_item, to_item, kind, created_by, created_at) VALUES (?, ?, ?, 'checklist_capa', NULL, ?)")
+          .run(newId(), item.id, capa.id, nowIso());
+        v[entry.id] = { r: 'fail', capa: capa.id };
+        changed = true;
+        this.emit({ kind: 'created', boardId: target.id, before: null, after: capa });
+      }
+      values[col.id] = v;
+    }
+    if (changed) this.db.prepare('UPDATE items SET cell_values = ? WHERE id = ?').run(JSON.stringify(values), item.id);
+  }
+
+  /** Links two items (used by investigations). */
+  link(fromItem: string, toItem: string, kind: 'investigation_action', userId: string): void {
+    this.db.prepare('INSERT INTO item_links (id, from_item, to_item, kind, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(newId(), fromItem, toItem, kind, userId, nowIso());
   }
 
   // ---------------------------------------------------------------- trash (soft delete)

@@ -74,6 +74,7 @@ export const TEMPLATES: TemplateDef[] = [
       },
       { title: 'תאריך האירוע', type: 'date' },
       { title: 'מיקום', type: 'text' },
+      { title: 'הערכת סיכון', type: 'risk' },
       { title: 'אחראי בירור', type: 'person' },
       { title: 'יעד לסגירה', type: 'date', settings: { role: 'due' } },
       { title: 'תיאור (ללא פרטים רפואיים)', type: 'long_text' },
@@ -105,6 +106,24 @@ export const TEMPLATES: TemplateDef[] = [
       { title: 'סוקר', type: 'person' },
       { title: 'תאריך סקר', type: 'date', settings: { role: 'due' } },
       { title: 'ציון', type: 'number' },
+      {
+        title: 'צ\'קליסט סקר',
+        type: 'checklist',
+        settings: {
+          checklist: {
+            items: [
+              { id: 'exits', label: 'דרכי מילוט פנויות ומסומנות' },
+              { id: 'extinguisher', label: 'מטף בתוקף ונגיש' },
+              { id: 'shower', label: 'מקלחת חירום ושוטף עיניים תקינים' },
+              { id: 'hood', label: 'מנדף כימי — זרימה תקינה ומדבקת בדיקה בתוקף' },
+              { id: 'storage', label: 'אחסון חומרים מסוכנים לפי הפרדה' },
+              { id: 'labels', label: 'סימון מכלים ותוויות SDS' },
+              { id: 'ppe', label: 'ציוד מגן אישי זמין' },
+              { id: 'waste', label: 'פסולת כימית מסומנת ומאוחסנת כנדרש' },
+            ],
+          },
+        },
+      },
       { title: 'ממצאים', type: 'long_text' },
       { title: 'סקר הבא', type: 'date' },
     ],

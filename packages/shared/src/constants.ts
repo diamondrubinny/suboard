@@ -25,6 +25,8 @@ export const COLUMN_TYPES = [
   'email',
   'phone',
   'auto_id',
+  'risk',
+  'checklist',
 ] as const;
 
 /** Column types that hold a list of label options in their settings. */
@@ -80,6 +82,8 @@ export const COLUMN_TYPE_LABELS: Record<ColumnType, string> = {
   email: 'דוא"ל',
   phone: 'טלפון',
   auto_id: 'מזהה רץ',
+  risk: 'מטריצת סיכון (סבירות × חומרה)',
+  checklist: 'צ\'קליסט בדיקה',
 };
 
 export const LIMITS = {
@@ -111,4 +115,29 @@ export const LIMITS = {
   reportsPerBoard: 20,
   reportRecipients: 30,
   automationRunRetentionDays: 90,
+  checklistItems: 50,
+  formFields: 30,
+  formsPerBoard: 20,
+  why: 500,
+  rootCause: 2000,
+  linksPerItem: 50,
+  formPhotos: 5,
+  formPhotoMinutes: 60,
 } as const;
+
+/** Investigation root-cause categories (wave C). */
+export const CAUSE_CATEGORIES = ['people', 'equipment', 'method', 'environment', 'management', 'materials'] as const;
+export type CauseCategory = (typeof CAUSE_CATEGORIES)[number];
+export const CAUSE_LABELS: Record<CauseCategory, string> = {
+  people: 'אדם',
+  equipment: 'ציוד',
+  method: 'שיטה / נוהל',
+  environment: 'סביבה',
+  management: 'ניהול',
+  materials: 'חומרים',
+};
+
+/** Column types a form open to all signed-in users may contain (no people lists, no computed / checklist). */
+export const FORM_FIELD_TYPES = ['text', 'long_text', 'number', 'status', 'tags', 'date', 'date_range', 'checkbox', 'progress', 'rating', 'link', 'email', 'phone', 'risk'] as const;
+/** Additional types allowed when the form is limited to board members. */
+export const MEMBER_FORM_FIELD_TYPES = [...FORM_FIELD_TYPES, 'person'] as const;

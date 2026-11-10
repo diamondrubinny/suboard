@@ -283,4 +283,47 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       ALTER TABLE notifications ADD COLUMN detail TEXT;
     `,
   },
+  {
+    version: 5,
+    name: 'links_investigations_compliance_forms',
+    sql: /* sql */ `
+      CREATE TABLE item_links (
+        id TEXT PRIMARY KEY,
+        from_item TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        to_item TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('checklist_capa','investigation_action')),
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_links_from ON item_links(from_item);
+      CREATE INDEX idx_links_to ON item_links(to_item);
+
+      CREATE TABLE investigations (
+        item_id TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
+        data TEXT NOT NULL,                 -- JSON, validated by Zod on write
+        effectiveness_due TEXT,
+        effectiveness_result TEXT,
+        reminded_for TEXT,                  -- effectiveness_due value a reminder was already sent for
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_investigations_due ON investigations(effectiveness_due);
+
+      CREATE TABLE forms (
+        id TEXT PRIMARY KEY,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        config TEXT NOT NULL,               -- JSON {description, groupId, nameLabel, fields, audience, allowPhotos}
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_forms_board ON forms(board_id);
+
+      ALTER TABLE items ADD COLUMN form_id TEXT REFERENCES forms(id) ON DELETE SET NULL;
+      CREATE INDEX idx_items_form ON items(form_id, created_by);
+      ALTER TABLE boards ADD COLUMN compliance TEXT;
+    `,
+  },
 ];

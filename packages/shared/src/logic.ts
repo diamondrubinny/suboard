@@ -1,4 +1,4 @@
-import type { Column, Item } from './types.js';
+import type { Column, Item, RiskValue } from './types.js';
 
 /** Pure board-domain helpers used by both the dashboard (server) and the UI (client). */
 
@@ -142,4 +142,54 @@ export function upcomingOccurrences(s: ScheduleLike, from: string, count = 5): s
 /** Whole days from `a` to `b` (both YYYY-MM-DD). */
 export function diffDaysIso(a: string, b: string): number {
   return daysBetween(a, b);
+}
+
+// ---------------------------------------------------------------- risk matrix (wave C)
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
+export const RISK_LEVEL_LABELS: Record<RiskLevel, string> = { low: 'נמוך', medium: 'בינוני', high: 'גבוה', critical: 'קריטי' };
+/** Palette keys used for each level (all AA-tested label colours). */
+export const RISK_LEVEL_COLORS: Record<RiskLevel, 'green' | 'amber' | 'orange' | 'red'> = { low: 'green', medium: 'amber', high: 'orange', critical: 'red' };
+export const LIKELIHOOD_LABELS = ['', 'נדיר', 'לא סביר', 'אפשרי', 'סביר', 'כמעט ודאי'];
+export const SEVERITY_LABELS = ['', 'זניח', 'קל', 'בינוני', 'חמור', 'קטסטרופלי'];
+
+export function riskScore(v: RiskValue): number {
+  return v.l * v.s;
+}
+
+/** 5×5 matrix bands: 1–4 low, 5–9 medium, 10–16 high, 20–25 critical. */
+export function riskLevel(score: number): RiskLevel {
+  if (score >= 20) return 'critical';
+  if (score >= 10) return 'high';
+  if (score >= 5) return 'medium';
+  return 'low';
+}
+
+export function isRiskValue(v: unknown): v is RiskValue {
+  return typeof v === 'object' && v !== null && 'l' in v && 's' in v;
+}
+
+/** "12 · גבוה" */
+export function formatRisk(v: unknown): string {
+  if (!isRiskValue(v)) return '';
+  const s = riskScore(v);
+  return `${s} · ${RISK_LEVEL_LABELS[riskLevel(s)]}`;
+}
+
+/** Checklist progress: counts per result (unanswered = total − answered). */
+export function checklistStats(col: Column, v: unknown): { total: number; pass: number; fail: number; na: number; open: number } {
+  const items = col.settings.checklist?.items ?? [];
+  const map = (typeof v === 'object' && v !== null && !Array.isArray(v) ? v : {}) as Record<string, { r?: string }>;
+  const out = { total: items.length, pass: 0, fail: 0, na: 0, open: 0 };
+  for (const it of items) {
+    const r = map[it.id]?.r;
+    if (r === 'pass') out.pass++;
+    else if (r === 'fail') out.fail++;
+    else if (r === 'na') out.na++;
+    else out.open++;
+  }
+  return out;
+}
+
+export function isDateRange(v: unknown): v is { from: string; to: string } {
+  return typeof v === 'object' && v !== null && 'from' in v && 'to' in v;
 }
