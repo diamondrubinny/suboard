@@ -17,6 +17,13 @@ const TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
   monthly: (n) => `${n.title} מוכן`,
   effectiveness: (n) => `הגיע מועד בדיקת אפקטיביות: "${n.title}"`,
   report: (n) => `${n.detail ?? 'דוח מתוזמן'} — לוח "${n.title}"`,
+  followed: (n) =>
+    n.detail === 'status'
+      ? `${n.actorName ?? 'מישהו'} שינה/תה סטטוס ב"${n.title}" (במעקב)`
+      : n.detail === 'moved'
+        ? `${n.actorName ?? 'מישהו'} העביר/ה את "${n.title}" לקבוצה אחרת (במעקב)`
+        : `${n.actorName ?? 'מישהו'} הוסיף/ה עדכון ל"${n.title}" (במעקב)`,
+  reply: (n) => `${n.actorName ?? 'מישהו'} ענה/תה לעדכון שלך ב"${n.title}"`,
 };
 
 /** Where a notification leads (null = plain text). */

@@ -1,7 +1,7 @@
 import { createUserSchema, GLOBAL_ROLE_LABELS, GLOBAL_ROLES, LIMITS, type AdminUser, type GlobalRole } from '@suboard/shared';
 import { useRef, useState, type FormEvent } from 'react';
 import { ApiError, errorMessage } from '../api/client';
-import { useUserMutations, useUsers } from '../api/hooks';
+import { useRevokeUserSessions, useUserMutations, useUsers } from '../api/hooks';
 import { useAuth } from '../auth/AuthContext';
 import { Dialog } from '../components/Dialog';
 import { ErrorState, LoadingState, useFeedback } from '../components/Feedback';
@@ -151,6 +151,7 @@ function IssuedPasswordDialog({ issued, onClose }: { issued: { name: string; pas
 
 function UserRow({ u, isSelf, onIssued }: { u: AdminUser; isSelf: boolean; onIssued: (v: { name: string; password: string }) => void }) {
   const { update, resetMfa } = useUserMutations();
+  const revokeSessions = useRevokeUserSessions();
   const { toast, confirm } = useFeedback();
   const onErr = (e: unknown) => toast(errorMessage(e), 'error');
 
@@ -218,6 +219,20 @@ function UserRow({ u, isSelf, onIssued }: { u: AdminUser; isSelf: boolean; onIss
               }}
             >
               איפוס MFA
+            </button>
+          )}
+          {u.isActive && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={revokeSessions.isPending}
+              onClick={async () => {
+                const message = isSelf ? 'כל המכשירים האחרים שלך ינותקו; במכשיר הזה תישאר/י מחובר/ת.' : `${u.name} ינותק/תנותק בכל המכשירים ויידרש/תידרש להתחבר מחדש (למשל אחרי אובדן טלפון).`;
+                if (!(await confirm({ title: 'ניתוק כל המכשירים', message, confirmLabel: 'ניתוק', danger: true }))) return;
+                revokeSessions.mutate(u.id, { onSuccess: () => toast('המכשירים נותקו'), onError: onErr });
+              }}
+            >
+              ניתוק מכשירים
             </button>
           )}
           {!isSelf && (

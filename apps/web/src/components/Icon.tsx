@@ -37,11 +37,18 @@ const PATHS = {
   bell: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0',
   paperclip: 'm21.4 11.1-9.2 9.2a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5',
   download: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
+  reply: 'M9 14 4 9l5-5M4 9h10a6 6 0 0 1 6 6v5',
+  star: 'm12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2L5.8 21 7 14.2 2 9.3l6.9-1z',
+  eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  image: 'M3 3h18v18H3zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM21 15l-5-5L5 21',
+  monitor: 'M2 4h20v13H2zM8 21h8M12 17v4',
+  keyboard: 'M2 6h20v12H2zM6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10',
 } as const;
 
 export type IconName = keyof typeof PATHS;
 
-export function Icon({ name, size = 18, className }: { name: IconName; size?: number; className?: string }) {
+/** `filled` paints the shape (e.g. a selected star) — always paired with text / aria-pressed, never colour alone. */
+export function Icon({ name, size = 18, className, filled = false }: { name: IconName; size?: number; className?: string; filled?: boolean }) {
   return (
     <svg
       aria-hidden="true"
@@ -49,7 +56,7 @@ export function Icon({ name, size = 18, className }: { name: IconName; size?: nu
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
       strokeWidth={2}
       strokeLinecap="round"

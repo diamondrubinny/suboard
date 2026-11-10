@@ -23,6 +23,7 @@ const QrSheetPage = lazy(() => import('./pages/field/QrPages').then((m) => ({ de
 const FormsPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormsPage })));
 const FormFillPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormFillPage })));
 const FormsAdminPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormsAdminPage })));
+const FilesPage = lazy(() => import('./pages/board/FilesPage').then((m) => ({ default: m.FilesPage })));
 const DashboardsPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.DashboardsPage })));
 const CustomDashboardPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.CustomDashboardPage })));
 const WorkloadPage = lazy(() => import('./pages/dashboards/ReportPages').then((m) => ({ default: m.WorkloadPage })));
@@ -91,6 +92,7 @@ export function App() {
                   <Route path="procedures" element={lazyPage(<ProceduresPage />)} />
                   <Route path="procedures/:procedureId" element={lazyPage(<ProcedurePage />)} />
                   <Route path="boards/:boardId/plans" element={lazyPage(<FloorPlansPage />)} />
+                  <Route path="boards/:boardId/files" element={lazyPage(<FilesPage />)} />
                   <Route path="boards/:boardId/plans/:attachmentId" element={lazyPage(<FloorPlanPage />)} />
                   <Route path="reports/monthly" element={lazyPage(<MonthlyReportPage />)} />
                   <Route path="forms" element={lazyPage(<FormsPage />)} />

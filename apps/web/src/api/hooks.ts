@@ -1,4 +1,9 @@
 import type {
+  ActiveSession,
+  BoardFile,
+  FollowState,
+  Reaction,
+  RecentBoard,
   CreatePermitInput,
   MyTraining,
   Permit,
@@ -112,6 +117,10 @@ export const qk = {
   myProcedures: ['my-procedures'] as const,
   plans: (boardId: string) => ['plans', boardId] as const,
   pins: (attachmentId: string) => ['pins', attachmentId] as const,
+  sessions: ['sessions'] as const,
+  recentBoards: ['recent-boards'] as const,
+  follow: (itemId: string) => ['follow', itemId] as const,
+  boardFiles: (boardId: string) => ['board-files', boardId] as const,
 };
 
 // ------------------------------------------------------------------ phase 2
@@ -437,10 +446,18 @@ export function useUpdateMutations(itemId: string) {
   };
   return {
     add: useMutation({
-      mutationFn: (input: { body: string; mentions?: string[] }) => api(`/items/${itemId}/updates`, 'POST', input),
-      onSuccess: refresh,
+      mutationFn: (input: { body: string; mentions?: string[]; parentId?: string }) => api(`/items/${itemId}/updates`, 'POST', input),
+      onSuccess: () => {
+        refresh();
+        void qc.invalidateQueries({ queryKey: qk.follow(itemId) });
+      },
     }),
     remove: useMutation({ mutationFn: (updateId: string) => api(`/updates/${updateId}`, 'DELETE'), onSuccess: refresh }),
+    react: useMutation({
+      mutationFn: ({ updateId, emoji, on }: { updateId: string; emoji: Reaction; on: boolean }) =>
+        api(`/updates/${updateId}/reactions/${encodeURIComponent(emoji)}`, on ? 'PUT' : 'DELETE', on ? {} : undefined),
+      onSuccess: () => void qc.invalidateQueries({ queryKey: qk.updates(itemId) }),
+    }),
   };
 }
 
@@ -791,3 +808,40 @@ export function useSavePins(attachmentId: string, boardId: string) {
     },
   });
 }
+
+// ------------------------------------------------------------------ wave H
+export const useSessions = () => useQuery({ queryKey: qk.sessions, queryFn: () => api<{ sessions: ActiveSession[] }>('/auth/sessions').then((r) => r.sessions) });
+export function useSessionMutations() {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: qk.sessions });
+  return {
+    revoke: useMutation({ mutationFn: (handle: string) => api<{ ok: true; signedOut: boolean }>(`/auth/sessions/${handle}`, 'DELETE'), onSuccess: refresh }),
+    revokeOthers: useMutation({ mutationFn: () => api<{ sessions: ActiveSession[] }>('/auth/sessions/revoke-others', 'POST', {}), onSuccess: refresh }),
+  };
+}
+export const useRevokeUserSessions = () => useMutation({ mutationFn: (userId: string) => api(`/users/${userId}/revoke-sessions`, 'POST', {}) });
+
+export const useRecentBoards = (enabled = true) => useQuery({ queryKey: qk.recentBoards, enabled, queryFn: () => api<{ boards: RecentBoard[] }>('/me/recent-boards').then((r) => r.boards) });
+export function useToggleFavorite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ boardId, on }: { boardId: string; on: boolean }) => api<{ favorite: boolean }>(`/boards/${boardId}/favorite`, on ? 'PUT' : 'DELETE', on ? {} : undefined),
+    onSuccess: (r, { boardId }) => {
+      qc.setQueryData<BoardSummary[]>(qk.boards, (list) => list?.map((b) => (b.id === boardId ? { ...b, favorite: r.favorite } : b)));
+      qc.setQueryData<BoardDetail>(qk.board(boardId), (b) => (b ? { ...b, favorite: r.favorite } : b));
+      void qc.invalidateQueries({ queryKey: qk.recentBoards });
+    },
+  });
+}
+
+export const useFollow = (itemId: string) => useQuery({ queryKey: qk.follow(itemId), queryFn: () => api<{ follow: FollowState }>(`/items/${itemId}/follow`).then((r) => r.follow) });
+export function useToggleFollow(itemId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (on: boolean) => api<{ follow: FollowState }>(`/items/${itemId}/follow`, on ? 'PUT' : 'DELETE', on ? {} : undefined).then((r) => r.follow),
+    onSuccess: (f) => qc.setQueryData(qk.follow(itemId), f),
+  });
+}
+
+export const useBoardFiles = (boardId: string) =>
+  useQuery({ queryKey: qk.boardFiles(boardId), queryFn: () => api<{ files: BoardFile[] }>(`/boards/${boardId}/files`).then((r) => r.files) });

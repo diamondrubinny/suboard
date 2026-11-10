@@ -1,7 +1,7 @@
-import { findPrimaryStatusColumn, LIMITS, todayIso, isOverdue, type BoardDetail, type CellValue, type DirectoryUser } from '@suboard/shared';
-import { lazy, Suspense, useRef, useState, type FormEvent } from 'react';
+import { findPrimaryStatusColumn, LIMITS, REACTION_LABELS, REACTIONS, todayIso, isOverdue, type BoardDetail, type CellValue, type DirectoryUser, type ItemUpdate, type Reaction } from '@suboard/shared';
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import { errorMessage } from '../../api/client';
-import { useBoard, useBoards, useCreateItem, useDeleteItem, useItemActions, useItemActivity, useItemUpdates, useUpdateItem, useUpdateMutations } from '../../api/hooks';
+import { useBoard, useBoards, useCreateItem, useDeleteItem, useItemActions, useItemActivity, useItemUpdates, useUpdateItem, useUpdateMutations, useFollow, useToggleFollow } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
 import { CellEditor } from '../../components/cells/CellEditor';
 import { Dialog } from '../../components/Dialog';
@@ -46,6 +46,7 @@ export function ItemDrawer({
     <Dialog open={Boolean(item)} onClose={onClose} title={item?.name ?? ''} variant="drawer">
       {item && (
         <>
+          <FollowButton itemId={item.id} />
           <div role="tablist" aria-label="מידע על הפריט" className="tabs">
             {TABS.map(([key, label]) => (
               <button
@@ -385,6 +386,34 @@ function FieldRow({ label, htmlFor, labelled, wide, children }: { label: string;
   );
 }
 
+/** Follow / unfollow toggle with follower count (notifications on updates and status changes). */
+function FollowButton({ itemId }: { itemId: string }) {
+  const q = useFollow(itemId);
+  const toggle = useToggleFollow(itemId);
+  const { toast } = useFeedback();
+  if (!q.data) return null;
+  const { following, count } = q.data;
+  return (
+    <div className="follow-bar">
+      <button
+        type="button"
+        className="btn btn-sm"
+        aria-pressed={following}
+        disabled={toggle.isPending}
+        onClick={() =>
+          toggle.mutate(!following, {
+            onSuccess: (f) => toast(f.following ? 'תקבל/י התראות על עדכונים ושינויי סטטוס בפריט' : 'הפסקת לעקוב אחרי הפריט'),
+            onError: (e) => toast(errorMessage(e), 'error'),
+          })
+        }
+      >
+        <Icon name="eye" size={16} /> {following ? 'במעקב' : 'מעקב אחרי הפריט'}
+      </button>
+      <span className="muted">{count === 1 ? 'עוקב/ת אחד/ת' : `${count} עוקבים`}</span>
+    </div>
+  );
+}
+
 function UpdatesPanel({ board, itemId }: { board: BoardDetail; itemId: string }) {
   const { user } = useAuth();
   const [mentions, setMentions] = useState<{ id: string; name: string }[]>([]);
@@ -403,6 +432,13 @@ function UpdatesPanel({ board, itemId }: { board: BoardDetail; itemId: string })
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const canEdit = board.myRole !== 'viewer';
+  const onDelete = async (u: ItemUpdate) => {
+    const replies = q.data?.filter((r) => r.parentId === u.id).length ?? 0;
+    const message = replies ? `למחוק את העדכון ואת ${replies} התשובות אליו?` : u.parentId ? 'למחוק את התשובה?' : 'למחוק את העדכון?';
+    if (await confirm({ title: u.parentId ? 'מחיקת תשובה' : 'מחיקת עדכון', message, confirmLabel: 'מחיקה', danger: true })) {
+      remove.mutate(u.id, { onError: (e) => toast(errorMessage(e), 'error') });
+    }
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -481,38 +517,213 @@ function UpdatesPanel({ board, itemId }: { board: BoardDetail; itemId: string })
       {q.isPending && <LoadingState />}
       {q.isError && <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} />}
       {q.data?.length === 0 && <p className="muted">אין עדיין עדכונים.</p>}
-      <ul className="list-plain">
-        {q.data?.map((u) => (
-          <li key={u.id}>
-            <article className="update" aria-label={`עדכון מאת ${u.userName}`}>
-              <header>
-                <Avatar small name={u.userName} />
-                <strong>{u.userName}</strong>
-                <time className="muted" dateTime={u.createdAt}>
-                  {formatDateTime(u.createdAt)}
-                </time>
-                {canEdit && (u.userId === user?.id || board.myRole === 'owner') && (
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    style={{ marginInlineStart: 'auto' }}
-                    aria-label="מחיקת העדכון"
-                    onClick={async () => {
-                      if (await confirm({ title: 'מחיקת עדכון', message: 'למחוק את העדכון?', confirmLabel: 'מחיקה', danger: true })) {
-                        remove.mutate(u.id, { onError: (e) => toast(errorMessage(e), 'error') });
-                      }
-                    }}
-                  >
-                    <Icon name="trash" size={16} />
-                  </button>
-                )}
-              </header>
-              <div className="body">{u.body}</div>
-            </article>
-          </li>
-        ))}
-      </ul>
+      {q.data && (
+        <ul className="list-plain">
+          {q.data
+            .filter((u) => !u.parentId)
+            .map((u) => {
+              const replies = q.data.filter((r) => r.parentId === u.id).reverse(); // oldest first inside a thread
+              return (
+                <li key={u.id}>
+                  <UpdateCard board={board} itemId={itemId} update={u} canEdit={canEdit} onDelete={onDelete} />
+                  {(replies.length > 0 || canEdit) && (
+                    <div className="update-thread">
+                      {replies.length > 0 && (
+                        <ul className="list-plain" aria-label={`${replies.length} תשובות לעדכון של ${u.userName}`}>
+                          {replies.map((r) => (
+                            <li key={r.id}>
+                              <UpdateCard board={board} itemId={itemId} update={r} canEdit={canEdit} onDelete={onDelete} reply />
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                      {canEdit && <ReplyForm itemId={itemId} parent={u} />}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+        </ul>
+      )}
     </>
+  );
+}
+
+function UpdateCard({
+  board,
+  itemId,
+  update: u,
+  canEdit,
+  onDelete,
+  reply = false,
+}: {
+  board: BoardDetail;
+  itemId: string;
+  update: ItemUpdate;
+  canEdit: boolean;
+  onDelete: (u: ItemUpdate) => void;
+  reply?: boolean;
+}) {
+  const { user } = useAuth();
+  return (
+    <article className={`update${reply ? ' update-reply' : ''}`} aria-label={`${reply ? 'תשובה' : 'עדכון'} מאת ${u.userName}`}>
+      <header>
+        <Avatar small name={u.userName} />
+        <strong>{u.userName}</strong>
+        <time className="muted" dateTime={u.createdAt}>
+          {formatDateTime(u.createdAt)}
+        </time>
+        {canEdit && (u.userId === user?.id || board.myRole === 'owner') && (
+          <button type="button" className="icon-btn" style={{ marginInlineStart: 'auto' }} aria-label={reply ? 'מחיקת התשובה' : 'מחיקת העדכון'} onClick={() => onDelete(u)}>
+            <Icon name="trash" size={16} />
+          </button>
+        )}
+      </header>
+      <div className="body">{u.body}</div>
+      <Reactions itemId={itemId} update={u} canEdit={canEdit} />
+    </article>
+  );
+}
+
+/** Reaction chips (toggle buttons) plus a small picker with the fixed set. */
+function Reactions({ itemId, update: u, canEdit }: { itemId: string; update: ItemUpdate; canEdit: boolean }) {
+  const { react } = useUpdateMutations(itemId);
+  const { toast } = useFeedback();
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+  const toggle = (emoji: Reaction, on: boolean) => {
+    setOpen(false);
+    react.mutate({ updateId: u.id, emoji, on }, { onError: (e) => toast(errorMessage(e), 'error') });
+  };
+  if (!u.reactions.length && !canEdit) return null;
+  const unused = REACTIONS.filter((e) => !u.reactions.some((r) => r.emoji === e));
+  return (
+    <div className="reactions">
+      {u.reactions.map((r) => (
+        <button
+          key={r.emoji}
+          type="button"
+          className="reaction"
+          aria-pressed={r.mine}
+          disabled={!canEdit || react.isPending}
+          title={r.users.join(', ')}
+          aria-label={`${REACTION_LABELS[r.emoji]}: ${r.count} (${r.users.join(', ')})${r.mine ? ' — כולל אותך' : ''}`}
+          onClick={() => toggle(r.emoji, !r.mine)}
+        >
+          <span aria-hidden="true">{r.emoji}</span> {r.count}
+        </button>
+      ))}
+      {canEdit && unused.length > 0 && (
+        <span
+          className="person-cell"
+          ref={wrapRef}
+          onBlur={(e) => {
+            // Keyboard: Tab moved focus elsewhere. (A click that does not focus — e.g. Safari — has no
+            // relatedTarget and is handled by the outside-mousedown listener instead.)
+            if (open && e.relatedTarget && !e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false);
+          }}
+        >
+          <button ref={btnRef} type="button" className="reaction reaction-add" aria-expanded={open} aria-label="הוספת תגובה" onClick={() => setOpen((x) => !x)}>
+            <span aria-hidden="true">＋</span>
+          </button>
+          {open && (
+            <div
+              className="popover reaction-picker"
+              role="group"
+              aria-label="בחירת תגובה"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.stopPropagation();
+                  setOpen(false);
+                  btnRef.current?.focus();
+                }
+              }}
+            >
+              {unused.map((e, i) => (
+                <button key={e} type="button" className="reaction" aria-label={REACTION_LABELS[e]} title={REACTION_LABELS[e]} autoFocus={i === 0} onClick={() => toggle(e, true)}>
+                  <span aria-hidden="true">{e}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ReplyForm({ itemId, parent }: { itemId: string; parent: ItemUpdate }) {
+  const { add } = useUpdateMutations(itemId);
+  const { toast } = useFeedback();
+  const [open, setOpen] = useState(false);
+  const [body, setBody] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const id = `reply-${parent.id}`;
+  if (!open)
+    return (
+      <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(true)} aria-label={`תשובה לעדכון של ${parent.userName}`}>
+        <Icon name="reply" size={16} /> תשובה
+      </button>
+    );
+  return (
+    <form
+      noValidate
+      className="reply-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!body.trim()) return setError('יש לכתוב תשובה');
+        setError(null);
+        add.mutate(
+          { body, parentId: parent.id },
+          {
+            onSuccess: () => {
+              setBody('');
+              setOpen(false);
+              toast('התשובה נוספה');
+            },
+            onError: (err) => setError(errorMessage(err)),
+          },
+        );
+      }}
+    >
+      <div className="field">
+        <label htmlFor={id}>תשובה ל{parent.userName}</label>
+        <textarea
+          id={id}
+          className="textarea"
+          rows={2}
+          autoFocus
+          value={body}
+          maxLength={LIMITS.updateBody}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setOpen(false))}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-error` : undefined}
+        />
+        {error && (
+          <span id={`${id}-error`} className="error" role="alert">
+            {error}
+          </span>
+        )}
+      </div>
+      <div className="toolbar">
+        <button type="submit" className="btn btn-primary btn-sm" disabled={add.isPending}>
+          {add.isPending ? 'שולח…' : 'שליחת תשובה'}
+        </button>
+        <button type="button" className="btn btn-sm" onClick={() => setOpen(false)}>
+          ביטול
+        </button>
+      </div>
+    </form>
   );
 }
 

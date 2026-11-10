@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useFeedback } from '../components/Feedback';
 import { usePageTitle } from '../components/Layout';
 import { MfaSection, NotificationPrefsSection } from './MfaSection';
+import { SessionsSection } from './SessionsSection';
 
 export function ProfilePage() {
   usePageTitle('פרופיל');
@@ -113,6 +114,7 @@ export function ProfilePage() {
         </section>
         {!user.mustChangePassword && <MfaSection />}
         {!user.mustChangePassword && !user.mfaSetupRequired && <NotificationPrefsSection />}
+        {!user.mustChangePassword && !user.mfaSetupRequired && <SessionsSection />}
       </div>
     </>
   );

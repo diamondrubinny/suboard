@@ -1,7 +1,7 @@
 import { formatDateHe, PALETTE, type DashboardItemRef } from '@suboard/shared';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../api/client';
-import { useDashboard } from '../api/hooks';
+import { useDashboard, useRecentBoards } from '../api/hooks';
 import { useAuth } from '../auth/AuthContext';
 import { EmptyState, ErrorState, LoadingState } from '../components/Feedback';
 import { Icon } from '../components/Icon';
@@ -36,6 +36,7 @@ export function DashboardPage() {
   usePageTitle('לוח בקרה');
   const { user } = useAuth();
   const q = useDashboard();
+  const recent = useRecentBoards();
 
   if (q.isPending) return <LoadingState />;
   if (q.isError) return <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} />;
@@ -55,6 +56,25 @@ export function DashboardPage() {
           </span>
         </div>
       </div>
+
+      {recent.data && recent.data.length > 0 && (
+        <nav aria-labelledby="recent-h" className="recent-boards">
+          <h2 id="recent-h" className="label">
+            נפתחו לאחרונה
+          </h2>
+          <ul className="list-plain chip-row">
+            {recent.data.map((b) => (
+              <li key={b.id}>
+                <Link to={`/boards/${b.id}`} className="chip-link">
+                  <Icon name={b.favorite ? 'star' : 'table'} size={16} filled={b.favorite} />
+                  {b.name}
+                  {b.favorite && <span className="sr-only"> (מועדף)</span>}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
 
       <section aria-label="תמונת מצב" className="stat-row">
         <div className="card stat">

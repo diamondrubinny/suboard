@@ -28,9 +28,18 @@ const EVENTS: Record<string, string> = {
   upload_rejected: 'קובץ נדחה (סוג לא מותר)',
   malware_detected: 'זוהתה נוזקה בקובץ',
   data_export: 'ייצוא נתונים',
+  sso_login_success: 'התחברות ארגונית (SSO)',
+  sso_login_failed: 'התחברות ארגונית נכשלה',
+  scim_user_created: 'משתמש נוצר בסנכרון (SCIM)',
+  scim_user_updated: 'משתמש עודכן בסנכרון (SCIM)',
+  scim_user_deactivated: 'משתמש הושבת בסנכרון (SCIM)',
+  scim_auth_failed: 'ניסיון סנכרון עם אסימון שגוי',
+  session_revoked: 'ניתוק מכשיר',
+  sessions_revoked_others: 'ניתוק כל המכשירים האחרים',
+  sessions_revoked_by_admin: 'ניתוק מכשירים ע"י מנהל',
 };
 
-const DANGER = new Set(['login_failed', 'account_locked', 'access_denied', 'mfa_failed', 'mfa_disable_failed', 'malware_detected', 'upload_rejected']);
+const DANGER = new Set(['login_failed', 'account_locked', 'access_denied', 'mfa_failed', 'mfa_disable_failed', 'malware_detected', 'upload_rejected', 'sso_login_failed', 'scim_auth_failed']);
 
 const REASONS: Record<string, string> = {
   unknown_account: 'חשבון לא קיים',

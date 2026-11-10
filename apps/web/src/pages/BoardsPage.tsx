@@ -8,6 +8,7 @@ import { Dialog } from '../components/Dialog';
 import { EmptyState, ErrorState, LoadingState, useFeedback } from '../components/Feedback';
 import { Icon, type IconName } from '../components/Icon';
 import { usePageTitle } from '../components/Layout';
+import { FavoriteButton } from '../components/FavoriteButton';
 
 function CreateBoardDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const templates = useTemplates();
@@ -139,8 +140,9 @@ export function BoardsPage() {
       )}
       {boards.data && boards.data.length > 0 && (
         <ul className="list-plain grid grid-cards">
-          {boards.data.map((b) => (
-            <li key={b.id}>
+          {[...boards.data].sort((x, y) => Number(y.favorite) - Number(x.favorite)).map((b) => (
+            <li key={b.id} className="board-card-wrap">
+              <FavoriteButton boardId={b.id} boardName={b.name} favorite={b.favorite} className="icon-btn board-card-fav" />
               <Link to={`/boards/${b.id}`} className="card board-card">
                 <h2>{b.name}</h2>
                 {b.description && <span className="muted">{b.description}</span>}

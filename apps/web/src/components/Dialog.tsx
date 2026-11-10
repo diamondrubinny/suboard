@@ -14,12 +14,19 @@ interface DialogProps {
 
 /**
  * Accessible modal built on the native <dialog> element: focus is trapped and
- * Escape closes it natively; focus returns to the previously focused element on close.
+ * Escape closes it natively (unless a child component consumed that Escape); focus returns to the
+ * previously focused element on close.
  */
 export function Dialog({ open, title, onClose, children, footer, variant = 'modal', initialFocusRef }: DialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const returnFocus = useRef<HTMLElement | null>(null);
+  /**
+   * Set while an Escape keydown is being dispatched inside the dialog and cleared if it bubbles up to
+   * the dialog. If a child handled Escape (stopPropagation — a popover, picker or inline editor), the
+   * native "cancel" that follows must not close the whole dialog.
+   */
+  const escapeHandledInside = useRef(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -48,8 +55,18 @@ export function Dialog({ open, title, onClose, children, footer, variant = 'moda
       ref={ref}
       className={variant === 'drawer' ? 'drawer' : undefined}
       aria-labelledby={titleId}
+      onKeyDownCapture={(e) => {
+        if (e.key === 'Escape') escapeHandledInside.current = true;
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') escapeHandledInside.current = false;
+      }}
       onCancel={(e) => {
         e.preventDefault();
+        if (escapeHandledInside.current) {
+          escapeHandledInside.current = false;
+          return;
+        }
         onClose();
       }}
       onMouseDown={(e) => {

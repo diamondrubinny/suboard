@@ -58,6 +58,8 @@ export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const boards = useBoards();
+  const favorites = (boards.data ?? []).filter((b) => b.favorite);
+  const others = (boards.data ?? []).filter((b) => !b.favorite);
   const [menuOpen, setMenuOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
 
@@ -190,11 +192,27 @@ export function Layout() {
                 </>
               )}
             </ul>
+            {favorites.length > 0 && (
+              <>
+                <h2 className="nav-section" id="nav-favorites">
+                  מועדפים
+                </h2>
+                <ul className="nav-list" aria-labelledby="nav-favorites">
+                  {favorites.map((b) => (
+                    <li key={b.id}>
+                      <NavLink to={`/boards/${b.id}`} className="nav-link">
+                        <Icon name="star" size={16} filled /> {b.name}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             <h2 className="nav-section" id="nav-boards">
-              הלוחות שלי
+              {favorites.length > 0 ? 'שאר הלוחות' : 'הלוחות שלי'}
             </h2>
             <ul className="nav-list" aria-labelledby="nav-boards">
-              {boards.data?.map((b) => (
+              {others.map((b) => (
                 <li key={b.id}>
                   <NavLink to={`/boards/${b.id}`} className="nav-link">
                     <Icon name="table" size={16} /> {b.name}

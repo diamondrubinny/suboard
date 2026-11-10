@@ -7,6 +7,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
 import { usePageTitle } from '../../components/Layout';
+import { FavoriteButton } from '../../components/FavoriteButton';
 import { NotFoundPage } from '../NotFoundPage';
 import { BulkBar, ColumnsMenu, ImportDialog, TrashDialog, ViewsMenu } from './BoardTools';
 import { RiskMatrixView } from './RiskMatrixView';
@@ -97,7 +98,10 @@ export function BoardPage() {
     <>
       <div className="page-header">
         <div>
-          <h1>{b.name}</h1>
+          <div className="title-row">
+            <h1>{b.name}</h1>
+            <FavoriteButton boardId={b.id} boardName={b.name} favorite={b.favorite} />
+          </div>
           {b.description && <p className="muted" style={{ margin: 'var(--space-1) 0 0' }}>{b.description}</p>}
         </div>
         <div className="actions">
@@ -126,6 +130,9 @@ export function BoardPage() {
               <Icon name="grid" /> תוכניות קומה
             </Link>
           )}
+          <Link to={`/boards/${b.id}/files`} className="btn btn-ghost">
+            <Icon name="image" /> גלריית קבצים
+          </Link>
           <Link to={`/boards/${b.id}/qr`} className="btn btn-ghost">
             <Icon name="grid" /> מדבקות QR
           </Link>
