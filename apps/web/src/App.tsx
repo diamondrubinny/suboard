@@ -1,0 +1,80 @@
+import { Component, type ReactNode } from 'react';
+import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom';
+import { AuthProvider, useAuth } from './auth/AuthContext';
+import { FeedbackProvider } from './components/Feedback';
+import { Layout, RequireAuth } from './components/Layout';
+import { AdminUsersPage } from './pages/AdminUsersPage';
+import { AuditPage } from './pages/AuditPage';
+import { BoardPage } from './pages/board/BoardPage';
+import { BoardSettingsPage } from './pages/board/BoardSettingsPage';
+import { BoardsPage } from './pages/BoardsPage';
+import { DashboardPage } from './pages/DashboardPage';
+import { AccessibilityPage, CookiesPage, PrivacyPage, TermsPage } from './pages/legal/LegalPages';
+import { LoginPage } from './pages/LoginPage';
+import { NotFoundPage } from './pages/NotFoundPage';
+import { ProfilePage } from './pages/ProfilePage';
+
+/** Last-resort error boundary: friendly message, no stack traces shown to users. */
+class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  override state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  override render() {
+    if (this.state.failed)
+      return (
+        <div className="state" role="alert">
+          <h1>אירעה שגיאה בלתי צפויה</h1>
+          <p>נסו לרענן את הדף. אם הבעיה חוזרת, פנו למנהל המערכת.</p>
+          <button type="button" className="btn btn-primary" onClick={() => window.location.assign('/')}>
+            חזרה לדף הבית
+          </button>
+        </div>
+      );
+    return this.props.children;
+  }
+}
+
+export function App() {
+  return (
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <FeedbackProvider>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route element={<RequireAuth />}>
+                <Route element={<Layout />}>
+                  <Route index element={<DashboardPage />} />
+                  <Route path="boards" element={<BoardsPage />} />
+                  <Route path="boards/:boardId" element={<BoardPage />} />
+                  <Route path="boards/:boardId/settings" element={<BoardSettingsPage />} />
+                  <Route path="profile" element={<ProfilePage />} />
+                  <Route element={<RequireAuth admin />}>
+                    <Route path="admin/users" element={<AdminUsersPage />} />
+                    <Route path="admin/audit" element={<AuditPage />} />
+                  </Route>
+                  <Route path="*" element={<NotFoundPage />} />
+                </Route>
+              </Route>
+              <Route element={<AuthOptionalLayout />}>
+                <Route path="accessibility" element={<AccessibilityPage />} />
+                <Route path="privacy" element={<PrivacyPage />} />
+                <Route path="cookies" element={<CookiesPage />} />
+                <Route path="terms" element={<TermsPage />} />
+              </Route>
+            </Routes>
+          </FeedbackProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
+  );
+}
+
+/** Legal routes must be reachable without login; with a session they use the normal app layout. */
+function AuthOptionalLayout() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (user && !user.mustChangePassword) return <Layout />;
+  return <Outlet />;
+}

@@ -1,0 +1,99 @@
+import { useState } from 'react';
+import { errorMessage } from '../api/client';
+import { useAudit } from '../api/hooks';
+import { EmptyState, ErrorState, LoadingState } from '../components/Feedback';
+import { usePageTitle } from '../components/Layout';
+import { formatDateTime } from './board/activityText';
+
+const EVENTS: Record<string, string> = {
+  login_success: 'התחברות מוצלחת',
+  login_failed: 'התחברות כושלת',
+  account_locked: 'נעילת חשבון',
+  logout: 'התנתקות',
+  password_changed: 'החלפת סיסמה',
+  password_change_failed: 'החלפת סיסמה נכשלה',
+  user_created: 'יצירת משתמש',
+  user_updated: 'עדכון משתמש',
+  board_created: 'יצירת לוח',
+  board_archived: 'העברת לוח לארכיון',
+  member_set: 'עדכון הרשאת לוח',
+  member_removed: 'הסרת חבר מלוח',
+  access_denied: 'ניסיון גישה שנדחה',
+};
+
+const REASONS: Record<string, string> = {
+  unknown_account: 'חשבון לא קיים',
+  bad_password: 'סיסמה שגויה',
+  locked: 'חשבון נעול',
+  inactive: 'חשבון מושבת',
+};
+
+function describeMeta(meta: Record<string, unknown>): string {
+  const parts: string[] = [];
+  if (typeof meta.reason === 'string') parts.push(REASONS[meta.reason] ?? meta.reason);
+  if (typeof meta.role === 'string') parts.push(`תפקיד: ${meta.role}`);
+  if (Array.isArray(meta.changed)) parts.push(`שדות: ${meta.changed.join(', ')}`);
+  if (typeof meta.route === 'string') parts.push(`${String(meta.method ?? '')} ${meta.route}`);
+  if (typeof meta.until === 'string') parts.push(`עד ${formatDateTime(meta.until)}`);
+  return parts.join(' · ');
+}
+
+export function AuditPage() {
+  usePageTitle('יומן אבטחה');
+  const [event, setEvent] = useState('');
+  const q = useAudit(event);
+
+  return (
+    <>
+      <div className="page-header">
+        <h1>יומן אבטחה</h1>
+      </div>
+      <p className="muted">
+        תיעוד אירועי אבטחה (100 האחרונים). כתובות IP נשמרות כערך מגובב (HMAC) בלבד. מדיניות שמירה: 365 ימים (ניתן להגדרה).
+      </p>
+      <div className="toolbar">
+        <label htmlFor="audit-event">סוג אירוע</label>
+        <select id="audit-event" className="select" value={event} onChange={(e) => setEvent(e.target.value)}>
+          <option value="">הכל</option>
+          {Object.entries(EVENTS).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
+        </select>
+      </div>
+      {q.isPending && <LoadingState />}
+      {q.isError && <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} />}
+      {q.data?.length === 0 && <EmptyState title="אין אירועים" />}
+      {q.data && q.data.length > 0 && (
+        <div className="table-wrap">
+          <table className="data-table">
+            <caption className="sr-only">אירועי אבטחה</caption>
+            <thead>
+              <tr>
+                <th scope="col">זמן</th>
+                <th scope="col">אירוע</th>
+                <th scope="col">משתמש</th>
+                <th scope="col">פרטים</th>
+              </tr>
+            </thead>
+            <tbody>
+              {q.data.map((e) => (
+                <tr key={e.id}>
+                  <td className="nowrap">{formatDateTime(e.createdAt)}</td>
+                  <td>
+                    <span className={e.event === 'login_failed' || e.event === 'account_locked' || e.event === 'access_denied' ? 'badge danger' : 'badge'}>
+                      {EVENTS[e.event] ?? e.event}
+                    </span>
+                  </td>
+                  <td>{e.userName ?? '—'}</td>
+                  <td className="muted">{describeMeta(e.meta)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
+  );
+}

@@ -1,0 +1,24 @@
+{
+  "name": "suboard",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Work-management boards for an organizational safety unit (Hebrew / RTL)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build -w @suboard/web && npm run build -w @suboard/server",
+    "start": "npm run start -w @suboard/server",
+    "test": "npm run test -w @suboard/shared && npm run test -w @suboard/server",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "create-admin": "npm run create-admin -w @suboard/server --",
+    "seed:demo": "npm run seed:demo -w @suboard/server",
+    "audit:deps": "npm audit --omit=dev",
+    "backup": "npm run backup -w @suboard/server --"
+  }
+}
