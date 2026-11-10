@@ -105,7 +105,7 @@ npm run backup -- --out /secure/backups --keep 14
 | API | Fastify 5 | Express, NestJS | plugins רשמיים ל-helmet/rate-limit/cookie |
 | DB | SQLite (WAL) | PostgreSQL | מתאים ליחידה; מעבר ל-PG מתוכנן בשלב 3 |
 | סיסמאות | scrypt (N=2^15) | Argon2id | ללא תלות native נוספת |
-| UI | React 19 + CSS ממערכת העיצוב SUBoard Spectrum | MUI, Tailwind | שליטה מלאה ב-RTL ונגישות, ללא CDN; גופן Rubik מוגש מקומית |
+| UI | React 19 + CSS ממערכת העיצוב SUBoard Spectrum | MUI, Tailwind | שליטה מלאה ב-RTL ונגישות, ללא CDN; גופן Rubik מתוך מערכת העיצוב (`npm run sync-design`) |
 
 ## רישיון ושימוש
 

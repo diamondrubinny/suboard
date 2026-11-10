@@ -19,6 +19,7 @@
     "create-admin": "npm run create-admin -w @suboard/server --",
     "seed:demo": "npm run seed:demo -w @suboard/server",
     "audit:deps": "npm audit --omit=dev",
-    "backup": "npm run backup -w @suboard/server --"
+    "backup": "npm run backup -w @suboard/server --",
+    "sync-design": "node scripts/sync-design.mjs"
   }
 }

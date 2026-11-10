@@ -1,10 +1,5 @@
-/*
- * SUBoard Spectrum — component stylesheet.
- * Source of truth: the "SUBoard Spectrum" design system (claude.ai Design), project/components/bundle.css,
- * synced 2026-11-10. The Google Fonts @import was removed: Rubik is self-hosted (see main.tsx), as the
- * CSP (font-src 'self') and the privacy policy (no third parties) require.
- * Everything after "APP ADDITIONS" is app-only and not yet in the design system.
- */
+/* Copied verbatim by scripts/sync-design.mjs from design/bundle.css (SUBoard Spectrum design system). Do not edit here: change the design system and re-sync. */
+/* SUBoard Spectrum — component stylesheet. Colours, spacing, radii, shadows, the font stack and the Rubik @font-face come from tokens.css (no third-party font host). */
 :root {
   --sidebar-w: 256px;
   --header-h: 3.75rem;
@@ -1422,41 +1417,15 @@ table.data-table {
 }
 
 /* ==========================================================================
-   APP ADDITIONS — not (yet) in the SUBoard Spectrum design system.
-   Written with the system's tokens only. Candidates to upstream into the system.
+   Accessibility, notifications, attachments (added 2026-11-10 from the SUBoard app)
    ========================================================================== */
 
-/* ---------- accessibility toolbar modes (README: high contrast, readable font, links, motion stop) ---------- */
-:root[data-contrast='high'] {
-  --ground: #ffffff;
-  --surface: #ffffff;
-  --surface-sunken: #ffffff;
-  --ink: #000000;
-  --ink-muted: #000000;
-  --line: #000000;
-  --line-strong: #000000;
-  --primary: #00307a;
-  --primary-hover: #001f50;
-  --primary-ink: #00307a;
-  --primary-tint: #ffffff;
-  --on-primary: #ffffff;
-  --tint-tangerine: #ffffff;
-  --tint-berry: #ffffff;
-  --tint-sky: #ffffff;
-  --tint-mint: #ffffff;
-  --tint-sun: #ffffff;
-  --danger: #a00000;
-  --danger-tint: #ffffff;
-  --success: #005a2e;
-  --success-tint: #ffffff;
-  --focus: #c00000;
-  color-scheme: light;
-}
+/* ---------- accessibility toolbar modes (high contrast is the `contrast` theme in tokens) ---------- */
 :root[data-links='highlight'] a {
   text-decoration: underline !important;
   text-decoration-thickness: 2px !important;
   background: #fff3a8;
-  color: #000 !important;
+  color: #000000 !important;
 }
 :root[data-font='readable'] {
   --font-sans: Arial, 'Arial Hebrew', Helvetica, sans-serif;
@@ -1481,7 +1450,7 @@ table.data-table {
   }
 }
 
-/* ---------- narrow phones: keep the header to icons (profile is in the side menu) ---------- */
+/* ---------- narrow phones: header keeps icons only (profile lives in the side menu) ---------- */
 @media (max-width: 560px) {
   .user-chip .nowrap,
   .user-chip .avatar {
@@ -1489,7 +1458,7 @@ table.data-table {
   }
 }
 
-/* ---------- badges ---------- */
+/* ---------- badge: warning ---------- */
 .badge.warning {
   background: var(--warning-tint);
   color: var(--ink);
@@ -1547,7 +1516,7 @@ table.data-table {
   font-weight: 500;
 }
 .notif-item a {
-  display: block; /* whole row is the target (WCAG 2.5.8) */
+  display: block; /* the whole row is the target (WCAG 2.5.8) */
   padding-block: 0.1rem;
 }
 
@@ -1578,19 +1547,16 @@ table.data-table {
   overflow-wrap: anywhere;
 }
 
-/* ---------- login: the unit's official logo above the form ---------- */
+/* ---------- the Safety Unit's official logo (login) ---------- */
 .unit-logo {
   display: block;
   inline-size: min(240px, 70%);
   block-size: auto;
   margin: 0 auto var(--space-4);
 }
-/* The official unit logo has dark-navy lettering: in dark theme it sits on a light plate
-   (the logo itself is never recoloured). */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']):not([data-contrast='high']) .unit-logo {
-    background: #ffffff;
-    border-radius: var(--radius-md);
-    padding: var(--space-2) var(--space-3);
-  }
+/* Its dark-navy lettering needs a light plate in the dark theme; the logo itself is never recoloured. */
+[data-theme='dark'] .unit-logo {
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
 }

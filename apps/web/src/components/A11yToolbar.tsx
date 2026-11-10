@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { setHighContrast } from '../theme';
 import { Icon } from './Icon';
 
 /**
@@ -28,8 +29,7 @@ function load(): Prefs {
 function apply(p: Prefs) {
   const root = document.documentElement;
   root.style.setProperty('--font-size', `${p.size}%`);
-  root.toggleAttribute('data-contrast', p.contrast);
-  if (p.contrast) root.setAttribute('data-contrast', 'high');
+  setHighContrast(p.contrast); // the design system's `contrast` theme
   root.toggleAttribute('data-links', p.links);
   if (p.links) root.setAttribute('data-links', 'highlight');
   root.toggleAttribute('data-font', p.readable);

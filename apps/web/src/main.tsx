@@ -3,17 +3,12 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ApiError } from './api/client';
 import { App } from './App';
-// Rubik (SUBoard Spectrum's typeface), self-hosted: Hebrew + Latin subsets only, the weights the system uses.
-import '@fontsource/rubik/hebrew-400.css';
-import '@fontsource/rubik/hebrew-500.css';
-import '@fontsource/rubik/hebrew-600.css';
-import '@fontsource/rubik/hebrew-700.css';
-import '@fontsource/rubik/latin-400.css';
-import '@fontsource/rubik/latin-500.css';
-import '@fontsource/rubik/latin-600.css';
-import '@fontsource/rubik/latin-700.css';
+import { initTheme } from './theme';
+// Styles are generated from the SUBoard Spectrum design system (scripts/sync-design.mjs); Rubik is its own font file.
 import './styles/tokens.css';
 import './styles/global.css';
+
+initTheme();
 
 const queryClient = new QueryClient({
   defaultOptions: {
