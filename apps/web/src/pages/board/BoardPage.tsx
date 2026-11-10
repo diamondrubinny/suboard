@@ -121,6 +121,11 @@ export function BoardPage() {
           <Link to={`/boards/${b.id}/report`} className="btn btn-ghost">
             <Icon name="chart" /> סיכום
           </Link>
+          {b.templateKey === 'hazards' && (
+            <Link to={`/boards/${b.id}/plans`} className="btn btn-ghost">
+              <Icon name="grid" /> תוכניות קומה
+            </Link>
+          )}
           <Link to={`/boards/${b.id}/qr`} className="btn btn-ghost">
             <Icon name="grid" /> מדבקות QR
           </Link>

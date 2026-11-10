@@ -27,6 +27,15 @@ const DashboardsPage = lazy(() => import('./pages/dashboards/DashboardPages').th
 const CustomDashboardPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.CustomDashboardPage })));
 const WorkloadPage = lazy(() => import('./pages/dashboards/ReportPages').then((m) => ({ default: m.WorkloadPage })));
 const MonthlyReportPage = lazy(() => import('./pages/dashboards/ReportPages').then((m) => ({ default: m.MonthlyReportPage })));
+const TrainingsPage = lazy(() => import('./pages/modules/TrainingPages').then((m) => ({ default: m.TrainingsPage })));
+const MyTrainingsPage = lazy(() => import('./pages/modules/TrainingPages').then((m) => ({ default: m.MyTrainingsPage })));
+const PermitsPage = lazy(() => import('./pages/modules/PermitPages').then((m) => ({ default: m.PermitsPage })));
+const PermitNewPage = lazy(() => import('./pages/modules/PermitPages').then((m) => ({ default: m.PermitNewPage })));
+const PermitDetailPage = lazy(() => import('./pages/modules/PermitPages').then((m) => ({ default: m.PermitDetailPage })));
+const ProceduresPage = lazy(() => import('./pages/modules/ProcedurePages').then((m) => ({ default: m.ProceduresPage })));
+const ProcedurePage = lazy(() => import('./pages/modules/ProcedurePages').then((m) => ({ default: m.ProcedurePage })));
+const FloorPlansPage = lazy(() => import('./pages/modules/FloorPlanPage').then((m) => ({ default: m.FloorPlansPage })));
+const FloorPlanPage = lazy(() => import('./pages/modules/FloorPlanPage').then((m) => ({ default: m.FloorPlanPage })));
 const lazyPage = (node: ReactNode) => <Suspense fallback={<LoadingState />}>{node}</Suspense>;
 import { ProfilePage } from './pages/ProfilePage';
 
@@ -74,6 +83,15 @@ export function App() {
                   <Route path="dashboards" element={lazyPage(<DashboardsPage />)} />
                   <Route path="dashboards/:dashboardId" element={lazyPage(<CustomDashboardPage />)} />
                   <Route path="workload" element={lazyPage(<WorkloadPage />)} />
+                  <Route path="trainings" element={lazyPage(<TrainingsPage />)} />
+                  <Route path="trainings/me" element={lazyPage(<MyTrainingsPage />)} />
+                  <Route path="permits" element={lazyPage(<PermitsPage />)} />
+                  <Route path="permits/new" element={lazyPage(<PermitNewPage />)} />
+                  <Route path="permits/:permitId" element={lazyPage(<PermitDetailPage />)} />
+                  <Route path="procedures" element={lazyPage(<ProceduresPage />)} />
+                  <Route path="procedures/:procedureId" element={lazyPage(<ProcedurePage />)} />
+                  <Route path="boards/:boardId/plans" element={lazyPage(<FloorPlansPage />)} />
+                  <Route path="boards/:boardId/plans/:attachmentId" element={lazyPage(<FloorPlanPage />)} />
                   <Route path="reports/monthly" element={lazyPage(<MonthlyReportPage />)} />
                   <Route path="forms" element={lazyPage(<FormsPage />)} />
                   <Route path="forms/:formId" element={lazyPage(<FormFillPage />)} />

@@ -2977,3 +2977,253 @@ td.today .cal-num {
 .trend-plot {
   max-inline-size: 860px;
 }
+
+/* ==========================================================================
+   Wave E: training matrix, work permits, procedures, floor plans
+   ========================================================================== */
+
+/* ---------- trainings: state in words, tint as a second cue ---------- */
+.train-chip {
+  display: inline-grid;
+  gap: 1px;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-sm);
+  border-inline-start: 4px solid var(--line-strong);
+  background: var(--surface-sunken);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-align: start;
+  white-space: nowrap;
+}
+.train-chip strong {
+  font-size: 0.8125rem;
+}
+.train-valid {
+  background: var(--success-tint);
+  border-inline-start-color: var(--success);
+}
+.train-expiring {
+  background: var(--warning-tint);
+  border-inline-start-color: var(--hue-sun);
+}
+.train-expired,
+.train-missing {
+  background: var(--danger-tint);
+  border-inline-start-color: var(--danger);
+}
+.train-missing {
+  background: transparent;
+  border: 1px dashed var(--danger);
+  border-inline-start-width: 4px;
+}
+.train-cell {
+  display: block;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.train-matrix th[scope='col'] {
+  white-space: normal;
+  min-inline-size: 7rem;
+  vertical-align: bottom;
+}
+.train-matrix tbody th {
+  white-space: nowrap;
+  position: sticky;
+  inset-inline-start: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+.train-total {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+/* ---------- permits ---------- */
+.permit-card.permit-active {
+  border-inline-start-color: var(--success);
+}
+.permit-card.permit-pending {
+  border-inline-start-color: var(--hue-sun);
+}
+.permit-card.permit-rejected,
+.permit-card.permit-expired,
+.permit-card.permit-cancelled {
+  border-inline-start-color: var(--line-strong);
+}
+.badge.permit-active {
+  background: var(--success);
+  color: var(--on-primary);
+  font-weight: 700;
+}
+.conflict-warn {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border-inline-start: 4px solid var(--hue-sun);
+  background: var(--warning-tint);
+  margin: 0 0 var(--space-3);
+}
+.conflict-warn ul,
+.form-error ul {
+  margin: var(--space-1) 0 0;
+  padding-inline-start: 1.25rem;
+}
+.approver-list {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  display: grid;
+  gap: var(--space-1);
+}
+.approver-list li > span {
+  margin-inline-end: var(--space-2);
+}
+.approval-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.approval-step {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border-inline-start: 4px solid var(--line-strong);
+  background: var(--surface-sunken);
+}
+.approval-step.approved {
+  border-inline-start-color: var(--success);
+  background: var(--success-tint);
+}
+.approval-step.rejected {
+  border-inline-start-color: var(--danger);
+  background: var(--danger-tint);
+}
+.approval-step.current {
+  border-inline-start-color: var(--primary);
+  background: var(--primary-tint);
+  font-weight: 600;
+}
+.precautions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+.precautions svg {
+  color: var(--success);
+  vertical-align: -0.15em;
+}
+
+/* ---------- procedures ---------- */
+.section-title {
+  font-size: 1rem;
+  margin: 0 0 var(--space-2);
+  color: var(--ink-muted);
+}
+.procedure-summary {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--tint-sky);
+}
+.procedure-body {
+  white-space: pre-line;
+  line-height: 1.8;
+  max-inline-size: 70ch;
+  margin: var(--space-3) 0;
+}
+.ack-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-md);
+  background: var(--primary-tint);
+}
+
+/* ---------- floor plans ---------- */
+.plan-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  gap: var(--space-4);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .plan-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.plan-canvas {
+  position: relative;
+  direction: ltr;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: #fff;
+  user-select: none;
+}
+.plan-canvas.placing {
+  cursor: crosshair;
+  outline: 3px dashed var(--primary);
+  outline-offset: 2px;
+}
+.plan-canvas img {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+}
+.plan-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  inline-size: 1.9rem;
+  block-size: 1.9rem;
+  border-radius: 50% 50% 50% 0;
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.45);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.plan-pin.static {
+  position: static;
+  transform: none;
+  display: inline-grid;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  cursor: default;
+  vertical-align: middle;
+}
+.plan-pin:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.plan-link {
+  font-size: 0.8125rem;
+}
+@media (forced-colors: active) {
+  .plan-pin {
+    border-color: CanvasText;
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+  }
+}
+@media print {
+  .permit-doc .card {
+    border: 1px solid #999;
+  }
+  .train-chip {
+    border: 1px solid #999;
+  }
+}

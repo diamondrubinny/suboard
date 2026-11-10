@@ -1,4 +1,14 @@
 import type {
+  CreatePermitInput,
+  MyTraining,
+  Permit,
+  PermitConflict,
+  PlanPin,
+  Procedure,
+  ProcedureAckReport,
+  ProcedureVersionInput,
+  Training,
+  TrainingMatrix,
   CustomDashboard,
   DependencyInfo,
   MonthlyReport,
@@ -91,6 +101,17 @@ export const qk = {
   monthly: (month: string) => ['monthly', month] as const,
   dependencies: (itemId: string) => ['dependencies', itemId] as const,
   boardDependencies: (boardId: string) => ['board-dependencies', boardId] as const,
+  trainings: ['trainings'] as const,
+  trainingMatrix: ['training-matrix'] as const,
+  myTrainings: ['my-trainings'] as const,
+  permits: (scope: string) => ['permits', scope] as const,
+  permit: (id: string) => ['permit', id] as const,
+  procedures: ['procedures'] as const,
+  procedure: (id: string) => ['procedure', id] as const,
+  procedureAcks: (id: string) => ['procedure-acks', id] as const,
+  myProcedures: ['my-procedures'] as const,
+  plans: (boardId: string) => ['plans', boardId] as const,
+  pins: (attachmentId: string) => ['pins', attachmentId] as const,
 };
 
 // ------------------------------------------------------------------ phase 2
@@ -671,6 +692,102 @@ export function useSetDependencies(itemId: string, boardId: string) {
       void qc.invalidateQueries({ queryKey: qk.boardDependencies(boardId) });
       void qc.invalidateQueries({ queryKey: ['dependencies'] });
       void qc.invalidateQueries({ queryKey: qk.itemActivity(itemId) });
+    },
+  });
+}
+
+// ------------------------------------------------------------------ wave E
+export const useTrainings = () => useQuery({ queryKey: qk.trainings, queryFn: () => api<{ trainings: Training[] }>('/trainings').then((r) => r.trainings) });
+export const useTrainingMatrix = () => useQuery({ queryKey: qk.trainingMatrix, queryFn: () => api<{ matrix: TrainingMatrix }>('/trainings/matrix').then((r) => r.matrix) });
+export const useMyTrainings = () => useQuery({ queryKey: qk.myTrainings, queryFn: () => api<{ trainings: MyTraining[] }>('/me/trainings').then((r) => r.trainings) });
+
+export function useTrainingMutations() {
+  const qc = useQueryClient();
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: qk.trainings });
+    void qc.invalidateQueries({ queryKey: qk.trainingMatrix });
+    void qc.invalidateQueries({ queryKey: qk.myTrainings });
+  };
+  return {
+    create: useMutation({ mutationFn: (input: { name: string; description?: string; validityMonths: number; allUsers: boolean }) => api<{ training: Training }>('/trainings', 'POST', input), onSuccess: refresh }),
+    update: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: { name?: string; description?: string; validityMonths?: number; allUsers?: boolean } }) => api(`/trainings/${id}`, 'PATCH', patch),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/trainings/${id}`, 'DELETE'), onSuccess: refresh }),
+    requirements: useMutation({ mutationFn: ({ id, userIds }: { id: string; userIds: string[] }) => api(`/trainings/${id}/requirements`, 'PUT', { userIds }), onSuccess: refresh }),
+    record: useMutation({
+      mutationFn: ({ id, ...input }: { id: string; userIds: string[]; completedOn: string; note?: string }) => api<{ added: number }>(`/trainings/${id}/records`, 'POST', input),
+      onSuccess: refresh,
+    }),
+    removeRecord: useMutation({ mutationFn: (recordId: string) => api(`/training-records/${recordId}`, 'DELETE'), onSuccess: refresh }),
+  };
+}
+
+export const usePermits = (scope: 'mine' | 'approvals' | 'all') =>
+  useQuery({ queryKey: qk.permits(scope), queryFn: () => api<{ permits: Permit[] }>(`/permits?scope=${scope}`).then((r) => r.permits) });
+export const usePermit = (id: string) => useQuery({ queryKey: qk.permit(id), queryFn: () => api<{ permit: Permit }>(`/permits/${id}`).then((r) => r.permit), retry: false });
+
+export function usePermitMutations() {
+  const qc = useQueryClient();
+  const done = (p: Permit) => {
+    qc.setQueryData(qk.permit(p.id), p);
+    void qc.invalidateQueries({ queryKey: ['permits'] });
+    void qc.invalidateQueries({ queryKey: qk.notifications });
+  };
+  const act = (action: 'approve' | 'reject' | 'close' | 'cancel') =>
+    useMutation({ mutationFn: ({ id, comment }: { id: string; comment?: string }) => api<{ permit: Permit }>(`/permits/${id}/${action}`, 'POST', { comment: comment ?? '' }).then((r) => r.permit), onSuccess: done });
+  return {
+    create: useMutation({ mutationFn: (input: CreatePermitInput) => api<{ permit: Permit }>('/permits', 'POST', input).then((r) => r.permit), onSuccess: done }),
+    check: useMutation({ mutationFn: (input: { location: string; type: string; startsAt: string; endsAt: string }) => api<{ conflicts: PermitConflict[] }>('/permits/check', 'POST', input).then((r) => r.conflicts) }),
+    approve: act('approve'),
+    reject: act('reject'),
+    close: act('close'),
+    cancel: act('cancel'),
+  };
+}
+
+export const useProcedures = () => useQuery({ queryKey: qk.procedures, queryFn: () => api<{ procedures: Procedure[] }>('/procedures').then((r) => r.procedures) });
+export const useProcedure = (id: string) => useQuery({ queryKey: qk.procedure(id), queryFn: () => api<{ procedure: Procedure }>(`/procedures/${id}`).then((r) => r.procedure), retry: false });
+export const useProcedureAcks = (id: string, enabled: boolean) =>
+  useQuery({ queryKey: qk.procedureAcks(id), queryFn: () => api<{ report: ProcedureAckReport }>(`/procedures/${id}/acks`).then((r) => r.report), enabled });
+export const useMyProcedures = () => useQuery({ queryKey: qk.myProcedures, queryFn: () => api<{ procedures: Procedure[] }>('/me/procedures').then((r) => r.procedures) });
+
+export function useProcedureMutations() {
+  const qc = useQueryClient();
+  const done = (p: Procedure) => {
+    qc.setQueryData(qk.procedure(p.id), p);
+    void qc.invalidateQueries({ queryKey: qk.procedures });
+    void qc.invalidateQueries({ queryKey: qk.myProcedures });
+    void qc.invalidateQueries({ queryKey: qk.procedureAcks(p.id) });
+  };
+  return {
+    create: useMutation({
+      mutationFn: (input: { code: string; title: string; category?: string; audience: 'all' | 'users'; userIds: string[] }) => api<{ procedure: Procedure }>('/procedures', 'POST', input).then((r) => r.procedure),
+      onSuccess: done,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: { title?: string; category?: string; audience?: 'all' | 'users'; userIds?: string[] } }) => api<{ procedure: Procedure }>(`/procedures/${id}`, 'PATCH', patch).then((r) => r.procedure),
+      onSuccess: done,
+    }),
+    publish: useMutation({
+      mutationFn: ({ id, input }: { id: string; input: ProcedureVersionInput }) => api<{ procedure: Procedure }>(`/procedures/${id}/versions`, 'POST', input).then((r) => r.procedure),
+      onSuccess: done,
+    }),
+    ack: useMutation({ mutationFn: (versionId: string) => api<{ procedure: Procedure }>(`/procedure-versions/${versionId}/ack`, 'POST', {}).then((r) => r.procedure), onSuccess: done }),
+  };
+}
+
+export const usePlans = (boardId: string) =>
+  useQuery({ queryKey: qk.plans(boardId), queryFn: () => api<{ plans: { id: string; name: string; itemId: string; itemName: string; pins: number }[] }>(`/boards/${boardId}/plans`).then((r) => r.plans) });
+export const usePins = (attachmentId: string) => useQuery({ queryKey: qk.pins(attachmentId), queryFn: () => api<{ pins: PlanPin[] }>(`/attachments/${attachmentId}/pins`).then((r) => r.pins), retry: false });
+export function useSavePins(attachmentId: string, boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (pins: PlanPin[]) => api<{ pins: PlanPin[] }>(`/attachments/${attachmentId}/pins`, 'PUT', { pins }).then((r) => r.pins),
+    onSuccess: (pins) => {
+      qc.setQueryData(qk.pins(attachmentId), pins);
+      void qc.invalidateQueries({ queryKey: qk.plans(boardId) });
     },
   });
 }

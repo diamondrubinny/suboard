@@ -4,6 +4,7 @@ import { errorMessage } from '../../api/client';
 import { useAttachmentMutations, useAttachments } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback';
+import { Link } from 'react-router-dom';
 import { CameraButton } from '../../components/CameraButton';
 import { Icon } from '../../components/Icon';
 import { formatDateTime } from './activityText';
@@ -132,6 +133,14 @@ export function AttachmentsPanel({ board, itemId }: { board: BoardDetail; itemId
               <small className="muted">
                 {formatSize(a.size)} · {a.uploaderName ?? 'משתמש שנמחק'} · {formatDateTime(a.createdAt)}
               </small>
+              {a.status === 'clean' && /^image\/(png|jpeg|webp)$/.test(a.mime) && (
+                <>
+                  <br />
+                  <Link to={`/boards/${board.id}/plans/${a.id}`} className="plan-link">
+                    פתיחה כתוכנית קומה (נעיצת מפגעים)<span className="sr-only">: {a.originalName}</span>
+                  </Link>
+                </>
+              )}
             </span>
             <span className={STATUS[a.status].cls}>{STATUS[a.status].label}</span>
             {canEdit && (a.uploadedBy === user?.id || board.myRole === 'owner') && (

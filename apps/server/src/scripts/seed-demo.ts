@@ -2,7 +2,7 @@
  * Seeds fictitious demo data for local development / demos. Refuses to run in production.
  * Passwords are random per run and printed once to the console.
  */
-import { addDaysIso, todayIso } from '@suboard/shared';
+import { addDaysIso, PERMIT_PRECAUTIONS, todayIso } from '@suboard/shared';
 import { randomBytes } from 'node:crypto';
 import { loadConfig } from '../config.js';
 import { openDatabase } from '../db/index.js';
@@ -112,6 +112,52 @@ async function main() {
   });
   const capaItems = s.boards.get(manager, capa.id).items.filter((i) => !i.parentId);
   if (capaItems.length >= 2) s.dependencies.set(manager, capaItems[1]!.id, [capaItems[0]!.id]);
+
+  // Wave E: trainings, a work permit, a procedure, hazmat inventory and a hazards board.
+  const fireTraining = s.trainings.create(manager, { name: 'כיבוי אש ושימוש במטף', description: '', validityMonths: 12, allUsers: true });
+  const chemTraining = s.trainings.create(manager, { name: 'עבודה בטוחה עם חומרים מסוכנים', description: '', validityMonths: 24, allUsers: false });
+  s.trainings.setRequirements(manager, chemTraining.id, [member.id]);
+  s.trainings.addRecords(manager, fireTraining.id, { userIds: [member.id], completedOn: d(-350), note: '' });
+  s.trainings.addRecords(manager, fireTraining.id, { userIds: [manager.id], completedOn: d(-100), note: '' });
+
+  const tomorrow = new Date(Date.now() + 24 * 3600_000);
+  tomorrow.setMinutes(0, 0, 0);
+  s.permits.create(member, {
+    type: 'hot_work',
+    title: 'ריתוך מעקה בגג',
+    location: 'בניין A, גג',
+    description: 'ריתוך חשמלי של מעקה בטיחות.',
+    contractor: 'קבלן מסגרות (דמו)',
+    startsAt: tomorrow.toISOString(),
+    endsAt: new Date(tomorrow.getTime() + 4 * 3600_000).toISOString(),
+    approverIds: [manager.id],
+    precautions: PERMIT_PRECAUTIONS.hot_work.map((x) => x.id),
+    conflictNote: '',
+  });
+
+  const proc = s.procedures.create(manager, { code: 'SAF-001', title: 'עבודה בחום', category: 'היתרי עבודה', audience: 'all', userIds: [] });
+  s.procedures.publish(manager, proc.id, {
+    version: '1.0',
+    effectiveOn: today,
+    summary: 'גרסה ראשונה',
+    body: '1. כל עבודה בחום מחייבת היתר מאושר.\n2. יש לפנות חומרים דליקים ברדיוס 10 מטר.\n3. צופה אש נוכח במהלך העבודה ו-30 דקות אחריה.',
+    link: null,
+  });
+
+  const hazmat = s.boards.create(manager, { name: 'מלאי חומרים מסוכנים', templateKey: 'hazmat' });
+  s.boards.setMember(manager, hazmat.id, member.id, 'editor');
+  fill(hazmat.id, [
+    { group: 0, name: 'אצטון', values: (c) => ({ [c['מספר CAS']!]: '67-64-1', [c['מעבדה / חדר']!]: 'מעבדה 214', [c['כמות']!]: 4, [c['יחידה']!]: 'l', [c['סיווג GHS']!]: ['flammable', 'irritant'], [c['סקירת SDS הבאה']!]: d(20), [c['מצב']!]: 'ok' }) },
+    { group: 0, name: 'חומצה חנקתית 65%', values: (c) => ({ [c['מספר CAS']!]: '7697-37-2', [c['מעבדה / חדר']!]: 'מעבדה 110', [c['כמות']!]: 1, [c['יחידה']!]: 'l', [c['סיווג GHS']!]: ['oxidizer', 'corrosive'], [c['סקירת SDS הבאה']!]: d(-3), [c['מצב']!]: 'low' }) },
+  ]);
+
+  const hazards = s.boards.create(manager, { name: 'מפגעים ותוכניות קומה', templateKey: 'hazards' });
+  s.boards.setMember(manager, hazards.id, member.id, 'editor');
+  fill(hazards.id, [
+    { group: 0, name: 'בניין A — קומה 2', values: () => ({}) },
+    { group: 1, name: 'כבל מאריך על הרצפה במסדרון', values: (c) => ({ [c['סטטוס']!]: 'open', [c['הערכת סיכון']!]: { l: 3, s: 3 }, [c['מבנה / קומה']!]: 'A / 2' }) },
+    { group: 1, name: 'יציאת חירום חסומה בארגזים', values: (c) => ({ [c['סטטוס']!]: 'handling', [c['הערכת סיכון']!]: { l: 3, s: 5 }, [c['מבנה / קומה']!]: 'A / 2' }) },
+  ]);
 
   console.log('\nDemo data created. One-time credentials (fictitious users):');
   console.table(creds);

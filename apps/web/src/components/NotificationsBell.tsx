@@ -11,10 +11,31 @@ const TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
   due_tomorrow: (n) => `תאריך יעד מחר: "${n.title}"`,
   mentioned: (n) => `${n.actorName ?? 'מישהו'} הזכיר/ה אותך ב"${n.title}"`,
   automation: (n) => `${n.detail ?? 'אוטומציה'}: "${n.title}"`,
+  training: (n) => (n.detail === 'expired' ? `תוקף ההדרכה "${n.title}" פג` : `ההדרכה "${n.title}" פגה בקרוב`),
+  permit: (n) => `היתר עבודה ${n.title} — עודכן`,
+  procedure: (n) => `נוהל ${n.title} — נדרש אישור קריאה`,
   monthly: (n) => `${n.title} מוכן`,
   effectiveness: (n) => `הגיע מועד בדיקת אפקטיביות: "${n.title}"`,
   report: (n) => `${n.detail ?? 'דוח מתוזמן'} — לוח "${n.title}"`,
 };
+
+/** Where a notification leads (null = plain text). */
+function notifLink(n: AppNotification): string | null {
+  switch (n.kind) {
+    case 'monthly':
+      return `/reports/monthly?month=${n.detail ?? ''}`;
+    case 'training':
+      return '/trainings/me';
+    case 'permit':
+      return n.detail ? `/permits/${n.detail}` : '/permits';
+    case 'procedure':
+      return n.detail ? `/procedures/${n.detail}` : '/procedures';
+    case 'report':
+      return n.boardId ? `/boards/${n.boardId}/report` : null;
+    default:
+      return n.boardId && n.itemId ? `/boards/${n.boardId}?item=${n.itemId}` : null;
+  }
+}
 
 /** Header notifications: disclosure button + panel (Escape / outside click closes, focus returns). */
 export function NotificationsBell() {
@@ -77,9 +98,9 @@ export function NotificationsBell() {
           <ul className="list-plain">
             {q.data?.notifications.map((n) => (
               <li key={n.id} className={n.read ? 'notif-item' : 'notif-item unread'}>
-                {(n.boardId && (n.itemId || n.kind === 'report')) || n.kind === 'monthly' ? (
+                {notifLink(n) ? (
                   <Link
-                    to={n.kind === 'monthly' ? `/reports/monthly?month=${n.detail ?? ''}` : n.itemId ? `/boards/${n.boardId}?item=${n.itemId}` : `/boards/${n.boardId}/report`}
+                    to={notifLink(n)!}
                     onClick={() => {
                       if (!n.read) mark.mutate({ ids: [n.id] });
                       setOpen(false);
