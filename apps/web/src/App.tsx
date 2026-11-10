@@ -1,4 +1,4 @@
-import { Component, type ReactNode } from 'react';
+import { Component, lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { FeedbackProvider } from './components/Feedback';
@@ -12,6 +12,12 @@ import { DashboardPage } from './pages/DashboardPage';
 import { AccessibilityPage, CookiesPage, PrivacyPage, TermsPage } from './pages/legal/LegalPages';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { LoadingState } from './components/Feedback';
+
+// Wave B pages are loaded on demand to keep the main bundle small.
+const AutomationsPage = lazy(() => import('./pages/board/automations/AutomationsPage').then((m) => ({ default: m.AutomationsPage })));
+const ReportPage = lazy(() => import('./pages/board/automations/ReportPage').then((m) => ({ default: m.ReportPage })));
+const lazyPage = (node: ReactNode) => <Suspense fallback={<LoadingState />}>{node}</Suspense>;
 import { ProfilePage } from './pages/ProfilePage';
 
 /** Last-resort error boundary: friendly message, no stack traces shown to users. */
@@ -49,6 +55,8 @@ export function App() {
                   <Route path="boards" element={<BoardsPage />} />
                   <Route path="boards/:boardId" element={<BoardPage />} />
                   <Route path="boards/:boardId/settings" element={<BoardSettingsPage />} />
+                  <Route path="boards/:boardId/automations" element={lazyPage(<AutomationsPage />)} />
+                  <Route path="boards/:boardId/report" element={lazyPage(<ReportPage />)} />
                   <Route path="profile" element={<ProfilePage />} />
                   <Route element={<RequireAuth admin />}>
                     <Route path="admin/users" element={<AdminUsersPage />} />

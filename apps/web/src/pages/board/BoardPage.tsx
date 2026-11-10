@@ -108,6 +108,17 @@ export function BoardPage() {
           <a href={`/api/boards/${b.id}/export.csv`} className="btn btn-ghost" download>
             CSV
           </a>
+          {b.columns.some((c) => c.type === 'date' || c.type === 'date_range') && (
+            <a href={`/api/boards/${b.id}/calendar.ics${config.calendarColumnId ? `?columnId=${config.calendarColumnId}` : ''}`} className="btn btn-ghost" download>
+              <Icon name="calendar" /> ליומן (ICS)
+            </a>
+          )}
+          <Link to={`/boards/${b.id}/report`} className="btn btn-ghost">
+            <Icon name="chart" /> סיכום
+          </Link>
+          <Link to={`/boards/${b.id}/automations`} className="btn">
+            <Icon name="bolt" /> אוטומציות
+          </Link>
           {canEdit && (
             <>
               <button type="button" className="btn" onClick={() => setDialog('import')}>

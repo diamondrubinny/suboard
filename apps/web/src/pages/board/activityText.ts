@@ -75,6 +75,24 @@ export function activityText(entry: ActivityEntry, board: BoardDetail, users: Di
       return `העביר/ה את "${String(d.name ?? '')}" ללוח אחר`;
     case 'item_moved_in':
       return `העביר/ה את "${String(d.name ?? '')}" ללוח זה מלוח אחר`;
+    case 'automation_created':
+      return `יצר/ה אוטומציה "${String(d.name ?? '')}"`;
+    case 'automation_updated':
+      return d.enabled === false ? `השבית/ה את האוטומציה "${String(d.name ?? '')}"` : `עדכן/ה את האוטומציה "${String(d.name ?? '')}"`;
+    case 'automation_deleted':
+      return `מחק/ה את האוטומציה "${String(d.name ?? '')}"`;
+    case 'recurrence_created':
+      return `הגדיר/ה פריט חוזר "${String(d.name ?? '')}"`;
+    case 'recurrence_updated':
+      return `עדכן/ה את הפריט החוזר "${String(d.name ?? '')}"`;
+    case 'recurrence_deleted':
+      return `מחק/ה את הפריט החוזר "${String(d.name ?? '')}"`;
+    case 'report_created':
+      return `הגדיר/ה דוח מתוזמן "${String(d.name ?? '')}"`;
+    case 'report_updated':
+      return `עדכן/ה את הדוח המתוזמן "${String(d.name ?? '')}"`;
+    case 'report_deleted':
+      return `מחק/ה את הדוח המתוזמן "${String(d.name ?? '')}"`;
     case 'items_imported':
       return `ייבא/ה ${String(d.count ?? '')} פריטים`;
     case 'attachment_added':
@@ -84,6 +102,13 @@ export function activityText(entry: ActivityEntry, board: BoardDetail, users: Di
     default:
       return entry.action;
   }
+}
+
+/** Who made the change: the user, or the automation / recurring item for system changes. */
+export function actorLabel(entry: ActivityEntry): string {
+  if (entry.userName) return entry.userName;
+  if (typeof entry.detail.automation === 'string') return entry.detail.automation.startsWith('פריט חוזר') ? entry.detail.automation : `אוטומציה «${entry.detail.automation}»`;
+  return 'מערכת';
 }
 
 export function formatDateTime(iso: string): string {

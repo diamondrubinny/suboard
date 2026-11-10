@@ -1,4 +1,12 @@
 import type {
+  Automation,
+  AutomationRun,
+  BoardReportSummary,
+  CreateAutomationInput,
+  CreateRecurrenceInput,
+  CreateReportInput,
+  Recurrence,
+  ScheduledReport,
   ImportResult,
   SavedView,
   SearchHit,
@@ -44,6 +52,11 @@ export const qk = {
   views: (boardId: string) => ['views', boardId] as const,
   trash: (boardId: string) => ['trash', boardId] as const,
   search: (q: string) => ['search', q] as const,
+  automations: (boardId: string) => ['automations', boardId] as const,
+  automationRuns: (boardId: string) => ['automation-runs', boardId] as const,
+  recurrences: (boardId: string) => ['recurrences', boardId] as const,
+  reports: (boardId: string) => ['reports', boardId] as const,
+  reportSummary: (boardId: string, days: number) => ['report-summary', boardId, days] as const,
 };
 
 // ------------------------------------------------------------------ phase 2
@@ -394,3 +407,88 @@ export function useUserMutations() {
     resetMfa: useMutation({ mutationFn: (id: string) => api<{ user: AdminUser }>(`/users/${id}/reset-mfa`, 'POST'), onSuccess: refresh }),
   };
 }
+
+// ------------------------------------------------------------------ wave B
+export const useAutomations = (boardId: string, enabled = true) =>
+  useQuery({
+    queryKey: qk.automations(boardId),
+    queryFn: () => api<{ automations: Automation[] }>(`/boards/${boardId}/automations`).then((r) => r.automations),
+    enabled,
+  });
+
+export const useAutomationRuns = (boardId: string, enabled = true) =>
+  useQuery({
+    queryKey: qk.automationRuns(boardId),
+    queryFn: () => api<{ runs: AutomationRun[] }>(`/boards/${boardId}/automation-runs`).then((r) => r.runs),
+    enabled,
+  });
+
+export function useAutomationMutations(boardId: string) {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: qk.automations(boardId) });
+  return {
+    create: useMutation({
+      mutationFn: (input: CreateAutomationInput) => api<{ automation: Automation }>(`/boards/${boardId}/automations`, 'POST', input).then((r) => r.automation),
+      onSuccess: refresh,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: Partial<CreateAutomationInput> }) =>
+        api<{ automation: Automation }>(`/automations/${id}`, 'PATCH', patch).then((r) => r.automation),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/automations/${id}`, 'DELETE'), onSuccess: refresh }),
+  };
+}
+
+export const useRecurrences = (boardId: string) =>
+  useQuery({
+    queryKey: qk.recurrences(boardId),
+    queryFn: () => api<{ recurrences: Recurrence[] }>(`/boards/${boardId}/recurrences`).then((r) => r.recurrences),
+  });
+
+export function useRecurrenceMutations(boardId: string) {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: qk.recurrences(boardId) });
+  return {
+    create: useMutation({
+      mutationFn: (input: CreateRecurrenceInput) => api<{ recurrence: Recurrence }>(`/boards/${boardId}/recurrences`, 'POST', input).then((r) => r.recurrence),
+      onSuccess: refresh,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: Partial<CreateRecurrenceInput> }) =>
+        api<{ recurrence: Recurrence }>(`/recurrences/${id}`, 'PATCH', patch).then((r) => r.recurrence),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/recurrences/${id}`, 'DELETE'), onSuccess: refresh }),
+  };
+}
+
+export const useReports = (boardId: string, enabled = true) =>
+  useQuery({
+    queryKey: qk.reports(boardId),
+    queryFn: () => api<{ reports: ScheduledReport[] }>(`/boards/${boardId}/reports`).then((r) => r.reports),
+    enabled,
+  });
+
+export function useReportMutations(boardId: string) {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: qk.reports(boardId) });
+  return {
+    create: useMutation({
+      mutationFn: (input: CreateReportInput) => api<{ report: ScheduledReport }>(`/boards/${boardId}/reports`, 'POST', input).then((r) => r.report),
+      onSuccess: refresh,
+    }),
+    update: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: Partial<CreateReportInput> }) =>
+        api<{ report: ScheduledReport }>(`/reports/${id}`, 'PATCH', patch).then((r) => r.report),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/reports/${id}`, 'DELETE'), onSuccess: refresh }),
+  };
+}
+
+export const useReportSummary = (boardId: string, periodDays: number) =>
+  useQuery({
+    queryKey: qk.reportSummary(boardId, periodDays),
+    queryFn: () => api<{ summary: BoardReportSummary }>(`/boards/${boardId}/report-summary?periodDays=${periodDays}`).then((r) => r.summary),
+  });

@@ -8,7 +8,7 @@ import { Dialog } from '../../components/Dialog';
 import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
 import { Avatar, StatusPill } from '../../components/StatusPill';
-import { activityText, formatDateTime } from './activityText';
+import { activityText, actorLabel, formatDateTime } from './activityText';
 import { AttachmentsPanel } from './AttachmentsPanel';
 
 type Tab = 'details' | 'updates' | 'files' | 'history';
@@ -498,7 +498,7 @@ function HistoryPanel({ board, itemId, users }: { board: BoardDetail; itemId: st
     <ul className="list-plain activity-list">
       {q.data.map((a) => (
         <li key={a.id}>
-          <strong>{a.userName ?? 'מערכת'}</strong> {activityText(a, board, users)}
+          <strong>{actorLabel(a)}</strong> {activityText(a, board, users)}
           <br />
           <time className="muted" dateTime={a.createdAt} style={{ fontSize: '0.82rem' }}>
             {formatDateTime(a.createdAt)}

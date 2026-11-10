@@ -4,6 +4,7 @@ import { errorMessage } from '../api/client';
 import { useDashboard } from '../api/hooks';
 import { useAuth } from '../auth/AuthContext';
 import { EmptyState, ErrorState, LoadingState } from '../components/Feedback';
+import { Icon } from '../components/Icon';
 import { usePageTitle } from '../components/Layout';
 import { StatusPill } from '../components/StatusPill';
 
@@ -45,6 +46,14 @@ export function DashboardPage() {
     <>
       <div className="page-header">
         <h1>שלום, {user?.name}</h1>
+        <div className="actions">
+          <a href="/api/me/calendar.ics" className="btn" download aria-describedby="ics-hint">
+            <Icon name="calendar" /> הפריטים שלי ליומן (ICS)
+          </a>
+          <span id="ics-hint" className="sr-only">
+            קובץ להורדה עם הפריטים הפתוחים המשויכים אליך שיש להם תאריך יעד, לייבוא ל-Outlook או ל-Google Calendar
+          </span>
+        </div>
       </div>
 
       <section aria-label="תמונת מצב" className="stat-row">

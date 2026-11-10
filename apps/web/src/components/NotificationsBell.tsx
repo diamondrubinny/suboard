@@ -6,10 +6,12 @@ import { formatDateTime } from '../pages/board/activityText';
 import { Icon } from './Icon';
 
 const TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
-  assigned: (n) => `${n.actorName ?? 'מישהו'} שייך/ה אותך ל"${n.title}"`,
+  assigned: (n) => (n.actorName ? `${n.actorName} שייך/ה אותך ל"${n.title}"` : `שויכת אוטומטית ל"${n.title}"`),
   overdue: (n) => `באיחור: "${n.title}"`,
   due_tomorrow: (n) => `תאריך יעד מחר: "${n.title}"`,
   mentioned: (n) => `${n.actorName ?? 'מישהו'} הזכיר/ה אותך ב"${n.title}"`,
+  automation: (n) => `${n.detail ?? 'אוטומציה'}: "${n.title}"`,
+  report: (n) => `${n.detail ?? 'דוח מתוזמן'} — לוח "${n.title}"`,
 };
 
 /** Header notifications: disclosure button + panel (Escape / outside click closes, focus returns). */
@@ -73,9 +75,9 @@ export function NotificationsBell() {
           <ul className="list-plain">
             {q.data?.notifications.map((n) => (
               <li key={n.id} className={n.read ? 'notif-item' : 'notif-item unread'}>
-                {n.boardId && n.itemId ? (
+                {n.boardId && (n.itemId || n.kind === 'report') ? (
                   <Link
-                    to={`/boards/${n.boardId}?item=${n.itemId}`}
+                    to={n.itemId ? `/boards/${n.boardId}?item=${n.itemId}` : `/boards/${n.boardId}/report`}
                     onClick={() => {
                       if (!n.read) mark.mutate({ ids: [n.id] });
                       setOpen(false);

@@ -1838,3 +1838,325 @@ td.today .cal-num {
 .table-wrap {
   position: relative;
 }
+
+/* ==========================================================================
+   Wave B: automations (rule builder), recurring items, scheduled reports, board summary
+   ========================================================================== */
+
+/* ---------- page sections ---------- */
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.section-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.empty-state {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-5);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  color: var(--ink-muted);
+}
+.empty-state > svg {
+  flex: none;
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  color: var(--primary-ink);
+}
+.empty-state p {
+  margin: 0;
+}
+.table-scroll {
+  overflow-x: auto;
+  max-inline-size: 100%;
+}
+
+/* ---------- automation cards ---------- */
+.automation-list {
+  display: grid;
+  gap: var(--space-3);
+}
+.automation-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid var(--hue-sky);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+.automation-card.disabled {
+  border-inline-start-color: var(--line-strong);
+  background: var(--surface-sunken);
+}
+.automation-card.disabled .rule-sentence {
+  color: var(--ink-muted);
+}
+.automation-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.automation-card-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.automation-card .actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.automation-meta {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+/* "כאשר … ורק אם … אז …" */
+.rule-sentence {
+  margin: 0;
+  line-height: 1.7;
+}
+.rule-sentence svg {
+  vertical-align: -0.15em;
+}
+.rule-kw {
+  display: inline-block;
+  padding: 0 0.45em;
+  border-radius: var(--radius-sm);
+  background: var(--primary-tint);
+  color: var(--primary-ink);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+/* on/off switch built on a native checkbox (role="switch") */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 2rem;
+}
+.switch input {
+  appearance: none;
+  inline-size: 2.5rem;
+  block-size: 1.4rem;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--line-strong);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.switch input::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 0.2rem;
+  inset-inline-start: 0.2rem;
+  inline-size: 1rem;
+  block-size: 1rem;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: inset-inline-start 0.15s;
+}
+.switch input:checked {
+  background: var(--success);
+}
+.switch input:checked::after {
+  inset-inline-start: 1.3rem;
+}
+.switch input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- rule / recurrence / report editors ---------- */
+.rule-editor {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: min(36rem, 100%);
+}
+.rule-editor .field {
+  margin: 0;
+}
+.rule-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(11rem, 100%), 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+.rule-block {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  min-inline-size: 0;
+}
+.rule-block > legend {
+  padding: 0 var(--space-1);
+  font-size: 0.875rem;
+}
+.rule-item {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.rule-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.rule-add {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.rule-add .select {
+  inline-size: auto;
+  flex: 1 1 12rem;
+}
+.rule-preview {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--tint-sky);
+}
+.check-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(10rem, 100%), 1fr));
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+.check-list > legend {
+  padding: 0;
+  margin-bottom: var(--space-1);
+}
+.check-list-row {
+  grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2rem;
+  cursor: pointer;
+}
+.check input {
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+  flex: none;
+}
+.date-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.date-chips li {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- board summary ---------- */
+.status-bars {
+  display: grid;
+  gap: var(--space-2);
+}
+.status-bars li {
+  display: grid;
+  grid-template-columns: minmax(6rem, 10rem) 1fr 2.5rem;
+  align-items: center;
+  gap: var(--space-3);
+}
+.status-bar-label {
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.status-bar-track {
+  block-size: 0.9rem;
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  overflow: hidden;
+}
+.status-bar-fill {
+  display: block;
+  block-size: 100%;
+  min-inline-size: 2px;
+  border-radius: 999px;
+  background: var(--primary);
+}
+.status-bar-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: end;
+}
+.report-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(20rem, 100%), 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+.report-columns h2 svg {
+  vertical-align: -0.15em;
+}
+.report-items li {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.report-items li:last-child {
+  border-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch input,
+  .switch input::after {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  .switch input {
+    border: 1px solid CanvasText;
+  }
+  .switch input::after {
+    background: CanvasText;
+  }
+  .status-bar-fill {
+    background: Highlight;
+    forced-color-adjust: none;
+  }
+}
+.page-header .actions .select {
+  inline-size: auto;
+}

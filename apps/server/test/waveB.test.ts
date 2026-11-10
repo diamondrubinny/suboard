@@ -13,7 +13,7 @@ let board: BoardDetail;
 const today = () => todayIso('Asia/Jerusalem');
 const col = (t: string) => board.columns.find((c) => c.title === t)!;
 const group = (n: string) => board.groups.find((g) => g.name === n)!;
-const refresh = async () => (board = (await m.get(`/api/boards/${board.id}`)).json().board);
+const refresh = async (): Promise<BoardDetail> => (board = (await m.get(`/api/boards/${board.id}`)).json().board);
 
 beforeEach(async () => {
   ctx = await setup();
