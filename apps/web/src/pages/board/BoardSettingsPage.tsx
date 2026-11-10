@@ -89,7 +89,7 @@ function StatusOptionsEditor({ column, onSave, saving }: { column: Column; onSav
   const valid = options.length > 0 && options.every((o) => o.label.trim());
 
   return (
-    <fieldset style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '0.75rem', marginTop: '0.5rem' }}>
+    <fieldset style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', padding: 'var(--space-3)', marginTop: 'var(--space-2)' }}>
       <legend className="label">תוויות עבור "{column.title}"</legend>
       <table className="data-table">
         <thead>
@@ -418,7 +418,7 @@ function DangerSection({ board }: { board: BoardDetail }) {
   const { confirm, toast } = useFeedback();
   const navigate = useNavigate();
   return (
-    <section className="card" aria-labelledby="danger-h" style={{ borderColor: 'var(--danger)' }}>
+    <section className="card danger-zone" aria-labelledby="danger-h">
       <h2 id="danger-h">העברה לארכיון</h2>
       <p>הלוח יוסתר מכל המשתמשים. הנתונים נשמרים במסד הנתונים וניתנים לשחזור על ידי מנהל מערכת בלבד.</p>
       <button

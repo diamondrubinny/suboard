@@ -12,18 +12,21 @@ export type BoardRole = (typeof BOARD_ROLES)[number];
 export const COLUMN_TYPES = ['text', 'long_text', 'number', 'status', 'person', 'date', 'checkbox'] as const;
 export type ColumnType = (typeof COLUMN_TYPES)[number];
 
-/** Palette: background + foreground pairs chosen to meet WCAG AA (≥4.5:1) for normal text. */
+/**
+ * Status/label palette — SUBoard Spectrum design system (`label-*` tokens): bright full fills with
+ * `ink` (#1D1B2E) text, white on navy. Every pair is unit-tested for WCAG AA (≥4.5:1).
+ */
 export const PALETTE = {
-  green: { bg: '#1E7B4F', fg: '#FFFFFF', label: 'ירוק' },
-  teal: { bg: '#0F6E75', fg: '#FFFFFF', label: 'טורקיז' },
-  blue: { bg: '#1F5FB8', fg: '#FFFFFF', label: 'כחול' },
-  navy: { bg: '#24346B', fg: '#FFFFFF', label: 'כחול כהה' },
-  purple: { bg: '#6B3FA8', fg: '#FFFFFF', label: 'סגול' },
-  pink: { bg: '#A8326E', fg: '#FFFFFF', label: 'ורוד' },
-  red: { bg: '#B42318', fg: '#FFFFFF', label: 'אדום' },
-  orange: { bg: '#B54708', fg: '#FFFFFF', label: 'כתום' },
-  amber: { bg: '#F2C230', fg: '#1F1A05', label: 'צהוב' },
-  gray: { bg: '#5B6472', fg: '#FFFFFF', label: 'אפור' },
+  green: { bg: '#1FBF75', fg: '#1D1B2E', label: 'ירוק' },
+  teal: { bg: '#12B5B0', fg: '#1D1B2E', label: 'טורקיז' },
+  blue: { bg: '#4C8DFF', fg: '#1D1B2E', label: 'כחול' },
+  navy: { bg: '#3B4BBF', fg: '#FFFFFF', label: 'כחול כהה' },
+  purple: { bg: '#A97BFF', fg: '#1D1B2E', label: 'סגול' },
+  pink: { bg: '#FF6FB0', fg: '#1D1B2E', label: 'ורוד' },
+  red: { bg: '#FF5A4F', fg: '#1D1B2E', label: 'אדום' },
+  orange: { bg: '#FF8A1F', fg: '#1D1B2E', label: 'כתום' },
+  amber: { bg: '#FFC83D', fg: '#1D1B2E', label: 'צהוב' },
+  gray: { bg: '#9AA0B4', fg: '#1D1B2E', label: 'אפור' },
 } as const;
 export type ColorKey = keyof typeof PALETTE;
 export const COLOR_KEYS = Object.keys(PALETTE) as ColorKey[];

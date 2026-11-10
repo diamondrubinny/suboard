@@ -3,6 +3,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError, errorMessage, safeNextPath } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import unitLogo from '../assets/safety-unit-logo.webp';
+import { A11yToolbar } from '../components/A11yToolbar';
 import { Footer, Logo, usePageTitle } from '../components/Layout';
 
 export function LoginPage() {
@@ -89,6 +91,7 @@ export function LoginPage() {
     <>
       <main className="auth-page" id="main">
         <div className="card auth-card">
+          <img src={unitLogo} className="unit-logo" width={720} height={315} alt="יחידת הבטיחות — Safety Unit" />
           <div className="brand">
             <Logo />
             <span>SUBoard · יחידת הבטיחות</span>
@@ -196,6 +199,7 @@ export function LoginPage() {
         </div>
       </main>
       <Footer />
+      <A11yToolbar />
     </>
   );
 }

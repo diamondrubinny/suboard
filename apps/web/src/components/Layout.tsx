@@ -9,12 +9,15 @@ import { Icon } from './Icon';
 import { NotificationsBell } from './NotificationsBell';
 import { Avatar } from './StatusPill';
 
+/** SUBoard Spectrum mark (design system asset Logos/suboard-mark.svg) — a tiny colourful board. */
 export function Logo() {
   return (
     <svg aria-hidden="true" width="30" height="30" viewBox="0 0 64 64">
-      <rect width="64" height="64" rx="14" fill="#0F4C81" />
-      <path d="M32 10 50 17v14c0 11-7.5 19.5-18 23-10.5-3.5-18-12-18-23V17z" fill="#E8A317" />
-      <path d="m24 32 6 6 11-12" fill="none" stroke="#0F4C81" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect width="64" height="64" rx="16" fill="#2B59F0" />
+      <rect x="13" y="15" width="38" height="9" rx="4.5" fill="#FF8A1F" />
+      <rect x="13" y="28" width="26" height="9" rx="4.5" fill="#FF6FB0" />
+      <rect x="13" y="41" width="32" height="9" rx="4.5" fill="#1FBF75" />
+      <circle cx="47" cy="45.5" r="6" fill="#FFC83D" />
     </svg>
   );
 }

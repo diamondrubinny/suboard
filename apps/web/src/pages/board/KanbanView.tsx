@@ -34,7 +34,11 @@ export function KanbanView({ board, items, users, onOpenItem }: Props) {
   const dueCol = findDueColumn(board.columns);
   const personCols = board.columns.filter((c) => c.type === 'person');
   const options = column.settings.options ?? [];
-  const lanes = [...options.map((o) => ({ id: o.id, label: o.label, color: PALETTE[o.color].bg })), { id: NONE, label: 'ללא ערך', color: 'var(--border-strong)' }];
+  // Lane header = full fill in the status colour with its paired text colour (design system: Kanban).
+  const lanes = [
+    ...options.map((o) => ({ id: o.id, label: o.label, color: PALETTE[o.color].bg, fg: PALETTE[o.color].fg })),
+    { id: NONE, label: 'ללא ערך', color: 'var(--surface-sunken)', fg: 'var(--ink)' },
+  ];
 
   const move = (item: Item, laneId: string) => {
     const value = laneId === NONE ? null : laneId;
@@ -72,7 +76,7 @@ export function KanbanView({ board, items, users, onOpenItem }: Props) {
               key={lane.id}
               className="kanban-col"
               aria-label={`${lane.label} (${laneItems.length})`}
-              style={{ ['--col-color' as string]: lane.color }}
+              style={{ ['--col-color' as string]: lane.color, ['--col-fg' as string]: lane.fg }}
               data-drop={dropTarget === lane.id}
               onDragOver={(e) => {
                 if (!canEdit || !dragId) return;

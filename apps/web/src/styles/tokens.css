@@ -1,0 +1,202 @@
+/*
+ * SUBoard Spectrum — design tokens.
+ * Source of truth: the "SUBoard Spectrum" design system (claude.ai Design), project/tokens.css,
+ * synced 2026-11-10 (version 1794303124-1958). Do not hand-edit values here: change them in the
+ * design system and re-sync. App-only additions are at the end of this file.
+ */
+:root, [data-theme="light"] {
+  --ground: #f5f6fa; /* Page background behind cards and tables. */
+  --surface: #ffffff; /* Cards, header, sidebar, table body, dialogs, inputs, toasts. */
+  --surface-sunken: #eef0f6; /* Kanban lanes, segmented track, user chip, neutral badges, hover. */
+  --ink: #1d1b2e; /* Body text and headings on `ground`, `surface`, `surface-sunken` and every `tint-*` (14:1+). Also the text on every light `hue-*` and label fill. */
+  --ink-muted: #5a5870; /* Secondary text: meta lines, table header, field hints. On `ground`/`surface`/`surface-sunken` (6.3:1+ light, 6:1+ dark). */
+  --line: #e3e4ec; /* Hairlines: card borders, row and cell separators. Decorative only. */
+  --line-strong: #8c8ba0; /* Control borders (inputs, secondary buttons, dashed add-row): 3:1+ on `surface`/`ground`. */
+  --primary: #2b59f0; /* The action colour: primary button fill, active tab underline, focus ring, drop target, a11y button. */
+  --primary-hover: #1f47d1; /* Primary button hover; link hover. */
+  --primary-ink: #2048d6; /* Links and active-nav / selected text on `surface` and `primary-tint` (6:1+). */
+  --primary-tint: #e8eeff; /* Active nav item ground, row hover in tables, drop-target lane. */
+  --on-primary: #ffffff; /* Text on `primary` (5.5:1 light, 6:1+ dark). */
+  --hue-tangerine: #ff8a1f; /* Spectrum hue 1 — header strip, logo, spinner. Text on it is `ink`. */
+  --hue-berry: #ff6fb0; /* Spectrum hue 2 — strip, avatar, KPI bubble. */
+  --hue-sky: #4c8dff; /* Spectrum hue 3 — strip, small avatars, KPI bubble. */
+  --hue-mint: #1fbf75; /* Spectrum hue 4 — strip, toast dot, KPI bubble. */
+  --hue-sun: #ffc83d; /* Spectrum hue 5 — strip, draft banner badge, KPI bubble. */
+  --tint-tangerine: #ffe7d6; /* Board chip ground in the sidebar (1st of 5). Text/icon on it: `ink`. */
+  --tint-berry: #ffe3ef; /* KPI tile 2 and board chip 2. */
+  --tint-sky: #e3ecff; /* KPI tile 1 and board chip 3. */
+  --tint-mint: #d9f5e8; /* KPI tile 4, board chip 4, toast dot halo. */
+  --tint-sun: #fff4cc; /* KPI tile 3, board chip 5, draft banner. */
+  --danger: #c4231a; /* Overdue, errors, destructive buttons; text on `surface`/`danger-tint` (4.5:1+ light, 6:1+ dark). */
+  --danger-tint: #fee4e2; /* Ground of overdue badges/cells, the overdue KPI tile and form errors. */
+  --on-danger: #ffffff; /* Text on a `danger` fill. */
+  --success: #0e7a4f; /* Success text on `surface`/`success-tint` (4.7:1+). */
+  --success-tint: #ddf6ea; /* Success badge ground. */
+  --focus: #2b59f0; /* 3px keyboard focus ring, 2px offset — 3:1+ on every surface. */
+  --scrim: rgba(29, 27, 46, 0.45); /* Backdrop behind dialogs and the item drawer. */
+  --label-green: #1fbf75; /* Status label `green` (PALETTE in @suboard/shared): full fill of status cells, pills, kanban lane headers, group dots. Text on it is `ink` #1d1b2e (AA-checked by a unit test). */
+  --label-teal: #12b5b0; /* Status label `teal` (PALETTE in @suboard/shared): full fill of status cells, pills, kanban lane headers, group dots. Text on it is `ink` #1d1b2e (AA-checked by a unit test). */
+  --label-blue: #4c8dff; /* Status label `blue` (PALETTE in @suboard/shared): full fill of status cells, pills, kanban lane headers, group dots. Text on it is `ink` #1d1b2e (AA-checked by a unit test). */
+  --label-navy: #3b4bbf; /* Status label `navy` (PALETTE in @suboard/shared): full fill of status cells, pills, kanban lane headers, group dots. Text on it is white (AA-checked by a unit test). */
+  --label-purple: #a97bff; /* Status label `purple` (PALETTE in @suboard/shared): full fill of status cells, pills, kanban lane headers, group dots. Text on it is `ink` #1d1b2e (AA-checked by a unit test). */
+  --label-pink: #ff6fb0; /* Status label `pink` (PALETTE in @suboard/shared): full fill of status cells, pills, kanban lane headers, group dots. Text on it is `ink` #1d1b2e (AA-checked by a unit test). */
+  --label-red: #ff5a4f; /* Status label `red` (PALETTE in @suboard/shared): full fill of status cells, pills, kanban lane headers, group dots. Text on it is `ink` #1d1b2e (AA-checked by a unit test). */
+  --label-orange: #ff8a1f; /* Status label `orange` (PALETTE in @suboard/shared): full fill of status cells, pills, kanban lane headers, group dots. Text on it is `ink` #1d1b2e (AA-checked by a unit test). */
+  --label-amber: #ffc83d; /* Status label `amber` (PALETTE in @suboard/shared): full fill of status cells, pills, kanban lane headers, group dots. Text on it is `ink` #1d1b2e (AA-checked by a unit test). */
+  --label-gray: #9aa0b4; /* Status label `gray` (PALETTE in @suboard/shared): full fill of status cells, pills, kanban lane headers, group dots. Text on it is `ink` #1d1b2e (AA-checked by a unit test). */
+  --shadow-1: 0 1px 2px rgba(29, 27, 46, 0.06), 0 1px 3px rgba(29, 27, 46, 0.04); /* Resting cards, tables, kanban cards, pressed segment. */
+  --shadow-2: 0 4px 14px rgba(29, 27, 46, 0.08); /* Hover lift on board cards and kanban cards; login card. */
+  --shadow-overlay: 0 16px 40px rgba(29, 27, 46, 0.22); /* Dialogs, drawer, popovers, toasts, mobile sidebar. */
+}
+[data-theme="dark"] {
+  --ground: #17162a;
+  --surface: #211f36;
+  --surface-sunken: #2a2843;
+  --ink: #f3f2fa;
+  --ink-muted: #b9b7cf;
+  --line: #363452;
+  --line-strong: #8a88a6;
+  --primary: #7d9bff;
+  --primary-hover: #a2b8ff;
+  --primary-ink: #a2b8ff;
+  --primary-tint: #2b3266;
+  --on-primary: #1d1b2e;
+  --hue-tangerine: #ff8a1f;
+  --hue-berry: #ff6fb0;
+  --hue-sky: #4c8dff;
+  --hue-mint: #1fbf75;
+  --hue-sun: #ffc83d;
+  --tint-tangerine: #4a2e1c;
+  --tint-berry: #4a2238;
+  --tint-sky: #22305c;
+  --tint-mint: #173d2e;
+  --tint-sun: #4a3d14;
+  --danger: #ff8a7f;
+  --danger-tint: #4a1f1f;
+  --on-danger: #1d1b2e;
+  --success: #6fe0a8;
+  --success-tint: #173d2e;
+  --focus: #a2b8ff;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow-overlay: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+:root {
+  --space-1: 4px; /* Icon gap inside badges. */
+  --space-2: 8px; /* Gap between buttons, pills, toasts. */
+  --space-3: 12px; /* List row padding, kanban card padding. */
+  --space-4: 16px; /* Grid gaps, KPI tile top padding. */
+  --space-5: 24px; /* Card padding, header side padding. */
+  --space-6: 32px; /* Page padding, between page sections. */
+  --space-7: 48px; /* Empty/loading state padding. */
+  --radius-sm: 8px; /* Buttons, inputs, status cells in tables, chips. */
+  --radius-md: 12px; /* Tables, kanban cards and lane headers, nav items, popovers, toasts. */
+  --radius-lg: 16px; /* Cards, KPI tiles, kanban lanes, dialogs. */
+  --radius-pill: 999px; /* Status pills, badges, user chip, avatars. */
+  --font-sans: Rubik, "Noto Sans Hebrew", "Arial Hebrew", Arial, sans-serif;
+  --text-page-title: 700 30px/36px var(--font-sans); /* One per page. */
+  --text-dialog-title: 600 20px/24px var(--font-sans); /* Dialog and drawer titles. */
+  --text-section-title: 600 18px/22px var(--font-sans); /* Card titles, section headings, group names (17px). */
+  --text-body: 400 15px/23px var(--font-sans); /* Default text. */
+  --text-body-medium: 500 15px/21px var(--font-sans); /* Item names, buttons, nav links. */
+  --text-small: 500 13px/18px var(--font-sans); /* Pills, badges, table headers, meta lines. */
+  --text-kpi: 700 44px/46px var(--font-sans); /* KPI tile numerals (tabular figures). */
+}
+.page-title {
+  font-family: var(--font-sans);
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.dialog-title {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.section-title {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 22px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.body {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 23px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.body-medium {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 21px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.small {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.kpi {
+  font-family: var(--font-sans);
+  font-size: 44px;
+  line-height: 46px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+/* ---------- app additions (not in the design system) ---------- */
+
+/* Dark theme follows the OS preference unless the page pins a theme (README: "Dark follows prefers-color-scheme"). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+  --ground: #17162a;
+  --surface: #211f36;
+  --surface-sunken: #2a2843;
+  --ink: #f3f2fa;
+  --ink-muted: #b9b7cf;
+  --line: #363452;
+  --line-strong: #8a88a6;
+  --primary: #7d9bff;
+  --primary-hover: #a2b8ff;
+  --primary-ink: #a2b8ff;
+  --primary-tint: #2b3266;
+  --on-primary: #1d1b2e;
+  --hue-tangerine: #ff8a1f;
+  --hue-berry: #ff6fb0;
+  --hue-sky: #4c8dff;
+  --hue-mint: #1fbf75;
+  --hue-sun: #ffc83d;
+  --tint-tangerine: #4a2e1c;
+  --tint-berry: #4a2238;
+  --tint-sky: #22305c;
+  --tint-mint: #173d2e;
+  --tint-sun: #4a3d14;
+  --danger: #ff8a7f;
+  --danger-tint: #4a1f1f;
+  --on-danger: #1d1b2e;
+  --success: #6fe0a8;
+  --success-tint: #173d2e;
+  --focus: #a2b8ff;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow-overlay: 0 16px 40px rgba(0, 0, 0, 0.55);
+    color-scheme: dark;
+  }
+}
+:root {
+  color-scheme: light;
+  /* Text scale set by the accessibility toolbar (100% / 115% / 130%). */
+  --font-size: 100%;
+  /* Referenced by the component stylesheet but not defined in tokens.json — mapped to the sun tint. */
+  --warning-tint: var(--tint-sun);
+}
