@@ -1,7 +1,7 @@
 # עיצוב — SUBoard Spectrum
 
 מקור האמת לעיצוב הוא מערכת העיצוב **SUBoard Spectrum** ב-claude.ai Design:
-https://claude.ai/artifact/ALsm6bLsE2AwqWCd6qvBQh (גרסה 12, 10/11/2026 — כולל רכיבי גלים A–D; גל D: טוקני גרפים chart-1/2, Dashboard, TrendChart, Gantt).
+https://claude.ai/artifact/ALsm6bLsE2AwqWCd6qvBQh (גרסה 13, 10/11/2026 — כולל רכיבי גלים A–E; גל E: TrainingMatrix, PermitFlow, FloorPlan).
 
 ## איך הקוד מחובר למערכת העיצוב
 
