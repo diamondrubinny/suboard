@@ -129,6 +129,23 @@ export function Layout() {
                 </NavLink>
               </li>
               <li>
+                <NavLink to="/dashboards" className="nav-link">
+                  <Icon name="chart" /> דשבורדים
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/workload" className="nav-link">
+                  <Icon name="users" /> עומס צוות
+                </NavLink>
+              </li>
+              {user.role !== 'member' && (
+                <li>
+                  <NavLink to="/reports/monthly" className="nav-link">
+                    <Icon name="history" /> מבט מנהל
+                  </NavLink>
+                </li>
+              )}
+              <li>
                 <NavLink to="/compliance" className="nav-link">
                   <Icon name="checks" /> תאימות
                 </NavLink>

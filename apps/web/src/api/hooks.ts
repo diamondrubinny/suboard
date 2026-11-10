@@ -1,4 +1,11 @@
 import type {
+  CustomDashboard,
+  DependencyInfo,
+  MonthlyReport,
+  TrendPoint,
+  WidgetData,
+  WidgetInput,
+  WorkloadRow,
   BoardCompliance,
   BoardForm,
   ComplianceSettings,
@@ -76,6 +83,14 @@ export const qk = {
   forms: ['forms'] as const,
   form: (id: string) => ['form', id] as const,
   mySubmissions: ['my-submissions'] as const,
+  dashboards: ['dashboards'] as const,
+  customDashboard: (id: string) => ['custom-dashboard', id] as const,
+  dashboardData: (id: string) => ['custom-dashboard-data', id] as const,
+  trend: (key: string) => ['trend', key] as const,
+  workload: ['workload'] as const,
+  monthly: (month: string) => ['monthly', month] as const,
+  dependencies: (itemId: string) => ['dependencies', itemId] as const,
+  boardDependencies: (boardId: string) => ['board-dependencies', boardId] as const,
 };
 
 // ------------------------------------------------------------------ phase 2
@@ -598,4 +613,64 @@ export function useSubmitForm(id: string) {
       mutationFn: ({ itemId, file }: { itemId: string; file: File }) => uploadFile(`/forms/${id}/items/${itemId}/attachments`, file),
     }),
   };
+}
+
+// ------------------------------------------------------------------ wave D
+export const useDashboards = () => useQuery({ queryKey: qk.dashboards, queryFn: () => api<{ dashboards: CustomDashboard[] }>('/dashboards').then((r) => r.dashboards) });
+export const useCustomDashboard = (id: string) =>
+  useQuery({ queryKey: qk.customDashboard(id), queryFn: () => api<{ dashboard: CustomDashboard }>(`/dashboards/${id}`).then((r) => r.dashboard), retry: false });
+export const useDashboardData = (id: string, enabled = true) =>
+  useQuery({ queryKey: qk.dashboardData(id), queryFn: () => api<{ data: Record<string, WidgetData> }>(`/dashboards/${id}/data`).then((r) => r.data), enabled, refetchInterval: 5 * 60_000 });
+
+export function useDashboardMutations() {
+  const qc = useQueryClient();
+  const refresh = (id?: string) => {
+    void qc.invalidateQueries({ queryKey: qk.dashboards });
+    if (id) {
+      void qc.invalidateQueries({ queryKey: qk.customDashboard(id) });
+      void qc.invalidateQueries({ queryKey: qk.dashboardData(id) });
+    }
+  };
+  return {
+    create: useMutation({
+      mutationFn: (input: { name: string; shared?: boolean; widgets?: WidgetInput[] }) => api<{ dashboard: CustomDashboard }>('/dashboards', 'POST', input).then((r) => r.dashboard),
+      onSuccess: () => refresh(),
+    }),
+    update: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: { name?: string; shared?: boolean; widgets?: WidgetInput[] } }) =>
+        api<{ dashboard: CustomDashboard }>(`/dashboards/${id}`, 'PATCH', patch).then((r) => r.dashboard),
+      onSuccess: (d) => refresh(d.id),
+    }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/dashboards/${id}`, 'DELETE'), onSuccess: () => refresh() }),
+  };
+}
+
+export const useTrend = (boardIds: string[], period: 'week' | 'month', count: number) =>
+  useQuery({
+    queryKey: qk.trend(`${boardIds.join(',')}|${period}|${count}`),
+    queryFn: () => api<{ points: TrendPoint[] }>(`/analytics/trend?boards=${boardIds.join(',')}&period=${period}&count=${count}`).then((r) => r.points),
+  });
+export const useWorkload = () => useQuery({ queryKey: qk.workload, queryFn: () => api<{ rows: WorkloadRow[] }>('/workload').then((r) => r.rows) });
+export const useMonthlyReport = (month: string) =>
+  useQuery({ queryKey: qk.monthly(month), queryFn: () => api<{ report: MonthlyReport }>(`/reports/monthly${month ? `?month=${month}` : ''}`).then((r) => r.report), retry: false });
+
+export const useDependencies = (itemId: string) =>
+  useQuery({ queryKey: qk.dependencies(itemId), queryFn: () => api<{ dependencies: DependencyInfo }>(`/items/${itemId}/dependencies`).then((r) => r.dependencies) });
+export const useBoardDependencies = (boardId: string, enabled = true) =>
+  useQuery({
+    queryKey: qk.boardDependencies(boardId),
+    queryFn: () => api<{ dependencies: { blocker: string; blocked: string }[] }>(`/boards/${boardId}/dependencies`).then((r) => r.dependencies),
+    enabled,
+  });
+export function useSetDependencies(itemId: string, boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (blockedBy: string[]) => api<{ dependencies: DependencyInfo }>(`/items/${itemId}/dependencies`, 'PUT', { blockedBy }).then((r) => r.dependencies),
+    onSuccess: (d) => {
+      qc.setQueryData(qk.dependencies(itemId), d);
+      void qc.invalidateQueries({ queryKey: qk.boardDependencies(boardId) });
+      void qc.invalidateQueries({ queryKey: ['dependencies'] });
+      void qc.invalidateQueries({ queryKey: qk.itemActivity(itemId) });
+    },
+  });
 }

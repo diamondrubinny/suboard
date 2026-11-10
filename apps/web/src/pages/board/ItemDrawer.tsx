@@ -11,6 +11,7 @@ import { Avatar, StatusPill } from '../../components/StatusPill';
 import { activityText, actorLabel, formatDateTime } from './activityText';
 import { AttachmentsPanel } from './AttachmentsPanel';
 import { LinksSection } from './LinksSection';
+import { DependenciesSection } from './DependenciesSection';
 
 // Loaded on demand (QR encoder and the investigation form are not needed for everyday editing).
 const InvestigationPanel = lazy(() => import('./FieldPanels').then((m) => ({ default: m.InvestigationPanel })));
@@ -203,6 +204,7 @@ function DetailsPanel({
       </p>
       {!parent && <SubitemsSection board={board} parentId={item.id} onOpenItem={onOpenItem} />}
       <LinksSection itemId={item.id} />
+      {!parent && <DependenciesSection board={board} itemId={item.id} onOpenItem={onOpenItem} />}
       <div className="toolbar" style={{ marginTop: 'var(--space-3)' }}>
         <button type="button" className="btn btn-sm" onClick={() => setQrOpen(true)}>
           <Icon name="grid" /> קוד QR

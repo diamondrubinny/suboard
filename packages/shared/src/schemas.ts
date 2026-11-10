@@ -279,7 +279,7 @@ export const createUpdateSchema = z.object({
 const sortSchema = z.object({ by: z.union([z.literal('name'), z.literal('seq'), idSchema]), dir: z.enum(['asc', 'desc']) });
 
 export const viewConfigSchema = z.object({
-  view: z.enum(['table', 'kanban', 'calendar', 'risk']).default('table'),
+  view: z.enum(['table', 'kanban', 'calendar', 'risk', 'gantt']).default('table'),
   search: z.string().max(LIMITS.searchQuery).optional(),
   statusFilter: z.string().max(40).optional(),
   mine: z.boolean().optional(),
@@ -288,6 +288,7 @@ export const viewConfigSchema = z.object({
   kanbanColumnId: idSchema.optional(),
   calendarColumnId: idSchema.optional(),
   riskColumnId: idSchema.optional(),
+  ganttScale: z.enum(['week', 'month']).optional(),
 });
 export type ViewConfig = z.infer<typeof viewConfigSchema>;
 

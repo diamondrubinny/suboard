@@ -10,6 +10,7 @@ import { usePageTitle } from '../../components/Layout';
 import { NotFoundPage } from '../NotFoundPage';
 import { BulkBar, ColumnsMenu, ImportDialog, TrashDialog, ViewsMenu } from './BoardTools';
 import { RiskMatrixView } from './RiskMatrixView';
+import { GanttView } from './GanttView';
 import { CalendarView } from './CalendarView';
 import { ItemDrawer } from './ItemDrawer';
 import { KanbanView } from './KanbanView';
@@ -22,7 +23,7 @@ type ViewKind = ViewConfig['view'];
 function readView(boardId: string): ViewKind {
   try {
     const v = localStorage.getItem(`${VIEW_KEY}.${boardId}`);
-    return v === 'kanban' || v === 'calendar' || v === 'risk' ? v : 'table';
+    return v === 'kanban' || v === 'calendar' || v === 'risk' || v === 'gantt' ? v : 'table';
   } catch {
     return 'table';
   }
@@ -114,6 +115,9 @@ export function BoardPage() {
               <Icon name="calendar" /> ליומן (ICS)
             </a>
           )}
+          <button type="button" className="btn btn-ghost" onClick={() => window.print()}>
+            <Icon name="printer" /> PDF
+          </button>
           <Link to={`/boards/${b.id}/report`} className="btn btn-ghost">
             <Icon name="chart" /> סיכום
           </Link>
@@ -156,6 +160,11 @@ export function BoardPage() {
           <button type="button" aria-pressed={config.view === 'calendar'} onClick={() => changeView('calendar')}>
             <Icon name="history" /> לוח שנה
           </button>
+          {b.columns.some((c) => c.type === 'date_range' || c.type === 'date') && (
+            <button type="button" aria-pressed={config.view === 'gantt'} onClick={() => changeView('gantt')}>
+              <Icon name="chart" /> ציר זמן
+            </button>
+          )}
           {b.columns.some((c) => c.type === 'risk') && (
             <button type="button" aria-pressed={config.view === 'risk'} onClick={() => changeView('risk')}>
               <Icon name="grid" /> מפת סיכונים
@@ -221,6 +230,9 @@ export function BoardPage() {
         <CalendarView board={b} items={filteredItems} onOpenItem={openItem} columnId={config.calendarColumnId} onColumnChange={(id) => patch({ calendarColumnId: id })} />
       )}
 
+      {config.view === 'gantt' && (
+        <GanttView board={b} items={filteredItems.filter((i) => !i.parentId)} onOpenItem={openItem} scale={config.ganttScale ?? 'week'} onScaleChange={(ganttScale) => patch({ ganttScale })} />
+      )}
       {config.view === 'risk' && (
         <RiskMatrixView board={b} items={filteredItems.filter((i) => !i.parentId)} onOpenItem={openItem} columnId={config.riskColumnId} onColumnChange={(id) => patch({ riskColumnId: id })} />
       )}

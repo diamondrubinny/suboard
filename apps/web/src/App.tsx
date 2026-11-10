@@ -23,6 +23,10 @@ const QrSheetPage = lazy(() => import('./pages/field/QrPages').then((m) => ({ de
 const FormsPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormsPage })));
 const FormFillPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormFillPage })));
 const FormsAdminPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormsAdminPage })));
+const DashboardsPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.DashboardsPage })));
+const CustomDashboardPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.CustomDashboardPage })));
+const WorkloadPage = lazy(() => import('./pages/dashboards/ReportPages').then((m) => ({ default: m.WorkloadPage })));
+const MonthlyReportPage = lazy(() => import('./pages/dashboards/ReportPages').then((m) => ({ default: m.MonthlyReportPage })));
 const lazyPage = (node: ReactNode) => <Suspense fallback={<LoadingState />}>{node}</Suspense>;
 import { ProfilePage } from './pages/ProfilePage';
 
@@ -67,6 +71,10 @@ export function App() {
                   <Route path="boards/:boardId/forms" element={lazyPage(<FormsAdminPage />)} />
                   <Route path="q/:itemId" element={lazyPage(<QrLandingPage />)} />
                   <Route path="compliance" element={lazyPage(<CompliancePage />)} />
+                  <Route path="dashboards" element={lazyPage(<DashboardsPage />)} />
+                  <Route path="dashboards/:dashboardId" element={lazyPage(<CustomDashboardPage />)} />
+                  <Route path="workload" element={lazyPage(<WorkloadPage />)} />
+                  <Route path="reports/monthly" element={lazyPage(<MonthlyReportPage />)} />
                   <Route path="forms" element={lazyPage(<FormsPage />)} />
                   <Route path="forms/:formId" element={lazyPage(<FormFillPage />)} />
                   <Route path="profile" element={<ProfilePage />} />

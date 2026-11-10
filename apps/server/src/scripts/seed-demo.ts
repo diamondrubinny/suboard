@@ -95,6 +95,24 @@ async function main() {
     enabled: true,
   });
 
+  // Wave D: a shared management dashboard and one dependency on the CAPA board.
+  s.dashboards.create(manager, {
+    name: 'מבט יחידת הבטיחות',
+    shared: true,
+    widgets: [
+      { id: 'wopen001', type: 'count', metric: 'open', boardIds: [], size: 's' },
+      { id: 'wover001', type: 'count', metric: 'overdue', boardIds: [], size: 's' },
+      { id: 'wclos001', type: 'count', metric: 'closed_month', boardIds: [], size: 's' },
+      { id: 'wtrnd001', type: 'trend', boardIds: [], period: 'week', count: 8, size: 'l' },
+      { id: 'wlate001', type: 'overdue', boardIds: [], limit: 10, size: 'm' },
+      { id: 'wload001', type: 'workload', boardIds: [], size: 'm' },
+      { id: 'wcomp001', type: 'compliance', boardIds: [], size: 'm' },
+      { id: 'wrisk001', type: 'risk', boardIds: [], size: 'm' },
+    ],
+  });
+  const capaItems = s.boards.get(manager, capa.id).items.filter((i) => !i.parentId);
+  if (capaItems.length >= 2) s.dependencies.set(manager, capaItems[1]!.id, [capaItems[0]!.id]);
+
   console.log('\nDemo data created. One-time credentials (fictitious users):');
   console.table(creds);
   console.log(`(admin id ${admin.id.slice(0, 8)}…)`);

@@ -45,6 +45,9 @@ export function ReportPage() {
               </option>
             ))}
           </select>
+          <button type="button" className="btn" onClick={() => window.print()}>
+            <Icon name="printer" /> PDF / הדפסה
+          </button>
           <Link to={`/boards/${boardId}`} className="btn">
             חזרה ללוח
           </Link>

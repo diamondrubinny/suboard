@@ -237,6 +237,34 @@ export function NotificationPrefsSection() {
         קבלת התראות גם בדוא"ל
       </label>
       {meta.data && !meta.data.emailAvailable && <p className="hint muted" style={{ marginTop: '0.5rem' }}>שליחת דוא"ל אינה מוגדרת כרגע בשרת; ההעדפה תיכנס לתוקף כשתוגדר.</p>}
+      {(user.role === 'admin' || user.role === 'manager') && <MonthlyPref />}
     </section>
+  );
+}
+
+/** Managers / admins: monthly management report on the 1st (in the bell + e-mail). */
+function MonthlyPref() {
+  const { user, setUser } = useAuth();
+  const { toast } = useFeedback();
+  const [checked, setChecked] = useState(user?.monthlyReport ?? false);
+  useEffect(() => {
+    if (user) setChecked(user.monthlyReport);
+  }, [user?.monthlyReport]); // eslint-disable-line react-hooks/exhaustive-deps
+  const onChange = async (next: boolean) => {
+    setChecked(next);
+    try {
+      const res = await api<{ user: SessionUser }>('/auth/preferences', 'PATCH', { monthlyReport: next });
+      setUser(res.user);
+      toast('ההעדפה נשמרה');
+    } catch (err) {
+      setChecked(!next);
+      toast(errorMessage(err), 'error');
+    }
+  };
+  return (
+    <label className="checkbox-row" style={{ marginTop: 'var(--space-3)' }}>
+      <input type="checkbox" checked={checked} onChange={(e) => void onChange(e.target.checked)} />
+      דוח "מבט מנהל" חודשי ב-1 לכל חודש (ספירות בלבד, ללא שמות פריטים)
+    </label>
   );
 }
