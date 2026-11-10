@@ -2612,3 +2612,18 @@ td.today .cal-num {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
+.fields-grid > .full {
+  grid-column: 1 / -1;
+}
+.fields-grid > .label.full {
+  margin-top: var(--space-3);
+  color: var(--ink);
+  font-weight: 600;
+}
+/* In forms, inline cell editors look like regular fields (they are not inside a table). */
+.form-page .cell-input {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
+}

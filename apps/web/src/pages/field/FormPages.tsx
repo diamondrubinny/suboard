@@ -390,7 +390,7 @@ export function FormFillPage() {
           <label htmlFor="ff-name">
             {f.nameLabel} <span aria-hidden="true">*</span>
           </label>
-          <input id="ff-name" className="input" required aria-required="true" maxLength={LIMITS.itemName} value={name} onChange={(e) => setName(e.target.value)} />
+          <input id="ff-name" className="input" required aria-required="true" maxLength={LIMITS.itemName} value={name} onChange={(e) => (setName(e.target.value), setError(null))} />
         </div>
         {f.fields.map((x) => {
           const label = x.label ?? x.column.title;
@@ -416,7 +416,7 @@ export function FormFillPage() {
                 readOnly={false}
                 label={x.required ? `${label} (חובה)` : label}
                 mode="drawer"
-                onChange={(v) => setValues((cur) => ({ ...cur, [x.columnId]: v }))}
+                onChange={(v) => (setValues((cur) => ({ ...cur, [x.columnId]: v })), setError(null))}
               />
               {x.help && <span className="hint">{x.help}</span>}
             </div>

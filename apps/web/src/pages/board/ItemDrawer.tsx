@@ -181,7 +181,7 @@ function DetailsPanel({
         </select>
 
         {board.columns.map((c) => (
-          <FieldRow key={c.id} label={c.title} htmlFor={`f-${c.id}`} labelled={SINGLE_INPUT.has(c.type)}>
+          <FieldRow key={c.id} label={c.title} htmlFor={`f-${c.id}`} labelled={SINGLE_INPUT.has(c.type)} wide={c.type === 'checklist'}>
             <CellEditor
               id={`f-${c.id}`}
               column={c}
@@ -364,19 +364,21 @@ function MoveDialog({ board, itemId, itemName, onClose, onMoved }: { board: Boar
   );
 }
 
-function FieldRow({ label, htmlFor, labelled, children }: { label: string; htmlFor: string; labelled: boolean; children: React.ReactNode }) {
+/** `wide` fields (e.g. a checklist) take the full drawer width with the label above them. */
+function FieldRow({ label, htmlFor, labelled, wide, children }: { label: string; htmlFor: string; labelled: boolean; wide?: boolean; children: React.ReactNode }) {
+  const cls = wide ? 'label full' : 'label';
   return (
     <>
       {labelled ? (
-        <label className="label" htmlFor={htmlFor}>
+        <label className={cls} htmlFor={htmlFor}>
           {label}
         </label>
       ) : (
-        <span className="label" aria-hidden="true">
+        <span className={cls} aria-hidden="true">
           {label}
         </span>
       )}
-      <div>{children}</div>
+      <div className={wide ? 'full' : undefined}>{children}</div>
     </>
   );
 }
