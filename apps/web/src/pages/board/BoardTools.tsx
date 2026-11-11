@@ -63,7 +63,7 @@ export function BulkBar({ board, selected, onClear }: { board: BoardDetail; sele
             {
               onSuccess: (r) => {
                 onClear();
-                toast(`${r.affected} פריטים הועברו לסל המחזור`, 'info', { label: 'ביטול', onClick: () => ids.forEach((id) => restore.mutate(id)) });
+                toast(`${r.affected} פריטים הועברו לסל המחזור`, 'info', { label: 'ביטול', onClick: () => ids.forEach((id) => restore.mutate(id)) }, 'undo');
               },
               onError: (e) => toast(errorMessage(e), 'error'),
             },

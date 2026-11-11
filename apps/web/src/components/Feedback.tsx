@@ -37,11 +37,13 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const pick = () => {
       const open = document.querySelectorAll('dialog[open]');
-      setHost(open.length ? open[open.length - 1]! : null);
+      const next = open.length ? open[open.length - 1]! : null;
+      setHost((cur) => (cur === next ? cur : next)); // no re-render when nothing changed
     };
     pick();
     const mo = new MutationObserver(pick);
-    mo.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['open'] });
+    // childList too: a dialog that is unmounted while open never fires an attribute change.
+    mo.observe(document.body, { attributes: true, childList: true, subtree: true, attributeFilter: ['open'] });
     return () => mo.disconnect();
   }, []);
 
@@ -106,7 +108,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
             ))}
         </div>
       </div>,
-        host ?? document.body,
+        host?.isConnected ? host : document.body,
       )}
       <Dialog
         open={confirmState !== null}

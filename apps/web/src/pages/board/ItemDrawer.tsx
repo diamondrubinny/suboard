@@ -134,7 +134,7 @@ function DetailsPanel({
     if (!ok) return;
     del.mutate(itemId, {
       onSuccess: () => {
-        toast(`"${item.name}" הועבר לסל המחזור`, 'info', { label: 'ביטול', onClick: () => restore.mutate(itemId) });
+        toast(`"${item.name}" הועבר לסל המחזור`, 'info', { label: 'ביטול', onClick: () => restore.mutate(itemId) }, 'undo');
         onDeleted();
       },
       onError: (e) => toast(errorMessage(e), 'error'),
