@@ -2,6 +2,7 @@ import {
   COLOR_KEYS,
   FORM_FIELD_TYPES,
   QUESTION_TYPES,
+  visibleFormFields,
   quickFormSchema,
   findPrimaryStatusColumn,
   formatAutoId,
@@ -26,6 +27,7 @@ import type { ActivityService } from './activity.js';
 import type { AttachmentService } from './attachments.js';
 import type { BoardService } from './boards.js';
 import type { ItemService } from './items.js';
+import type { NotificationService } from './notifications.js';
 import { toItem, type ItemRow } from './mappers.js';
 
 interface FormConfig {
@@ -35,6 +37,9 @@ interface FormConfig {
   fields: FormField[];
   audience: 'members' | 'all_users';
   allowPhotos: boolean;
+  successMessage?: string;
+  notifyUserIds?: string[];
+  assignUserIds?: string[];
 }
 interface FormRow {
   id: string;
@@ -46,7 +51,14 @@ interface FormRow {
   created_by_name: string | null;
   submissions: number;
 }
-type FormInput = Omit<FormConfig, 'fields'> & { name: string; enabled: boolean; fields: FormField[] };
+type FormInput = Omit<FormConfig, 'fields' | 'successMessage' | 'notifyUserIds' | 'assignUserIds'> & {
+  name: string;
+  enabled: boolean;
+  fields: FormField[];
+  successMessage?: string;
+  notifyUserIds?: string[];
+  assignUserIds?: string[];
+};
 
 /**
  * Internal forms (sign-in required). A form creates an item on its board. "all_users" forms let any
@@ -61,6 +73,7 @@ export class FormService {
     private readonly items: ItemService,
     private readonly attachments: AttachmentService,
     private readonly activity: ActivityService,
+    private readonly notifications: NotificationService,
   ) {}
 
   private select(where: string) {
@@ -86,6 +99,9 @@ export class FormService {
       enabled: r.enabled === 1,
       createdByName: r.created_by_name,
       submissions: r.submissions,
+      successMessage: c.successMessage ?? '',
+      notifyUserIds: c.notifyUserIds ?? [],
+      assignUserIds: c.assignUserIds ?? [],
     };
   }
 
@@ -95,7 +111,7 @@ export class FormService {
     return this.toForm(r);
   }
 
-  private validate(boardId: string, input: Pick<FormInput, 'groupId' | 'fields' | 'audience'>): void {
+  private validate(boardId: string, input: Pick<FormInput, 'groupId' | 'fields' | 'audience' | 'notifyUserIds' | 'assignUserIds'>): void {
     if (!this.db.prepare('SELECT 1 FROM board_groups WHERE id = ? AND board_id = ?').get(input.groupId, boardId)) {
       throw badRequest('הקבוצה אינה שייכת ללוח', { groupId: 'קבוצה לא תקינה' });
     }
@@ -112,6 +128,23 @@ export class FormService {
           { fields: 'סוג עמודה לא מותר' },
         );
       }
+    }
+    // "Show only if": the controlling field must come earlier in the form and be a choice / yes-no.
+    input.fields.forEach((f, i) => {
+      if (!f.showIf) return;
+      const ctrlIdx = input.fields.findIndex((x) => x.columnId === f.showIf!.columnId);
+      const ctrl = cols.find((x) => x.id === f.showIf!.columnId);
+      if (ctrlIdx < 0 || ctrlIdx >= i || !ctrl || !['status', 'tags', 'checkbox'].includes(ctrl.type)) {
+        throw badRequest('תנאי תצוגה חייב להתבסס על שאלת בחירה או כן/לא שמופיעה קודם בטופס', { fields: 'תנאי לא תקין' });
+      }
+      const valid = ctrl.type === 'checkbox' ? ['true', 'false'] : (ctrl.settings.options ?? []).map((o) => o.id);
+      if (!f.showIf.optionIds.every((o) => valid.includes(o))) throw badRequest('תנאי תצוגה מפנה לתשובה שאינה קיימת', { fields: 'תנאי לא תקין' });
+    });
+    // People wired to the form must be members of the board (they will see the responses).
+    const people = [...(input.notifyUserIds ?? []), ...(input.assignUserIds ?? [])];
+    if (people.length) this.items.assertUsersOnBoard(boardId, people, 'טופס', 'notifyUserIds');
+    if (input.assignUserIds?.length && !cols.some((c) => c.type === 'person')) {
+      throw badRequest('לשיוך אוטומטי נדרשת עמודת אנשים בלוח', { assignUserIds: 'אין עמודת אנשים' });
     }
   }
 
@@ -183,6 +216,9 @@ export class FormService {
       fields: patch.fields ?? cur.fields,
       audience: patch.audience ?? cur.audience,
       allowPhotos: patch.allowPhotos ?? cur.allowPhotos,
+      successMessage: patch.successMessage ?? cur.successMessage,
+      notifyUserIds: patch.notifyUserIds ?? cur.notifyUserIds,
+      assignUserIds: patch.assignUserIds ?? cur.assignUserIds,
     };
     this.validate(cur.boardId, merged);
     const { name, enabled, ...config } = merged;
@@ -210,6 +246,31 @@ export class FormService {
     return f;
   }
 
+  /** Forms on boards the actor owns (admins: every board) — the management hub. */
+  managed(actor: Actor): BoardForm[] {
+    const rows = this.db.prepare(this.select('b.archived_at IS NULL') + ' ORDER BY b.name, f.created_at').all() as FormRow[];
+    return rows.map((r) => this.toForm(r)).filter((f) => this.access.boardRole(actor, f.boardId) === 'owner');
+  }
+
+  /** Copy of a form on the same board (disabled until reviewed, so two live copies never surprise anyone). */
+  duplicate(actor: Actor, id: string): BoardForm {
+    const cur = this.row(id);
+    this.access.requireBoard(actor, cur.boardId, 'owner');
+    return this.create(actor, cur.boardId, {
+      name: `${cur.name} (עותק)`.slice(0, 80),
+      description: cur.description,
+      groupId: cur.groupId,
+      nameLabel: cur.nameLabel,
+      fields: cur.fields,
+      audience: cur.audience,
+      allowPhotos: cur.allowPhotos,
+      successMessage: cur.successMessage,
+      notifyUserIds: cur.notifyUserIds,
+      assignUserIds: cur.assignUserIds,
+      enabled: false,
+    });
+  }
+
   /** Forms the actor can fill. */
   available(actor: Actor): BoardForm[] {
     const rows = this.db.prepare(this.select('f.enabled = 1 AND b.archived_at IS NULL') + ' ORDER BY b.name, f.name').all() as FormRow[];
@@ -232,7 +293,7 @@ export class FormService {
     const members = needsMembers
       ? (this.db.prepare('SELECT u.id, u.name FROM board_members m JOIN users u ON u.id = m.user_id WHERE m.board_id = ? AND u.is_active = 1 ORDER BY u.name').all(f.boardId) as { id: string; name: string }[])
       : [];
-    return { id: f.id, name: f.name, description: f.description, boardName: f.boardName, nameLabel: f.nameLabel, allowPhotos: f.allowPhotos, fields, members };
+    return { id: f.id, name: f.name, description: f.description, boardName: f.boardName, nameLabel: f.nameLabel, allowPhotos: f.allowPhotos, successMessage: f.successMessage, fields, members };
   }
 
   submit(actor: Actor, id: string, input: { name: string; values: Record<string, unknown> }): { itemId: string; ref: string } {
@@ -242,8 +303,11 @@ export class FormService {
     for (const key of Object.keys(input.values)) {
       if (!fieldIds.has(key)) throw badRequest('שדה שאינו בטופס', { [key]: 'שדה לא מותר' });
     }
+    // Conditional fields: answers to hidden questions are dropped; hidden questions are never required.
+    const visible = visibleFormFields(f.fields, input.values);
+    for (const key of Object.keys(input.values)) if (!visible.has(key)) delete input.values[key];
     for (const field of f.fields) {
-      if (!field.required || !fieldIds.has(field.columnId)) continue;
+      if (!field.required || !fieldIds.has(field.columnId) || !visible.has(field.columnId)) continue;
       const v = input.values[field.columnId];
       if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0)) {
         throw badRequest(`השדה "${field.label ?? 'חובה'}" הוא חובה`, { [field.columnId]: 'שדה חובה' });
@@ -252,7 +316,14 @@ export class FormService {
     if (!this.db.prepare('SELECT 1 FROM board_groups WHERE id = ? AND board_id = ?').get(f.groupId, f.boardId)) {
       throw badRequest('הטופס אינו זמין כרגע (הקבוצה נמחקה). פנו לבעלי הלוח.');
     }
-    const item = this.items.createFromForm(actor, f.boardId, f.id, f.name, { groupId: f.groupId, name: input.name, values: input.values });
+    // Workflow wiring: assign every response to the chosen members (first person column, if still there).
+    const personCol = this.boards.columns(f.boardId).find((c) => c.type === 'person');
+    const assignees = personCol && !fieldIds.has(personCol.id) ? this.notifications.usersWithAccess(f.boardId, f.assignUserIds) : [];
+    const values = assignees.length && personCol ? { ...input.values, [personCol.id]: assignees } : input.values;
+    const item = this.items.createFromForm(actor, f.boardId, f.id, f.name, { groupId: f.groupId, name: input.name, values });
+    // …and tell the chosen members (access re-checked now; the submitter and fresh assignees are skipped).
+    const notify = f.notifyUserIds.filter((id) => id !== actor.id && !assignees.includes(id));
+    if (notify.length) this.notifications.onAutomation(f.boardId, item.id, item.name, `טופס «${f.name}»`, 'התקבלה תשובה חדשה בטופס', notify);
     return { itemId: item.id, ref: this.ref(f.boardId, item.seq) };
   }
 

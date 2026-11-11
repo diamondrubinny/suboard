@@ -3826,3 +3826,61 @@ kbd {
     display: none;
   }
 }
+
+/* ---------- wave L: forms hub, conditional questions ---------- */
+.managed-forms {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+.managed-form {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-inline-start: 4px solid var(--primary);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.managed-form.disabled {
+  border-inline-start-color: var(--line-strong);
+  background: var(--surface-sunken);
+}
+.managed-form-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.managed-form-head h3,
+.managed-form-head p {
+  margin: 0;
+}
+.managed-form .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.form-section {
+  margin: var(--space-4) 0 var(--space-3);
+  padding-block-end: var(--space-1);
+  border-bottom: 2px solid var(--line);
+  font-size: 1.05rem;
+}
+.field-advanced {
+  margin-block: var(--space-1) var(--space-3);
+  padding-inline-start: var(--space-5);
+}
+.field-advanced summary {
+  cursor: pointer;
+  color: var(--primary-ink);
+  font-size: 0.85rem;
+}
+.field-advanced .rule-row {
+  margin-block-start: var(--space-2);
+}
+.show-if .check-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}

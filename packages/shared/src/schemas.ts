@@ -496,7 +496,19 @@ export const formFieldSchema = z.object({
   label: line(LIMITS.columnTitle).optional(),
   help: z.string().max(300).optional(),
   required: z.boolean().default(false),
+  /** Section heading shown before this field. */
+  section: z.string().trim().max(80).optional(),
+  /** Show only when an earlier choice / yes-no field has one of these answers ("true" / "false" for yes-no). */
+  showIf: z.object({ columnId: idSchema, optionIds: z.array(z.string().max(60)).min(1).max(LIMITS.statusOptions) }).optional(),
 });
+const formExtras = {
+  /** Shown after a successful submission instead of the default text. */
+  successMessage: z.string().trim().max(500),
+  /** Board members notified of every new response. */
+  notifyUserIds: z.array(idSchema).max(20),
+  /** Board members every response is assigned to (first person column). */
+  assignUserIds: z.array(idSchema).max(10),
+};
 export const createFormSchema = z.object({
   name: line(80),
   description: multiline(1000).default(''),
@@ -506,6 +518,9 @@ export const createFormSchema = z.object({
   audience: z.enum(['members', 'all_users']).default('members'),
   allowPhotos: z.boolean().default(false),
   enabled: z.boolean().default(true),
+  successMessage: formExtras.successMessage.default(''),
+  notifyUserIds: formExtras.notifyUserIds.default([]),
+  assignUserIds: formExtras.assignUserIds.default([]),
 });
 export type CreateFormInput = z.input<typeof createFormSchema>;
 export const updateFormSchema = z
@@ -518,6 +533,9 @@ export const updateFormSchema = z
     audience: z.enum(['members', 'all_users']).optional(),
     allowPhotos: z.boolean().optional(),
     enabled: z.boolean().optional(),
+    successMessage: formExtras.successMessage.optional(),
+    notifyUserIds: formExtras.notifyUserIds.optional(),
+    assignUserIds: formExtras.assignUserIds.optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
 /** Question kinds offered by the form builder → the board column type that stores the answer. */

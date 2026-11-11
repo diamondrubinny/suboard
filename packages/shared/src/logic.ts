@@ -208,3 +208,24 @@ export function addMonthsIso(iso: string, months: number): string {
   target.setUTCDate(Math.min(d, last));
   return target.toISOString().slice(0, 10);
 }
+
+/**
+ * Which form fields are visible for the given answers ("show only if"). A field is visible when it
+ * has no condition, or when its controlling field is itself visible and holds one of the listed
+ * answers (option id for a choice, any of them for multiple choice, "true" / "false" for yes-no).
+ * Used by the form page and re-checked by the server on submit.
+ */
+export function visibleFormFields(fields: { columnId: string; showIf?: { columnId: string; optionIds: string[] } }[], values: Record<string, unknown>): Set<string> {
+  const visible = new Set<string>();
+  for (const f of fields) {
+    if (!f.showIf) {
+      visible.add(f.columnId);
+      continue;
+    }
+    if (!visible.has(f.showIf.columnId)) continue;
+    const v = values[f.showIf.columnId];
+    const answers = Array.isArray(v) ? v.map(String) : typeof v === 'boolean' ? [String(v)] : typeof v === 'string' ? [v] : v === undefined || v === null ? ['false'] : [];
+    if (answers.some((a) => f.showIf!.optionIds.includes(a))) visible.add(f.columnId);
+  }
+  return visible;
+}

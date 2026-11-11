@@ -633,8 +633,10 @@ export function useFormMutations(boardId: string) {
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: qk.boardForms(boardId) });
     void qc.invalidateQueries({ queryKey: qk.forms });
+    void qc.invalidateQueries({ queryKey: ['forms-managed'] });
   };
   return {
+    duplicate: useMutation({ mutationFn: (id: string) => api<{ form: BoardForm }>(`/forms/${id}/duplicate`, 'POST', {}).then((r) => r.form), onSuccess: refresh }),
     create: useMutation({
       mutationFn: (input: CreateFormInput) => api<{ form: BoardForm }>(`/boards/${boardId}/forms`, 'POST', input).then((r) => r.form),
       onSuccess: refresh,
@@ -647,6 +649,22 @@ export function useFormMutations(boardId: string) {
   };
 }
 
+/** Forms on boards I own (the management hub). */
+export const useManagedForms = (enabled = true) => useQuery({ queryKey: ['forms-managed'], enabled, queryFn: () => api<{ forms: BoardForm[] }>('/forms/managed').then((r) => r.forms) });
+/** Hub actions that are not tied to one board's cache. */
+export function useManagedFormActions() {
+  const qc = useQueryClient();
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ['forms-managed'] });
+    void qc.invalidateQueries({ queryKey: qk.forms });
+    void qc.invalidateQueries({ queryKey: ['board-forms'] });
+  };
+  return {
+    toggle: useMutation({ mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) => api<{ form: BoardForm }>(`/forms/${id}`, 'PATCH', { enabled }), onSuccess: refresh }),
+    duplicate: useMutation({ mutationFn: (id: string) => api<{ form: BoardForm }>(`/forms/${id}/duplicate`, 'POST', {}).then((r) => r.form), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/forms/${id}`, 'DELETE'), onSuccess: refresh }),
+  };
+}
 export const useAvailableForms = () => useQuery({ queryKey: qk.forms, queryFn: () => api<{ forms: BoardForm[] }>('/forms').then((r) => r.forms) });
 export const useFormForFill = (id: string) =>
   useQuery({ queryKey: qk.form(id), queryFn: () => api<{ form: FormForFill }>(`/forms/${id}`).then((r) => r.form), retry: false });
@@ -859,6 +877,7 @@ export function useQuickForm() {
   return useMutation({
     mutationFn: (input: QuickFormInput) => api<{ form: BoardForm; boardId: string }>('/forms/quick', 'POST', input),
     onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['forms-managed'] });
       void qc.invalidateQueries({ queryKey: qk.forms });
       void qc.invalidateQueries({ queryKey: qk.boards });
     },

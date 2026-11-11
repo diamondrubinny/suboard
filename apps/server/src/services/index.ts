@@ -109,7 +109,7 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const links = new LinkService(db, access, boards, items);
   const investigations = new InvestigationService(db, config, access, boards, items, activity, notifications);
   const compliance = new ComplianceService(db, config, access, boards, activity);
-  const forms = new FormService(db, access, boards, items, attachments, activity);
+  const forms = new FormService(db, access, boards, items, attachments, activity, notifications);
   const analytics = new AnalyticsService(db, config, access, boards, compliance);
   const dashboards = new CustomDashboardService(db, access, analytics);
   const dependencies = new DependencyService(db, access, boards, activity);

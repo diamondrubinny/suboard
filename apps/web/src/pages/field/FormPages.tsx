@@ -1,6 +1,7 @@
-import { appLink } from '../../api/base';
+import { apiUrl, appLink } from '../../api/base';
 import {
   createFormSchema,
+  visibleFormFields,
   findPrimaryStatusColumn,
   QUESTION_TYPE_LABELS,
   QUESTION_TYPES,
@@ -15,10 +16,10 @@ import {
   type ColumnType,
   type FormField,
 } from '@suboard/shared';
-import { useId, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useId, useState, type FormEvent } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../../api/client';
-import { useAvailableForms, useBoard, useBoardForms, useColumnMutations, useFormForFill, useFormMutations, useMySubmissions, useSubmitForm } from '../../api/hooks';
+import { useAvailableForms, useManagedFormActions, useManagedForms, useBoard, useBoardForms, useColumnMutations, useFormForFill, useFormMutations, useMySubmissions, useSubmitForm } from '../../api/hooks';
 import { CameraButton } from '../../components/CameraButton';
 import { CellEditor } from '../../components/cells/CellEditor';
 import { Dialog } from '../../components/Dialog';
@@ -32,6 +33,33 @@ import { ShareFormDialog } from './ShareFormDialog';
 /** Question kinds that need no options editor (choice questions are edited in the board's column settings). */
 const SIMPLE_QUESTIONS: QuestionType[] = ['text', 'long_text', 'number', 'date', 'yes_no', 'rating', 'email', 'phone', 'link'];
 
+/** On/off switch that reflects the click at once (no flicker while the change is saved). */
+function FormSwitch({ name, enabled, onToggle }: { name: string; enabled: boolean; onToggle: (on: boolean) => void }) {
+  const [local, setLocal] = useState<boolean | null>(null);
+  useEffect(() => setLocal(null), [enabled]);
+  useEffect(() => {
+    if (local === null) return;
+    const t = window.setTimeout(() => setLocal(null), 4000); // a failed save falls back to the stored state
+    return () => window.clearTimeout(t);
+  }, [local]);
+  const on = local ?? enabled;
+  return (
+    <>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={on}
+        aria-label={`הטופס "${name}" פעיל`}
+        onChange={(e) => {
+          setLocal(e.target.checked);
+          onToggle(e.target.checked);
+        }}
+      />
+      <span aria-hidden="true">{on ? 'פעיל' : 'כבוי'}</span>
+    </>
+  );
+}
+
 // ---------------------------------------------------------------- management
 export function FormsAdminPage() {
   const { boardId = '' } = useParams();
@@ -42,6 +70,15 @@ export function FormsAdminPage() {
   const [editing, setEditing] = useState<BoardForm | 'new' | null>(null);
   const [sharing, setSharing] = useState<{ form: BoardForm; created: boolean } | null>(null);
   const { create } = useFormMutations(boardId);
+  const [params, setParams] = useSearchParams();
+  const editParam = params.get('edit');
+  useEffect(() => {
+    const f = editParam && forms.data?.find((x) => x.id === editParam);
+    if (f) {
+      setEditing(f);
+      setParams((p) => (p.delete('edit'), p), { replace: true });
+    }
+  }, [editParam, forms.data, setParams]);
   usePageTitle(`טפסים — ${board.data?.name ?? 'לוח'}`);
   if (board.isPending) return <LoadingState />;
   if (board.isError) return <ErrorState message={errorMessage(board.error)} onRetry={() => board.refetch()} />;
@@ -102,8 +139,7 @@ export function FormsAdminPage() {
             <div className="automation-card-head">
               <h3>{f.name}</h3>
               <label className="switch">
-                <input type="checkbox" role="switch" checked={f.enabled} aria-label={`הטופס "${f.name}" פעיל`} onChange={(e) => update.mutate({ id: f.id, patch: { enabled: e.target.checked } }, { onError: (err) => toast(errorMessage(err), 'error') })} />
-                <span aria-hidden="true">{f.enabled ? 'פעיל' : 'כבוי'}</span>
+                <FormSwitch name={f.name} enabled={f.enabled} onToggle={(on) => update.mutate({ id: f.id, patch: { enabled: on } }, { onError: (err) => toast(errorMessage(err), 'error') })} />
               </label>
             </div>
             <p className="rule-sentence">
@@ -149,6 +185,73 @@ export function FormsAdminPage() {
   );
 }
 
+/** "Show only if": pick an earlier choice / yes-no question of the form and the answers that reveal this one. */
+function ShowIfEditor({ board, fields, field, title, onChange }: { board: BoardDetail; fields: FormField[]; field: FormField; title: string; onChange: (v: FormField['showIf']) => void }) {
+  const idx = fields.findIndex((f) => f.columnId === field.columnId);
+  const candidates = fields
+    .slice(0, idx)
+    .map((f) => board.columns.find((c) => c.id === f.columnId))
+    .filter((c): c is BoardDetail['columns'][number] => Boolean(c) && ['status', 'tags', 'checkbox'].includes(c!.type));
+  const ctrl = candidates.find((c) => c.id === field.showIf?.columnId);
+  const options = ctrl ? (ctrl.type === 'checkbox' ? [{ id: 'true', label: 'כן' }, { id: 'false', label: 'לא' }] : (ctrl.settings.options ?? []).map((o) => ({ id: o.id, label: o.label }))) : [];
+  if (!candidates.length) return <p className="hint">תנאי תצוגה: אפשרי כשיש לפני השאלה הזו שאלת בחירה או כן/לא בטופס.</p>;
+  return (
+    <div className="rule-row show-if">
+      <select
+        className="select"
+        aria-label={`הצגת ${title} רק אם — שאלה`}
+        value={field.showIf?.columnId ?? ''}
+        onChange={(e) => {
+          const c = candidates.find((x) => x.id === e.target.value);
+          if (!c) return onChange(undefined);
+          const first = c.type === 'checkbox' ? 'true' : c.settings.options?.[0]?.id;
+          onChange(first ? { columnId: c.id, optionIds: [first] } : undefined);
+        }}
+      >
+        <option value="">תמיד מוצגת</option>
+        {candidates.map((c) => (
+          <option key={c.id} value={c.id}>
+            רק אם "{c.title}" הוא…
+          </option>
+        ))}
+      </select>
+      {ctrl && (
+        <span className="check-list" role="group" aria-label={`תשובות שמציגות את ${title}`}>
+          {options.map((o) => {
+            const on = field.showIf!.optionIds.includes(o.id);
+            return (
+              <label key={o.id} className="check">
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={(e) => {
+                    const next = e.target.checked ? [...field.showIf!.optionIds, o.id] : field.showIf!.optionIds.filter((x) => x !== o.id);
+                    onChange(next.length ? { columnId: ctrl.id, optionIds: next } : undefined);
+                  }}
+                />{' '}
+                {o.label}
+              </label>
+            );
+          })}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function MemberChecks({ legend, board, value, onChange, disabled = false }: { legend: string; board: BoardDetail; value: string[]; onChange: (v: string[]) => void; disabled?: boolean }) {
+  return (
+    <fieldset className="check-list" disabled={disabled}>
+      <legend className="label">{legend}</legend>
+      {board.members.map((mb) => (
+        <label key={mb.userId} className="check">
+          <input type="checkbox" checked={value.includes(mb.userId)} onChange={(e) => onChange(e.target.checked ? [...value, mb.userId] : value.filter((x) => x !== mb.userId))} /> {mb.name}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
 function FormEditor({ board, form, onClose }: { board: BoardDetail; form: BoardForm | null; onClose: () => void }) {
   const { create, update } = useFormMutations(board.id);
   const { toast } = useFeedback();
@@ -158,20 +261,24 @@ function FormEditor({ board, form, onClose }: { board: BoardDetail; form: BoardF
   const [nameLabel, setNameLabel] = useState(form?.nameLabel ?? 'כותרת');
   const [audience, setAudience] = useState<'members' | 'all_users'>(form?.audience ?? 'members');
   const [allowPhotos, setAllowPhotos] = useState(form?.allowPhotos ?? false);
+  const [successMessage, setSuccessMessage] = useState(form?.successMessage ?? '');
+  const [notifyUserIds, setNotifyUserIds] = useState<string[]>(form?.notifyUserIds ?? []);
+  const [assignUserIds, setAssignUserIds] = useState<string[]>(form?.assignUserIds ?? []);
   const [fields, setFields] = useState<FormField[]>(form?.fields ?? []);
   const [error, setError] = useState<string | null>(null);
   const columns = useColumnMutations(board.id);
   const [newQ, setNewQ] = useState<{ title: string; type: QuestionType }>({ title: '', type: 'text' });
-  const ids = { n: useId(), d: useId(), g: useId(), nl: useId() };
+  const ids = { n: useId(), d: useId(), g: useId(), nl: useId(), sm: useId() };
   const allowed: readonly ColumnType[] = audience === 'all_users' ? FORM_FIELD_TYPES : MEMBER_FORM_FIELD_TYPES;
   const pending = create.isPending || update.isPending;
 
-  const toggle = (columnId: string, on: boolean) => setFields(on ? [...fields, { columnId, required: false }] : fields.filter((f) => f.columnId !== columnId));
+  const toggle = (columnId: string, on: boolean) =>
+    setFields(on ? [...fields, { columnId, required: false }] : fields.filter((f) => f.columnId !== columnId).map((f) => (f.showIf?.columnId === columnId ? { ...f, showIf: undefined } : f)));
   const patchField = (columnId: string, patch: Partial<FormField>) => setFields(fields.map((f) => (f.columnId === columnId ? { ...f, ...patch } : f)));
 
   const save = () => {
     setError(null);
-    const parsed = createFormSchema.safeParse({ name, description, groupId, nameLabel, audience, allowPhotos, fields: fields.filter((f) => allowed.includes(board.columns.find((c) => c.id === f.columnId)?.type as ColumnType)), enabled: form?.enabled ?? true });
+    const parsed = createFormSchema.safeParse({ name, description, groupId, nameLabel, audience, allowPhotos, successMessage, notifyUserIds, assignUserIds, fields: fields.filter((f) => allowed.includes(board.columns.find((c) => c.id === f.columnId)?.type as ColumnType)), enabled: form?.enabled ?? true });
     if (!parsed.success) return setError(parsed.error.issues[0]?.path[0] === 'name' ? 'יש לתת שם לטופס' : (parsed.error.issues[0]?.message ?? 'יש להשלים את השדות'));
     const done = () => (toast(form ? 'הטופס עודכן' : 'הטופס נוצר'), onClose());
     if (form) update.mutate({ id: form.id, patch: parsed.data }, { onSuccess: done, onError: (e) => setError(errorMessage(e)) });
@@ -259,6 +366,15 @@ function FormEditor({ board, form, onClose }: { board: BoardDetail; form: BoardF
                     </label>
                   </div>
                 )}
+                {f && ok && (
+                  <details className="field-advanced">
+                    <summary>התאמה: כותרת מקטע ותנאי תצוגה{f.section || f.showIf ? ' ●' : ''}</summary>
+                    <div className="rule-row">
+                      <input className="input" aria-label={`כותרת מקטע לפני ${c.title}`} placeholder="כותרת מקטע לפני השאלה (לא חובה)" maxLength={80} value={f.section ?? ''} onChange={(e) => patchField(c.id, { section: e.target.value || undefined })} />
+                    </div>
+                    <ShowIfEditor board={board} fields={fields} field={f} title={c.title} onChange={(showIf) => patchField(c.id, { showIf })} />
+                  </details>
+                )}
               </div>
             );
           })}
@@ -296,6 +412,21 @@ function FormEditor({ board, form, onClose }: { board: BoardDetail; form: BoardF
         <label className="check">
           <input type="checkbox" checked={allowPhotos} onChange={(e) => setAllowPhotos(e.target.checked)} /> לאפשר צירוף עד {LIMITS.formPhotos} תמונות (נסרקות לאיתור נוזקות)
         </label>
+        <div className="field">
+          <label htmlFor={ids.sm}>הודעה אחרי שליחה (לא חובה)</label>
+          <input id={ids.sm} className="input" maxLength={500} value={successMessage} onChange={(e) => setSuccessMessage(e.target.value)} placeholder="למשל: תודה! נחזור אליך תוך שני ימי עבודה." />
+        </div>
+        <fieldset className="rule-block">
+          <legend>
+            <span className="rule-kw">חיבור לתהליך העבודה</span>
+          </legend>
+          <p className="hint">רק חברי הלוח. מי שיוסר מהלוח יפסיק לקבל התראות ושיוכים.</p>
+          <div className="rule-row">
+            <MemberChecks legend="התראה על כל תשובה חדשה" board={board} value={notifyUserIds} onChange={setNotifyUserIds} />
+            <MemberChecks legend="שיוך אוטומטי של כל תשובה ל-" board={board} value={assignUserIds} onChange={setAssignUserIds} disabled={!board.columns.some((c) => c.type === 'person')} />
+          </div>
+          {!board.columns.some((c) => c.type === 'person') && <p className="hint">לשיוך אוטומטי נדרשת עמודת "אנשים" בלוח.</p>}
+        </fieldset>
         {error && (
           <div className="form-error" role="alert">
             {error}
@@ -307,6 +438,69 @@ function FormEditor({ board, form, onClose }: { board: BoardDetail; form: BoardF
 }
 
 // ---------------------------------------------------------------- list + my submissions
+/** Management hub: every form on a board I own — responses, on/off, share, edit, duplicate, export. */
+function ManagedForms() {
+  const q = useManagedForms();
+  const { toggle, duplicate, remove } = useManagedFormActions();
+  const { toast, confirm } = useFeedback();
+  const [sharing, setSharing] = useState<BoardForm | null>(null);
+  const onErr = (e: unknown) => toast(errorMessage(e), 'error');
+  if (!q.data || q.data.length === 0) return null;
+  return (
+    <section aria-labelledby="forms-managed" className="card">
+      <h2 id="forms-managed">
+        הטפסים שאני מנהל/ת <span className="badge">{q.data.length}</span>
+      </h2>
+      <ul className="list-plain managed-forms">
+        {q.data.map((f) => (
+          <li key={f.id} className={f.enabled ? 'managed-form' : 'managed-form disabled'}>
+            <div className="managed-form-head">
+              <div>
+                <h3>{f.name}</h3>
+                <p className="muted">
+                  לוח: {f.boardName} · {f.submissions} תשובות · {f.audience === 'all_users' ? 'לכל המשתמשים' : 'לחברי הלוח'}
+                  {f.assignUserIds.length > 0 && ' · שיוך אוטומטי'}
+                  {f.notifyUserIds.length > 0 && ' · התראה'}
+                </p>
+              </div>
+              <label className="switch">
+                <FormSwitch name={f.name} enabled={f.enabled} onToggle={(on) => toggle.mutate({ id: f.id, enabled: on }, { onError: onErr })} />
+              </label>
+            </div>
+            <div className="actions">
+              <button type="button" className="btn btn-sm btn-primary" onClick={() => setSharing(f)}>
+                שיתוף וקוד QR<span className="sr-only"> של {f.name}</span>
+              </button>
+              <Link className="btn btn-sm" to={`/boards/${f.boardId}/forms?edit=${f.id}`}>
+                עריכה<span className="sr-only"> של {f.name}</span>
+              </Link>
+              <button type="button" className="btn btn-sm" disabled={duplicate.isPending} onClick={() => duplicate.mutate(f.id, { onSuccess: (c) => toast(`נוצר "${c.name}" (כבוי עד שתפעילו אותו)`), onError: onErr })}>
+                שכפול<span className="sr-only"> של {f.name}</span>
+              </button>
+              <Link className="btn btn-sm" to={`/boards/${f.boardId}`}>
+                תשובות<span className="sr-only"> של {f.name} (לוח {f.boardName})</span>
+              </Link>
+              <a className="btn btn-sm btn-ghost" href={apiUrl(`/boards/${f.boardId}/export.xlsx`)} download>
+                <Icon name="download" size={16} /> Excel<span className="sr-only"> — תשובות {f.name}</span>
+              </a>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                onClick={async () => {
+                  if (await confirm({ title: 'מחיקת טופס', message: `למחוק את הטופס "${f.name}"? התשובות שכבר התקבלו יישארו בלוח.`, confirmLabel: 'מחיקה', danger: true })) remove.mutate(f.id, { onSuccess: () => toast('הטופס נמחק'), onError: onErr });
+                }}
+              >
+                מחיקה<span className="sr-only"> של {f.name}</span>
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <ShareFormDialog form={sharing} onClose={() => setSharing(null)} />
+    </section>
+  );
+}
+
 export function FormsPage() {
   usePageTitle('טפסים ודיווחים');
   const { user } = useAuth();
@@ -329,6 +523,7 @@ export function FormsPage() {
           </div>
         )}
       </div>
+      <ManagedForms />
       <section aria-labelledby="forms-avail" className="card">
         <h2 id="forms-avail">טפסים זמינים</h2>
         {forms.isPending && <LoadingState />}
@@ -414,9 +609,10 @@ export function FormFillPage() {
     e.preventDefault();
     setError(null);
     if (!name.trim()) return setError(`השדה "${f.nameLabel}" הוא חובה`);
-    const missing = f.fields.find((x) => x.required && (values[x.columnId] === undefined || values[x.columnId] === null));
+    const shown = visibleFormFields(f.fields, values);
+    const missing = f.fields.find((x) => x.required && shown.has(x.columnId) && (values[x.columnId] === undefined || values[x.columnId] === null));
     if (missing) return setError(`השדה "${missing.label ?? missing.column.title}" הוא חובה`);
-    const clean = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== null && v !== undefined));
+    const clean = Object.fromEntries(Object.entries(values).filter(([k, v]) => v !== null && v !== undefined && shown.has(k)));
     submit.mutate({ name: name.trim(), values: clean }, { onSuccess: (r) => setDone(r), onError: (err) => setError(errorMessage(err)) });
   };
   const sendPhotos = async (files: FileList | null) => {
@@ -439,7 +635,7 @@ export function FormFillPage() {
             <Icon name="checks" /> הדיווח התקבל
           </h1>
           <p>
-            מספר אסמכתא: <strong className="num">{done.ref}</strong>. יחידת הבטיחות תטפל בו; אפשר לעקוב אחרי הסטטוס ב"הדיווחים שלי".
+            מספר אסמכתא: <strong className="num">{done.ref}</strong>. {f.successMessage || 'יחידת הבטיחות תטפל בו; אפשר לעקוב אחרי הסטטוס ב"הדיווחים שלי".'}
           </p>
           {f.allowPhotos && (
             <div className="form-photos">
@@ -475,14 +671,17 @@ export function FormFillPage() {
           <label htmlFor="ff-name">
             {f.nameLabel} <span aria-hidden="true">*</span>
           </label>
-          <input id="ff-name" className="input" required aria-required="true" maxLength={LIMITS.itemName} value={name} onChange={(e) => (setName(e.target.value), setError(null))} />
+          <input id="ff-name" className="input" required aria-required="true" maxLength={LIMITS.itemName} value={name} onChange={(e) => setName(e.target.value)} />
         </div>
         {f.fields.map((x) => {
+          // Conditional questions appear only when their condition holds (announced politely when they do).
+          if (!visibleFormFields(f.fields, values).has(x.columnId)) return null;
           const label = x.label ?? x.column.title;
           const single = !['tags', 'person', 'rating', 'risk', 'date_range', 'checkbox'].includes(x.column.type);
           const fieldId = `ff-${x.columnId}`;
           return (
-            <div className="field" key={x.columnId}>
+            <div className="field" key={x.columnId} aria-live={x.showIf ? 'polite' : undefined}>
+              {x.section && <h2 className="form-section">{x.section}</h2>}
               {single ? (
                 <label htmlFor={fieldId}>
                   {label} {x.required && <span aria-hidden="true">*</span>}
@@ -501,12 +700,13 @@ export function FormFillPage() {
                 readOnly={false}
                 label={x.required ? `${label} (חובה)` : label}
                 mode="drawer"
-                onChange={(v) => (setValues((cur) => ({ ...cur, [x.columnId]: v })), setError(null))}
+                onChange={(v) => setValues((cur) => ({ ...cur, [x.columnId]: v }))}
               />
               {x.help && <span className="hint">{x.help}</span>}
             </div>
           );
         })}
+        {/* Kept until the next submit: clearing it on edit shifted the button under the pointer mid-click. */}
         {error && (
           <div className="form-error" role="alert">
             {error}

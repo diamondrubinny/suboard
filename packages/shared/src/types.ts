@@ -396,6 +396,8 @@ export interface FormField {
   label?: string;
   help?: string;
   required: boolean;
+  section?: string;
+  showIf?: { columnId: string; optionIds: string[] };
 }
 
 export interface BoardForm {
@@ -412,6 +414,9 @@ export interface BoardForm {
   enabled: boolean;
   createdByName: string | null;
   submissions: number;
+  successMessage: string;
+  notifyUserIds: string[];
+  assignUserIds: string[];
 }
 
 /** What a person filling the form receives: only the columns of its fields. */
@@ -422,6 +427,7 @@ export interface FormForFill {
   boardName: string;
   nameLabel: string;
   allowPhotos: boolean;
+  successMessage: string;
   fields: (FormField & { column: Column })[];
   /** Board members (only for member forms with a person field). */
   members: DirectoryUser[];

@@ -63,6 +63,8 @@ export async function fieldRoutes(app: FastifyInstance, { services }: { services
     reply.code(201).send(forms.createQuick(actorOf(req), quickFormSchema.parse(req.body))),
   );
   app.get('/forms', async (req) => ({ forms: forms.available(actorOf(req)) }));
+  app.get('/forms/managed', async (req) => ({ forms: forms.managed(actorOf(req)) }));
+  app.post('/forms/:id/duplicate', async (req, reply) => reply.code(201).send({ form: forms.duplicate(actorOf(req), param(req, 'id')) }));
   app.get('/forms/mine', async (req) => ({ submissions: forms.mine(actorOf(req)) }));
   app.get('/forms/:id', async (req) => ({ form: forms.forFill(actorOf(req), param(req, 'id')) }));
   app.post('/forms/:id/submit', { config: { rateLimit: { max: 20, timeWindow: 10 * 60_000 } } }, async (req, reply) =>
