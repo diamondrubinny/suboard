@@ -227,7 +227,7 @@ function UserRow({ u, isSelf, onIssued }: { u: AdminUser; isSelf: boolean; onIss
               className="btn btn-sm"
               disabled={revokeSessions.isPending}
               onClick={async () => {
-                const message = isSelf ? 'כל המכשירים האחרים שלך ינותקו; במכשיר הזה תישאר/י מחובר/ת.' : `${u.name} ינותק/תנותק בכל המכשירים ויידרש/תידרש להתחבר מחדש (למשל אחרי אובדן טלפון).`;
+                const message = isSelf ? 'כל המכשירים האחרים שלך ינותקו; במכשיר הזה תישאר/י מחובר/ת.' : `${u.name} ינותק/תנותק בכל המכשירים ויידרש/תידרש להתחבר מחדש (למשל אחרי אובדן טלפון). גם מפתחות הגישה (Passkeys) של המשתמש יימחקו.`;
                 if (!(await confirm({ title: 'ניתוק כל המכשירים', message, confirmLabel: 'ניתוק', danger: true }))) return;
                 revokeSessions.mutate(u.id, { onSuccess: () => toast('המכשירים נותקו'), onError: onErr });
               }}

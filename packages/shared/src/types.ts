@@ -604,6 +604,17 @@ export interface ActiveSession {
   lastSeenAt: string;
   current: boolean;
   viaSso: boolean;
+  viaPasskey?: boolean;
+}
+
+/** A registered passkey, as shown to its owner (never the key material). */
+export interface PasskeyInfo {
+  id: string;
+  name: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  /** Synced by the platform (iCloud Keychain, Google Password Manager…) rather than bound to one device. */
+  synced: boolean;
 }
 
 export interface RecentBoard {

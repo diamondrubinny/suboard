@@ -30,6 +30,7 @@ export function SessionsSection() {
                 <strong>{s.device}</strong>
                 {s.current && <span className="badge success">המכשיר הזה</span>}
                 {s.viaSso && <span className="badge">התחברות ארגונית</span>}
+                {s.viaPasskey && <span className="badge">מפתח גישה</span>}
                 <br />
                 <small className="muted">
                   פעילות אחרונה: <time dateTime={s.lastSeenAt}>{formatDateTime(s.lastSeenAt)}</time> · התחברות: <time dateTime={s.createdAt}>{formatDateTime(s.createdAt)}</time>

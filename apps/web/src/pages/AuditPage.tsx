@@ -37,6 +37,9 @@ const EVENTS: Record<string, string> = {
   session_revoked: 'ניתוק מכשיר',
   sessions_revoked_others: 'ניתוק כל המכשירים האחרים',
   sessions_revoked_by_admin: 'ניתוק מכשירים ע"י מנהל',
+  passkey_added: 'מפתח גישה נוסף',
+  passkey_add_failed: 'הוספת מפתח גישה נכשלה',
+  passkey_removed: 'מפתח גישה הוסר',
 };
 
 const DANGER = new Set(['login_failed', 'account_locked', 'access_denied', 'mfa_failed', 'mfa_disable_failed', 'malware_detected', 'upload_rejected', 'sso_login_failed', 'scim_auth_failed']);

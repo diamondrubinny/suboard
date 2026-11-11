@@ -605,4 +605,33 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE INDEX idx_item_templates_board ON item_templates(board_id);
     `,
   },
+  {
+    version: 14,
+    name: 'passkeys',
+    sql: /* sql */ `
+      -- Passkeys (WebAuthn). Only the public key is stored; the private key and any biometric never leave the device.
+      CREATE TABLE passkeys (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        credential_id TEXT NOT NULL UNIQUE,
+        public_key BLOB NOT NULL,
+        counter INTEGER NOT NULL DEFAULT 0,
+        transports TEXT NOT NULL DEFAULT '[]',
+        backed_up INTEGER NOT NULL DEFAULT 0,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        last_used_at TEXT
+      );
+      CREATE INDEX idx_passkeys_user ON passkeys(user_id);
+      -- Short-lived, single-use ceremony challenges (id is a hash of the handle given to the browser).
+      CREATE TABLE webauthn_challenges (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL CHECK (kind IN ('register', 'login')),
+        user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+        challenge TEXT NOT NULL,
+        expires_at TEXT NOT NULL
+      );
+      ALTER TABLE sessions ADD COLUMN via_passkey INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];

@@ -96,18 +96,36 @@ export class AuthService {
     return this.startSession(row, meta, { sso: true, idpMfa });
   }
 
-  private startSession(row: UserRow, meta: { ip: string; userAgent?: string }, via: { sso: boolean; idpMfa: boolean } = { sso: false, idpMfa: false }): LoginResult {
+  /**
+   * After a verified passkey assertion (user verification required, so it is a multi-factor login by
+   * itself: no TOTP step). The same sign-in policy as passwords applies when SSO is enforced.
+   */
+  passkeyLogin(userId: string, meta: { ip: string; userAgent?: string }): LoginResult {
+    const row = this.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined;
+    if (!row || !row.is_active) {
+      this.audit.log('login_failed', { userId: row?.id, ip: meta.ip, meta: { reason: 'inactive', method: 'passkey' } });
+      throw new AppError(401, 'INVALID_CREDENTIALS', 'הכניסה עם מפתח הגישה נכשלה');
+    }
+    if (this.config.localLogin === 'disabled' || (this.config.localLogin === 'admins_only' && row.role !== 'admin')) {
+      this.audit.log('login_failed', { userId: row.id, ip: meta.ip, meta: { reason: 'local_login_disabled', method: 'passkey' } });
+      throw new AppError(403, 'USE_SSO', `כניסה עם מפתח גישה אינה זמינה — יש להשתמש ב"${this.config.sso?.label ?? 'התחברות ארגונית'}"`);
+    }
+    return this.startSession(row, meta, { sso: false, idpMfa: false, passkey: true });
+  }
+
+  private startSession(row: UserRow, meta: { ip: string; userAgent?: string }, via: { sso: boolean; idpMfa: boolean; passkey?: boolean } = { sso: false, idpMfa: false }): LoginResult {
     const token = newSessionToken();
     const ts = nowIso();
     this.db.transaction(() => {
       this.db.prepare('UPDATE users SET failed_logins = 0, locked_until = NULL, last_login_at = ? WHERE id = ?').run(ts, row.id);
       this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND expires_at < ?').run(row.id, ts);
       this.db
-        .prepare('INSERT INTO sessions (id, user_id, created_at, expires_at, last_seen_at, user_agent, via_sso, idp_mfa) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(sha256(token), row.id, ts, new Date(Date.now() + this.config.sessionTtlMs).toISOString(), ts, meta.userAgent?.slice(0, 200) ?? null, via.sso ? 1 : 0, via.idpMfa ? 1 : 0);
+        .prepare('INSERT INTO sessions (id, user_id, created_at, expires_at, last_seen_at, user_agent, via_sso, idp_mfa, via_passkey) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(sha256(token), row.id, ts, new Date(Date.now() + this.config.sessionTtlMs).toISOString(), ts, meta.userAgent?.slice(0, 200) ?? null, via.sso ? 1 : 0, via.idpMfa ? 1 : 0, via.passkey ? 1 : 0);
     })();
-    this.audit.log(via.sso ? 'sso_login_success' : 'login_success', { userId: row.id, ip: meta.ip, meta: { mfa: row.mfa_enabled === 1 || via.idpMfa, idpMfa: via.idpMfa } });
-    return { kind: 'session', token, user: this.toSessionUser(row, via.idpMfa) };
+    const strong = via.idpMfa || via.passkey === true;
+    this.audit.log(via.sso ? 'sso_login_success' : 'login_success', { userId: row.id, ip: meta.ip, meta: { mfa: row.mfa_enabled === 1 || strong, idpMfa: via.idpMfa, ...(via.passkey ? { method: 'passkey' } : {}) } });
+    return { kind: 'session', token, user: this.toSessionUser(row, strong) };
   }
 
   private registerFailure(row: UserRow, ip: string): void {
@@ -128,10 +146,10 @@ export class AuthService {
     const id = sha256(token);
     const row = this.db
       .prepare(
-        `SELECT s.id AS session_id, s.expires_at, s.last_seen_at, s.idp_mfa, u.*
+        `SELECT s.id AS session_id, s.expires_at, s.last_seen_at, s.idp_mfa, s.via_passkey, u.*
          FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`,
       )
-      .get(id) as (UserRow & { session_id: string; expires_at: string; last_seen_at: string; idp_mfa: number }) | undefined;
+      .get(id) as (UserRow & { session_id: string; expires_at: string; last_seen_at: string; idp_mfa: number; via_passkey: number }) | undefined;
     if (!row) return null;
 
     const now = Date.now();
@@ -144,7 +162,7 @@ export class AuthService {
     if (now - Date.parse(row.last_seen_at) > 60_000) {
       this.db.prepare('UPDATE sessions SET last_seen_at = ? WHERE id = ?').run(new Date(now).toISOString(), id);
     }
-    return { sessionId: id, user: this.toSessionUser(row, row.idp_mfa === 1) };
+    return { sessionId: id, user: this.toSessionUser(row, row.idp_mfa === 1 || row.via_passkey === 1) };
   }
 
   logout(sessionId: string, userId: string, ip: string): void {
@@ -178,8 +196,16 @@ export class AuthService {
     }
   }
 
-  getSessionUser(userId: string): SessionUser {
-    return this.toSessionUser(this.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow);
+  /** `sessionId`: keeps the "signed in with MFA at the IdP / with a passkey" state of that session. */
+  getSessionUser(userId: string, sessionId?: string | null): SessionUser {
+    const s = sessionId ? (this.db.prepare('SELECT idp_mfa, via_passkey FROM sessions WHERE id = ?').get(sessionId) as { idp_mfa: number; via_passkey: number } | undefined) : undefined;
+    return this.toSessionUser(this.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow, s ? s.idp_mfa === 1 || s.via_passkey === 1 : false);
+  }
+
+  /** Re-authentication for sensitive changes. */
+  async checkPassword(userId: string, password: string): Promise<boolean> {
+    const row = this.db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as { password_hash: string } | undefined;
+    return Boolean(row) && (await verifyPassword(password, row!.password_hash));
   }
 
   revokeAllSessions(userId: string): void {
@@ -195,8 +221,8 @@ export class AuthService {
   listSessions(userId: string, currentSessionId: string): ActiveSession[] {
     const idleCutoff = Date.now() - this.config.sessionIdleMs;
     const rows = this.db
-      .prepare('SELECT id, created_at, last_seen_at, expires_at, user_agent, via_sso FROM sessions WHERE user_id = ? ORDER BY last_seen_at DESC')
-      .all(userId) as { id: string; created_at: string; last_seen_at: string; expires_at: string; user_agent: string | null; via_sso: number }[];
+      .prepare('SELECT id, created_at, last_seen_at, expires_at, user_agent, via_sso, via_passkey FROM sessions WHERE user_id = ? ORDER BY last_seen_at DESC')
+      .all(userId) as { id: string; created_at: string; last_seen_at: string; expires_at: string; user_agent: string | null; via_sso: number; via_passkey: number }[];
     return rows
       .filter((r) => Date.parse(r.expires_at) > Date.now() && Date.parse(r.last_seen_at) > idleCutoff)
       .map((r) => ({
@@ -206,6 +232,7 @@ export class AuthService {
         lastSeenAt: r.last_seen_at,
         current: r.id === currentSessionId,
         viaSso: r.via_sso === 1,
+        viaPasskey: r.via_passkey === 1,
       }));
   }
 
@@ -231,6 +258,7 @@ export class AuthService {
   purgeExpiredSessions(): number {
     const idleCutoff = new Date(Date.now() - this.config.sessionIdleMs).toISOString();
     this.db.prepare('DELETE FROM mfa_challenges WHERE expires_at < ?').run(nowIso());
+    this.db.prepare('DELETE FROM webauthn_challenges WHERE expires_at < ?').run(nowIso());
     return this.db.prepare('DELETE FROM sessions WHERE expires_at < ? OR last_seen_at < ?').run(nowIso(), idleCutoff).changes;
   }
 

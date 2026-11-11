@@ -6,6 +6,7 @@ import type {
   MyWorkItem,
   CustomTemplate,
   ActiveSession,
+  PasskeyInfo,
   BoardFile,
   FollowState,
   Reaction,
@@ -119,6 +120,7 @@ export const qk = {
   plans: (boardId: string) => ['plans', boardId] as const,
   pins: (attachmentId: string) => ['pins', attachmentId] as const,
   sessions: ['sessions'] as const,
+  passkeys: ['passkeys'] as const,
   recentBoards: ['recent-boards'] as const,
   follow: (itemId: string) => ['follow', itemId] as const,
   boardFiles: (boardId: string) => ['board-files', boardId] as const,
@@ -830,6 +832,11 @@ export function useSessionMutations() {
     revokeOthers: useMutation({ mutationFn: () => api<{ sessions: ActiveSession[] }>('/auth/sessions/revoke-others', 'POST', {}), onSuccess: refresh }),
   };
 }
+export const usePasskeys = () => useQuery({ queryKey: qk.passkeys, queryFn: () => api<{ passkeys: PasskeyInfo[] }>('/auth/passkeys').then((r) => r.passkeys) });
+export const useRemovePasskey = () => {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => api(`/auth/passkeys/${id}`, 'DELETE'), onSuccess: () => void qc.invalidateQueries({ queryKey: qk.passkeys }) });
+};
 export const useRevokeUserSessions = () => useMutation({ mutationFn: (userId: string) => api(`/users/${userId}/revoke-sessions`, 'POST', {}) });
 
 export const useRecentBoards = (enabled = true) => useQuery({ queryKey: qk.recentBoards, enabled, queryFn: () => api<{ boards: RecentBoard[] }>('/me/recent-boards').then((r) => r.boards) });

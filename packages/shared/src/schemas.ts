@@ -74,6 +74,44 @@ export const mfaDisableSchema = z.object({
   code: mfaCodeSchema,
 });
 
+// ---- passkeys (WebAuthn). The browser's credential JSON is verified cryptographically on the server;
+// here it is only bounded in size and shape.
+const b64url = (max: number) => z.string().regex(/^[A-Za-z0-9_-]+$/).max(max);
+const challengeIdSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'בקשה לא תקינה');
+export const passkeyRegisterOptionsSchema = z.object({ password: z.string().max(LIMITS.passwordMax).optional() });
+export const passkeyRegisterSchema = z.object({
+  challengeId: challengeIdSchema,
+  name: z.string().trim().max(60).optional(),
+  response: z.object({
+    id: b64url(1400),
+    rawId: b64url(1400),
+    type: z.literal('public-key'),
+    response: z.object({
+      clientDataJSON: b64url(4000),
+      attestationObject: b64url(40_000),
+      transports: z.array(z.string().max(20)).max(8).optional(),
+    }),
+    authenticatorAttachment: z.string().max(30).nullish(),
+    clientExtensionResults: z.record(z.string(), z.unknown()).optional(),
+  }),
+});
+export const passkeyLoginSchema = z.object({
+  challengeId: challengeIdSchema,
+  response: z.object({
+    id: b64url(1400),
+    rawId: b64url(1400),
+    type: z.literal('public-key'),
+    response: z.object({
+      clientDataJSON: b64url(4000),
+      authenticatorData: b64url(4000),
+      signature: b64url(2000),
+      userHandle: b64url(200).nullish(),
+    }),
+    authenticatorAttachment: z.string().max(30).nullish(),
+    clientExtensionResults: z.record(z.string(), z.unknown()).optional(),
+  }),
+});
+
 export const preferencesSchema = z
   .object({
     emailNotifications: z.boolean().optional(),

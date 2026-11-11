@@ -1,3 +1,4 @@
+import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
 import type { LoginResponse, SessionUser } from '@suboard/shared';
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
@@ -11,6 +12,8 @@ interface AuthValue {
   login: (email: string, password: string) => Promise<{ user: SessionUser } | { challengeToken: string }>;
   verifyMfa: (challengeToken: string, code: string) => Promise<SessionUser>;
   /** Replace the cached session user after a server-side change (MFA, preferences). */
+  /** Sign in with a passkey stored on this device (or a nearby phone / security key). */
+  passkeyLogin: () => Promise<SessionUser>;
   setUser: (user: SessionUser) => void;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -73,6 +76,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [qc],
   );
 
+  const passkeyLogin = useCallback(async () => {
+    const { startAuthentication } = await import('@simplewebauthn/browser');
+    const { challengeId, options } = await api<{ challengeId: string; options: PublicKeyCredentialRequestOptionsJSON }>('/auth/passkey/login/options', 'POST', {});
+    const response = await startAuthentication({ optionsJSON: options });
+    const res = await api<LoginResponse>('/auth/passkey/login/verify', 'POST', { challengeId, response });
+    if (res.mfaRequired) throw new Error('unexpected MFA response');
+    resetCache(qc, res.user);
+    return res.user;
+  }, [qc]);
+
   const setUser = useCallback((user: SessionUser) => qc.setQueryData(qk.me, user), [qc]);
 
   const logout = useCallback(async () => {
@@ -88,8 +101,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [qc]);
 
   const value = useMemo<AuthValue>(
-    () => ({ user: me.data ?? null, loading: me.isPending, login, verifyMfa, setUser, logout, refresh }),
-    [me.data, me.isPending, login, verifyMfa, setUser, logout, refresh],
+    () => ({ user: me.data ?? null, loading: me.isPending, login, verifyMfa, passkeyLogin, setUser, logout, refresh }),
+    [me.data, me.isPending, login, verifyMfa, passkeyLogin, setUser, logout, refresh],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -39,8 +39,10 @@ export async function userRoutes(app: FastifyInstance, { services }: { services:
     if (!services.users.exists(id)) throw notFound('המשתמש לא נמצא');
     if (id === actor.id) services.auth.revokeOtherSessions(id, req.sessionId!);
     else services.auth.revokeAllSessions(id);
-    services.audit.log('sessions_revoked_by_admin', { userId: actor.id, ip: req.ip, meta: { targetUserId: id } });
-    return { ok: true };
+    // A lost or stolen device may hold a passkey: for another user, those go too (they can add new ones).
+    const passkeysRemoved = id === actor.id ? 0 : services.passkeys.removeAllOf(id);
+    services.audit.log('sessions_revoked_by_admin', { userId: actor.id, ip: req.ip, meta: { targetUserId: id, passkeysRemoved } });
+    return { ok: true, passkeysRemoved };
   });
 
   app.get('/admin/audit', async (req) => {

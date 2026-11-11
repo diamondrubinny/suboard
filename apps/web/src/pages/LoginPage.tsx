@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError, errorMessage, safeNextPath } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { passkeyErrorMessage, passkeysSupported } from '../auth/passkeys';
 import unitLogo from '../assets/safety-unit-logo.webp';
 import { Icon } from '../components/Icon';
 import { A11yToolbar } from '../components/A11yToolbar';
@@ -22,7 +23,7 @@ const SSO_ERRORS: Record<string, string> = {
 
 export function LoginPage() {
   usePageTitle('התחברות');
-  const { user, login, verifyMfa } = useAuth();
+  const { user, login, verifyMfa, passkeyLogin } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [email, setEmail] = useState('');
@@ -33,7 +34,7 @@ export function LoginPage() {
     const m = /(?:^#|&)mfa=([^&]+)/.exec(window.location.hash);
     return m ? decodeURIComponent(m[1]!) : null;
   });
-  const [sso, setSso] = useState<{ enabled: boolean; label: string; localLogin: 'enabled' | 'admins_only' | 'disabled'; passwordReset?: boolean } | null>(null);
+  const [sso, setSso] = useState<{ enabled: boolean; label: string; localLogin: 'enabled' | 'admins_only' | 'disabled'; passwordReset?: boolean; passkeys?: boolean } | null>(null);
   const [code, setCode] = useState('');
   const [useRecovery, setUseRecovery] = useState(false);
   const [error, setError] = useState<string | null>(() => SSO_ERRORS[params.get('sso_error') ?? ''] ?? null);
@@ -48,7 +49,7 @@ export function LoginPage() {
   }, [challenge, useRecovery]);
   useEffect(() => {
     if (window.location.hash.includes('mfa=')) history.replaceState(null, '', window.location.pathname + window.location.search);
-    api<{ enabled: boolean; label: string; localLogin: 'enabled' | 'admins_only' | 'disabled'; passwordReset?: boolean }>('/auth/sso/config')
+    api<{ enabled: boolean; label: string; localLogin: 'enabled' | 'admins_only' | 'disabled'; passwordReset?: boolean; passkeys?: boolean }>('/auth/sso/config')
       .then(setSso)
       .catch(() => setSso({ enabled: false, label: '', localLogin: 'enabled' }));
   }, []);
@@ -82,6 +83,23 @@ export function LoginPage() {
     } catch (err) {
       setPassword('');
       fail(err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const onPasskey = async () => {
+    if (submitting) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      done(await passkeyLogin());
+    } catch (err) {
+      const msg = passkeyErrorMessage(err, 'login');
+      if (msg) {
+        setError(msg);
+        requestAnimationFrame(() => errorRef.current?.focus());
+      } else fail(err);
     } finally {
       setSubmitting(false);
     }
@@ -240,6 +258,17 @@ export function LoginPage() {
                 {submitting ? 'מתחבר…' : 'התחברות'}
               </button>
             </form>
+              )}
+              {sso?.passkeys && sso.localLogin !== 'disabled' && passkeysSupported() && (
+                <>
+                  <p className="sso-or" aria-hidden="true"><span>או</span></p>
+                  <button type="button" className="btn passkey-btn" style={{ inlineSize: '100%' }} disabled={submitting} onClick={onPasskey} aria-describedby="passkey-hint">
+                    <Icon name="lock" /> כניסה עם מפתח גישה (Passkey){sso.localLogin === 'admins_only' ? ' — מנהלי מערכת' : ''}
+                  </button>
+                  <p id="passkey-hint" className="hint" style={{ textAlign: 'center' }}>
+                    בלי סיסמה: טביעת אצבע, זיהוי פנים או קוד הנעילה של המכשיר.
+                  </p>
+                </>
               )}
               {sso && sso.localLogin !== 'disabled' && (
                 <p className="auth-aside">

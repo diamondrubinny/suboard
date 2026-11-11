@@ -30,7 +30,7 @@ function pagesFor(role: string | undefined): { label: string; to: string; icon: 
     { label: 'נהלים', to: '/procedures', icon: 'clipboard' },
     { label: 'תאימות', to: '/compliance', icon: 'checks' },
     { label: 'טפסים ודיווחים', to: '/forms', icon: 'clipboard' },
-    { label: 'הפרופיל שלי', to: '/profile', icon: 'user', keywords: 'סיסמה אימות דו-שלבי חיבורים מכשירים' },
+    { label: 'הפרופיל שלי', to: '/profile', icon: 'user', keywords: 'סיסמה אימות דו-שלבי חיבורים מכשירים מפתח גישה passkey' },
     { label: 'ניהול משתמשים', to: '/admin/users', icon: 'users', roles: ['admin'] },
     { label: 'יומן אבטחה', to: '/admin/audit', icon: 'shield', roles: ['admin'] },
   ];

@@ -1,4 +1,5 @@
-import { changePasswordSchema, forgotPasswordSchema, resetPasswordSchema, loginSchema, mfaDisableSchema, mfaEnableSchema, mfaVerifySchema, preferencesSchema } from '@suboard/shared';
+import { changePasswordSchema, forgotPasswordSchema, resetPasswordSchema, loginSchema, mfaDisableSchema, mfaEnableSchema, mfaVerifySchema, passkeyLoginSchema, passkeyRegisterOptionsSchema, passkeyRegisterSchema, preferencesSchema } from '@suboard/shared';
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { AppConfig } from '../config.js';
 import { actorOf, clearSessionCookie, setSessionCookie } from '../plugins/auth.js';
@@ -33,7 +34,7 @@ export async function authRoutes(app: FastifyInstance, { services, config }: { s
       .header('Referrer-Policy', 'no-referrer')
       .send(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${escapeAttr(to)}"><title>מעביר…</title></head><body><p><a href="${escapeAttr(to)}">המשך</a></p></body></html>`);
 
-  app.get('/auth/sso/config', { config: { public: true } }, async () => ({ ...services.sso.publicConfig(), passwordReset: services.passwordReset.available }));
+  app.get('/auth/sso/config', { config: { public: true } }, async () => ({ ...services.sso.publicConfig(), passwordReset: services.passwordReset.available, passkeys: services.passkeys.loginAvailable }));
 
   // ---- self-service password reset (public; same answer whether or not the account exists)
   app.post('/auth/password/forgot', { config: { public: true, rateLimit: { max: 5, timeWindow: 15 * 60_000 } } }, async (req) => {
@@ -116,14 +117,45 @@ export async function authRoutes(app: FastifyInstance, { services, config }: { s
     const actor = actorOf(req);
     const recoveryCodes = services.mfa.enable(actor.id, code, req.ip);
     services.auth.revokeOtherSessions(actor.id, req.sessionId!);
-    return { recoveryCodes, user: services.auth.getSessionUser(actor.id) };
+    return { recoveryCodes, user: services.auth.getSessionUser(actor.id, req.sessionId) };
   });
 
   app.post('/auth/mfa/disable', { config: { rateLimit: mfaLimit } }, async (req) => {
     const input = mfaDisableSchema.parse(req.body);
     const actor = actorOf(req);
     await services.mfa.disable(actor.id, input.password, input.code, req.ip);
-    return { user: services.auth.getSessionUser(actor.id) };
+    return { user: services.auth.getSessionUser(actor.id, req.sessionId) };
+  });
+
+  // ---- passkeys: sign-in (public; names no account, so nothing can be enumerated)
+  app.post('/auth/passkey/login/options', { config: { public: true, rateLimit: loginLimit } }, async (_req, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    return services.passkeys.loginOptions();
+  });
+  app.post('/auth/passkey/login/verify', { config: { public: true, rateLimit: loginLimit } }, async (req, reply) => {
+    const input = passkeyLoginSchema.parse(req.body);
+    const userId = await services.passkeys.verifyLogin(input.challengeId, input.response as unknown as AuthenticationResponseJSON, req.ip);
+    return respond(reply, services.auth.passkeyLogin(userId, { ip: req.ip, userAgent: req.headers['user-agent'] }));
+  });
+
+  // ---- passkeys: the user's own
+  const passkeyLimit = { max: 20, timeWindow: 15 * 60_000 };
+  app.get('/auth/passkeys', async (req) => ({ passkeys: services.passkeys.list(actorOf(req).id) }));
+  app.post('/auth/passkeys/register/options', { config: { rateLimit: passkeyLimit } }, async (req, reply) => {
+    const { password } = passkeyRegisterOptionsSchema.parse(req.body ?? {});
+    reply.header('Cache-Control', 'no-store');
+    return services.passkeys.registrationOptions(req.user!, password, req.ip);
+  });
+  app.post('/auth/passkeys/register/verify', { config: { rateLimit: passkeyLimit } }, async (req) => {
+    const input = passkeyRegisterSchema.parse(req.body);
+    const passkey = await services.passkeys.register(actorOf(req).id, input.challengeId, input.name, input.response as unknown as RegistrationResponseJSON, { ip: req.ip, userAgent: req.headers['user-agent'] });
+    return { passkey };
+  });
+  app.delete('/auth/passkeys/:id', { config: { rateLimit: passkeyLimit } }, async (req) => {
+    const id = String((req.params as { id: string }).id);
+    if (!/^[0-9a-f-]{36}$/.test(id)) throw notFound('מפתח הגישה לא נמצא');
+    services.passkeys.remove(actorOf(req).id, id, req.ip);
+    return { ok: true };
   });
 
   // ---- active sessions (own devices)
@@ -150,6 +182,6 @@ export async function authRoutes(app: FastifyInstance, { services, config }: { s
     const input = preferencesSchema.parse(req.body);
     const actor = actorOf(req);
     services.auth.setPreferences(actor.id, input);
-    return { user: services.auth.getSessionUser(actor.id) };
+    return { user: services.auth.getSessionUser(actor.id, req.sessionId) };
   });
 }
