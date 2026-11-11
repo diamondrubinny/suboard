@@ -1,4 +1,4 @@
-import { checklistStats, isDateRange, formatAutoId, formatDateHe, type CellValue, type Column, type DirectoryUser } from '@suboard/shared';
+import { checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { colorStyle, StatusPill } from '../StatusPill';
 import { ContactEditor, DateRangeEditor, ProgressEditor, RatingEditor, TagsPicker } from './ExtraCells';
@@ -22,6 +22,10 @@ export interface CellEditorProps {
   id?: string;
   /** The item's running number (for `auto_id` columns). */
   seq?: number;
+  /** Creator (`created_by` columns): user id, or null for items created by an automation. */
+  createdBy?: string | null;
+  /** Last update time (`updated_at` columns). */
+  updatedAt?: string;
 }
 
 /** Text-like input that commits on blur / Enter and reverts on Escape. */
@@ -85,11 +89,14 @@ function LongTextEditor({ value, onCommit, label, id }: { value: string; onCommi
 
 function checklistLabel(label: string, column: Column, value: unknown): string {
   const st = checklistStats(column, value);
-  return `${label}: ${st.total - st.open} מתוך ${st.total} נבדקו${st.fail ? `, ${st.fail} לא תקין` : ''} — פתיחה לעריכה`;
+  const done = st.total - st.open;
+  // Starts with the visible text ("5/8 1 לא תקין" / "הושלם") so speech input users can say what they see.
+  const visible = `${done}/${st.total}${st.fail ? ` ${st.fail} לא תקין` : ''}${st.open === 0 && st.fail === 0 && st.total > 0 ? ' הושלם' : ''}`;
+  return `${visible} — ${label}: ${done} מתוך ${st.total} נבדקו — פתיחה לעריכה`;
 }
 
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq } = props;
+  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt } = props;
   const options = column.settings.options ?? [];
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -99,6 +106,20 @@ export function CellEditor(props: CellEditorProps) {
       return (
         <span className="cell-readonly auto-id num" id={inputId}>
           {seq ? formatAutoId(seq, column.settings.prefix) : '—'}
+        </span>
+      );
+
+    case 'created_by':
+      return (
+        <span className="cell-readonly" id={inputId}>
+          {createdBy === undefined ? '—' : createdBy === null ? 'אוטומציה' : (users.find((u) => u.id === createdBy)?.name ?? 'משתמש שאינו פעיל')}
+        </span>
+      );
+
+    case 'updated_at':
+      return (
+        <span className="cell-readonly num" id={inputId}>
+          {updatedAt ? <time dateTime={updatedAt}>{formatDateTimeHe(updatedAt)}</time> : '—'}
         </span>
       );
 

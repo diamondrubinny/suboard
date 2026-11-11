@@ -1,4 +1,4 @@
-import { checklistStats, formatRisk, isDateRange, formatAutoId, formatDateHe, formatDateRangeHe, type CellValue, type Column, type Item } from '@suboard/shared';
+import { formatDateTimeHe, checklistStats, formatRisk, isDateRange, formatAutoId, formatDateHe, formatDateRangeHe, type CellValue, type Column, type Item } from '@suboard/shared';
 import writeXlsxFile from 'write-excel-file/node';
 import type { DB } from '../db/index.js';
 import type { AccessService, Actor } from './access.js';
@@ -21,6 +21,8 @@ export function csvField(value: string): string {
 /** Human-readable text for a cell (labels instead of ids, Israeli dates, names instead of user ids). */
 export function formatCell(c: Column, v: CellValue | undefined, item: Item, users: Map<string, string>): string {
   if (c.type === 'auto_id') return formatAutoId(item.seq, c.settings.prefix);
+  if (c.type === 'created_by') return item.createdBy ? (users.get(item.createdBy) ?? '') : 'אוטומציה';
+  if (c.type === 'updated_at') return formatDateTimeHe(item.updatedAt);
   if (v === undefined || v === null) return '';
   const label = (id: unknown) => c.settings.options?.find((o) => o.id === id)?.label ?? '';
   switch (c.type) {

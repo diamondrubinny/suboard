@@ -27,13 +27,19 @@ export const COLUMN_TYPES = [
   'auto_id',
   'risk',
   'checklist',
+  'created_by',
+  'updated_at',
 ] as const;
 
 /** Column types that hold a list of label options in their settings. */
 export const OPTION_COLUMN_TYPES = ['status', 'tags'] as const;
 /** Column types computed by the server (not editable by users). */
-export const READONLY_COLUMN_TYPES = ['auto_id'] as const;
+export const READONLY_COLUMN_TYPES = ['auto_id', 'created_by', 'updated_at'] as const;
 export type ColumnType = (typeof COLUMN_TYPES)[number];
+/** Computed from the item itself (running number, creator, last update): no stored value, never edited. */
+export function isReadonlyColumnType(type: ColumnType): boolean {
+  return (READONLY_COLUMN_TYPES as readonly string[]).includes(type);
+}
 
 /**
  * Status/label palette — SUBoard Spectrum design system (`label-*` tokens): bright full fills with
@@ -84,6 +90,8 @@ export const COLUMN_TYPE_LABELS: Record<ColumnType, string> = {
   auto_id: 'מזהה רץ',
   risk: 'מטריצת סיכון (סבירות × חומרה)',
   checklist: 'צ\'קליסט בדיקה',
+  created_by: 'נוצר ע"י',
+  updated_at: 'עודכן לאחרונה',
 };
 
 export const LIMITS = {
@@ -203,6 +211,12 @@ export const PERMIT_BLOCKING_PAIRS: [PermitType, PermitType][] = [
 export const REACTIONS = ['👍', '✅', '👀', '❤️', '🙏'] as const;
 export type Reaction = (typeof REACTIONS)[number];
 export const REACTION_LABELS: Record<Reaction, string> = { '👍': 'אהבתי', '✅': 'בוצע', '👀': 'בבדיקה', '❤️': 'תודה', '🙏': 'בבקשה' };
+/** Maximum number of organisation board templates. */
+export const MAX_CUSTOM_TEMPLATES = 100;
+
+/** Table column width bounds (px) for the resize handle. */
+export const COLUMN_WIDTH = { min: 80, max: 640, step: 16 } as const;
+
 /** How many recently opened boards are kept / shown per user. */
 export const RECENT_BOARDS_KEEP = 20;
 export const RECENT_BOARDS_SHOW = 8;

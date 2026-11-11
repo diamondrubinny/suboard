@@ -526,4 +526,21 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       );
     `,
   },
+  {
+    version: 10,
+    name: 'board_templates',
+    sql: /* sql */ `
+      -- Organisation board templates: structure only (groups + columns), never items or people.
+      CREATE TABLE board_templates (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        base_key TEXT NOT NULL,
+        groups_json TEXT NOT NULL,
+        columns_json TEXT NOT NULL,
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+    `,
+  },
 ];

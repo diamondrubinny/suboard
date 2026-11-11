@@ -18,6 +18,8 @@ export function filterItems(board: BoardDetail, config: ViewConfig, userId: stri
 function sortKey(c: Column | undefined, v: CellValue | undefined, item: Item, users: DirectoryUser[]): string | number | null {
   if (!c) return null;
   if (c.type === 'auto_id') return item.seq;
+  if (c.type === 'created_by') return item.createdBy ? (users.find((u) => u.id === item.createdBy)?.name ?? null) : 'אוטומציה';
+  if (c.type === 'updated_at') return item.updatedAt;
   if (v === undefined || v === null) return null;
   switch (c.type) {
     case 'status': {

@@ -21,6 +21,7 @@ import type { ActivityService } from './activity.js';
 import type { AuditService } from './audit.js';
 import { toColumn, toGroup, toItem, type ColumnRow, type GroupRow, type ItemRow } from './mappers.js';
 import { getTemplate } from './templates.js';
+import type { TemplateStructure } from './boardTemplates.js';
 
 interface BoardRow {
   id: string;
@@ -75,10 +76,20 @@ export class BoardService {
     }));
   }
 
-  create(actor: Actor, input: { name: string; description?: string; templateKey: string }): BoardDetail {
+  /**
+   * New board from a built-in template, or — with `customTemplateId` and a resolver — from an
+   * organisation template (its structure; the board keeps the original built-in template key).
+   */
+  create(
+    actor: Actor,
+    input: { name: string; description?: string; templateKey: string; customTemplateId?: string },
+    resolveCustom?: (id: string) => TemplateStructure,
+  ): BoardDetail {
     if (actor.role === 'member') throw forbidden('רק מנהלים יכולים ליצור לוחות');
-    const template = getTemplate(input.templateKey);
-    if (!template) throw badRequest('תבנית לא קיימת', { templateKey: 'תבנית לא קיימת' });
+    const custom = input.customTemplateId && resolveCustom ? resolveCustom(input.customTemplateId) : null;
+    const builtIn = getTemplate(custom ? custom.baseKey : input.templateKey);
+    if (!builtIn) throw badRequest('תבנית לא קיימת', { templateKey: 'תבנית לא קיימת' });
+    const template = custom ? { key: builtIn.key, groups: custom.groups, columns: custom.columns } : builtIn;
 
     const id = newId();
     const ts = nowIso();
@@ -95,7 +106,7 @@ export class BoardService {
           .prepare('INSERT INTO board_columns (id, board_id, title, type, settings, position) VALUES (?, ?, ?, ?, ?, ?)')
           .run(newId(), id, c.title, c.type, JSON.stringify(c.settings ?? {}), i);
       });
-      this.activity.record(id, actor.id, 'board_created', { name: input.name, template: template.key });
+      this.activity.record(id, actor.id, 'board_created', { name: input.name, template: template.key, ...(custom ? { customTemplate: true } : {}) });
     })();
     this.audit.log('board_created', { userId: actor.id, meta: { boardId: id, template: template.key } });
     return this.get(actor, id);

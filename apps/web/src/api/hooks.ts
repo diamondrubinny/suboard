@@ -1,4 +1,5 @@
 import type {
+  CustomTemplate,
   ActiveSession,
   BoardFile,
   FollowState,
@@ -175,7 +176,20 @@ export const useDirectory = () =>
   useQuery({ queryKey: qk.directory, queryFn: () => api<{ users: DirectoryUser[] }>('/users/directory').then((r) => r.users), staleTime: 5 * 60_000 });
 
 export const useTemplates = () =>
-  useQuery({ queryKey: qk.templates, queryFn: () => api<{ templates: TemplateInfo[] }>('/templates').then((r) => r.templates), staleTime: Infinity });
+  useQuery({ queryKey: qk.templates, queryFn: () => api<{ templates: TemplateInfo[]; custom: CustomTemplate[] }>('/templates'), staleTime: 60_000 });
+
+export function useTemplateMutations() {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: qk.templates });
+  return {
+    save: useMutation({
+      mutationFn: ({ boardId, name, description }: { boardId: string; name: string; description?: string }) =>
+        api<{ template: CustomTemplate }>(`/boards/${boardId}/save-as-template`, 'POST', { name, description }).then((r) => r.template),
+      onSuccess: refresh,
+    }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/templates/custom/${id}`, 'DELETE'), onSuccess: refresh }),
+  };
+}
 
 export const useDashboard = () =>
   useQuery({ queryKey: qk.dashboard, queryFn: () => api<{ dashboard: Dashboard }>('/dashboard').then((r) => r.dashboard) });
@@ -210,7 +224,7 @@ function useBoardCache(boardId: string) {
 export function useCreateBoard() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { name: string; description?: string; templateKey: string }) => api<{ board: BoardDetail }>('/boards', 'POST', input).then((r) => r.board),
+    mutationFn: (input: { name: string; description?: string; templateKey: string; customTemplateId?: string }) => api<{ board: BoardDetail }>('/boards', 'POST', input).then((r) => r.board),
     onSuccess: (board) => {
       qc.setQueryData(qk.board(board.id), board);
       void qc.invalidateQueries({ queryKey: qk.boards });

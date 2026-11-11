@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BOARD_ROLES, CAUSE_CATEGORIES, PERMIT_TYPES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, REACTIONS, type ColorKey, type ColumnType } from './constants.js';
+import { BOARD_ROLES, CAUSE_CATEGORIES, PERMIT_TYPES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, REACTIONS, COLUMN_WIDTH, type ColorKey, type ColumnType } from './constants.js';
 
 /** Trimmed, non-empty single-line string without control characters. */
 const line = (max: number) =>
@@ -204,7 +204,9 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
         .regex(/^\+?[0-9][0-9 ()-]{2,19}$/, 'מספר טלפון לא תקין')
         .nullable();
     case 'auto_id':
-      // Computed by the server; any client value is rejected.
+    case 'created_by':
+    case 'updated_at':
+      // Computed from the item; any client value is rejected.
       return z.never();
     case 'risk':
       return z.object({ l: z.number().int().min(1).max(5), s: z.number().int().min(1).max(5) }).nullable();
@@ -224,6 +226,13 @@ export const createBoardSchema = z.object({
   name: line(LIMITS.boardName),
   description: multiline(LIMITS.boardDescription).optional(),
   templateKey: z.string().regex(/^[a-z_]{1,40}$/).default('blank'),
+  /** Create from an organisation template (structure saved from another board) instead. */
+  customTemplateId: idSchema.optional(),
+});
+
+export const saveTemplateSchema = z.object({
+  name: line(LIMITS.boardName),
+  description: multiline(LIMITS.boardDescription).optional(),
 });
 
 export const updateBoardSchema = z
@@ -293,6 +302,11 @@ export const viewConfigSchema = z.object({
   calendarColumnId: idSchema.optional(),
   riskColumnId: idSchema.optional(),
   ganttScale: z.enum(['week', 'month']).optional(),
+  /** Table column widths in px, by column id (or "name" for the item column). */
+  widths: z
+    .record(z.string().regex(/^(name|[0-9a-f-]{36})$/), z.number().int().min(COLUMN_WIDTH.min).max(COLUMN_WIDTH.max))
+    .refine((w) => Object.keys(w).length <= LIMITS.columnsPerBoard + 1, 'יותר מדי עמודות')
+    .optional(),
 });
 export type ViewConfig = z.infer<typeof viewConfigSchema>;
 

@@ -66,6 +66,8 @@ export function convertCell(col: Column, raw: unknown, members: DirectoryUser[])
     case 'checkbox':
       return /^(כן|true|1|v|✓|x)$/i.test(s) ? true : /^(לא|false|0)$/i.test(s) ? false : s;
     case 'auto_id':
+    case 'created_by':
+    case 'updated_at':
       return undefined;
     default:
       return s;

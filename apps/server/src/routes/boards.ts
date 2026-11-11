@@ -6,6 +6,7 @@ import {
   createUpdateSchema,
   idSchema,
   reactionSchema,
+  saveTemplateSchema,
   setMemberSchema,
   updateBoardSchema,
   updateColumnSchema,
@@ -22,14 +23,22 @@ const param = (req: FastifyRequest, name: string): string => idSchema.parse((req
 export async function boardRoutes(app: FastifyInstance, { services }: { services: Services }) {
   const { boards, items, activity, access, dashboard } = services;
 
-  app.get('/templates', async () => ({ templates: listTemplates() }));
+  app.get('/templates', async (req) => ({ templates: listTemplates(), custom: services.boardTemplates.list(actorOf(req)) }));
+  app.delete('/templates/custom/:id', async (req) => {
+    services.boardTemplates.remove(actorOf(req), param(req, 'id'));
+    return { ok: true };
+  });
+  app.post('/boards/:id/save-as-template', async (req, reply) => {
+    const template = services.boardTemplates.saveFromBoard(actorOf(req), param(req, 'id'), saveTemplateSchema.parse(req.body));
+    return reply.code(201).send({ template });
+  });
   app.get('/dashboard', async (req) => ({ dashboard: dashboard.build(actorOf(req)) }));
 
   // ---- boards
   app.get('/boards', async (req) => ({ boards: boards.list(actorOf(req)) }));
 
   app.post('/boards', async (req, reply) => {
-    const board = boards.create(actorOf(req), createBoardSchema.parse(req.body));
+    const board = boards.create(actorOf(req), createBoardSchema.parse(req.body), (id) => services.boardTemplates.structure(id));
     return reply.code(201).send({ board });
   });
 

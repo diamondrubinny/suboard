@@ -1,4 +1,4 @@
-import { cellValueSchema, LIMITS, REACTIONS, type CellValue, type Reaction, type UpdateReaction, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
+import { isReadonlyColumnType, cellValueSchema, LIMITS, REACTIONS, type CellValue, type Reaction, type UpdateReaction, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
 import { nowIso, type DB } from '../db/index.js';
 import { newId } from '../lib/crypto.js';
 import { AppError, badRequest, forbidden, notFound } from '../lib/errors.js';
@@ -140,7 +140,7 @@ export class ItemService {
     for (const [columnId, raw] of Object.entries(patch)) {
       const col = columns.get(columnId);
       if (!col) throw badRequest('עמודה לא קיימת בלוח', { [columnId]: 'עמודה לא קיימת' });
-      if (col.type === 'auto_id') throw badRequest(`העמודה "${col.title}" מחושבת אוטומטית`, { [columnId]: 'לא ניתן לעריכה' });
+      if (isReadonlyColumnType(col.type)) throw badRequest(`העמודה "${col.title}" מחושבת אוטומטית`, { [columnId]: 'לא ניתן לעריכה' });
       let value: unknown = raw;
       if (typeof value === 'string' && value.trim() === '' && col.type !== 'long_text') value = null;
       if (Array.isArray(value) && value.length === 0) value = null;
@@ -489,7 +489,7 @@ export class ItemService {
       for (const [cid, v] of Object.entries(values)) {
         const src = fromCols.find((c) => c.id === cid);
         if (!src) continue;
-        const dst = toCols.find((c) => c.title === src.title && c.type === src.type && c.type !== 'auto_id');
+        const dst = toCols.find((c) => c.title === src.title && c.type === src.type && !isReadonlyColumnType(c.type));
         if (!dst) {
           dropped.add(src.title);
           continue;

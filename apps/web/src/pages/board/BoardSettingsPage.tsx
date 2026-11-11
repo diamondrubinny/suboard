@@ -15,7 +15,7 @@ import {
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../api/client';
-import { useArchiveBoard, useBoard, useColumnMutations, useDirectory, useGroupMutations, useMemberMutations, useUpdateBoard } from '../../api/hooks';
+import { useArchiveBoard, useBoard, useColumnMutations, useDirectory, useGroupMutations, useMemberMutations, useTemplateMutations, useTemplates, useUpdateBoard } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
@@ -54,6 +54,7 @@ export function BoardSettingsPage() {
         </section>
         <GroupsSection board={b} />
         <MembersSection board={b} />
+        <TemplateSection board={b} />
         <DangerSection board={b} />
       </div>
     </>
@@ -373,53 +374,56 @@ function MembersSection({ board }: { board: BoardDetail }) {
         <strong>בעלים</strong> — ניהול מלא כולל עמודות וחברים · <strong>עורך</strong> — הוספה ועריכה של פריטים ועדכונים · <strong>צופה</strong> — קריאה בלבד.
         מנהלי מערכת רואים את כל הלוחות.
       </p>
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th scope="col">שם</th>
-            <th scope="col">דוא"ל</th>
-            <th scope="col">הרשאה</th>
-            <th scope="col">
-              <span className="sr-only">פעולות</span>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {board.members.map((m) => (
-            <tr key={m.userId}>
-              <td>{m.name}</td>
-              <td dir="ltr" style={{ textAlign: 'end' }}>
-                {m.email}
-              </td>
-              <td>
-                <select className="select" value={m.role} aria-label={`הרשאה עבור ${m.name}`}
-                  onChange={(e) => set.mutate({ userId: m.userId, role: e.target.value as BoardRole }, { onSuccess: () => toast('ההרשאה עודכנה'), onError: onErr })}>
-                  {BOARD_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {BOARD_ROLE_LABELS[r]}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  aria-label={`הסרת ${m.name} מהלוח`}
-                  onClick={async () => {
-                    const self = m.userId === user?.id;
-                    if (await confirm({ title: 'הסרת חבר', message: self ? 'להסיר את עצמך מהלוח? ייתכן שתאבד/י גישה אליו.' : `להסיר את ${m.name} מהלוח?`, confirmLabel: 'הסרה', danger: true })) {
-                      remove.mutate(m.userId, { onSuccess: () => toast('החבר הוסר'), onError: onErr });
-                    }
-                  }}
-                >
-                  <Icon name="trash" size={16} />
-                </button>
-              </td>
+      {/* Scrolls sideways on narrow screens instead of widening the page. */}
+      <div className="table-wrap" tabIndex={0} role="region" aria-label="חברי הלוח">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th scope="col">שם</th>
+              <th scope="col">דוא"ל</th>
+              <th scope="col">הרשאה</th>
+              <th scope="col">
+                <span className="sr-only">פעולות</span>
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {board.members.map((m) => (
+              <tr key={m.userId}>
+                <td>{m.name}</td>
+                <td dir="ltr" style={{ textAlign: 'end' }}>
+                  {m.email}
+                </td>
+                <td>
+                  <select className="select" value={m.role} aria-label={`הרשאה עבור ${m.name}`}
+                    onChange={(e) => set.mutate({ userId: m.userId, role: e.target.value as BoardRole }, { onSuccess: () => toast('ההרשאה עודכנה'), onError: onErr })}>
+                    {BOARD_ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {BOARD_ROLE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label={`הסרת ${m.name} מהלוח`}
+                    onClick={async () => {
+                      const self = m.userId === user?.id;
+                      if (await confirm({ title: 'הסרת חבר', message: self ? 'להסיר את עצמך מהלוח? ייתכן שתאבד/י גישה אליו.' : `להסיר את ${m.name} מהלוח?`, confirmLabel: 'הסרה', danger: true })) {
+                        remove.mutate(m.userId, { onSuccess: () => toast('החבר הוסר'), onError: onErr });
+                      }
+                    }}
+                  >
+                    <Icon name="trash" size={16} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <form
         className="toolbar"
         style={{ marginTop: '1rem' }}
@@ -454,6 +458,91 @@ function MembersSection({ board }: { board: BoardDetail }) {
           <Icon name="plus" /> הוספה
         </button>
       </form>
+    </section>
+  );
+}
+
+/** Save this board's structure as an organisation template; manage the templates you may delete. */
+function TemplateSection({ board }: { board: BoardDetail }) {
+  const { user } = useAuth();
+  const templates = useTemplates();
+  const { save, remove } = useTemplateMutations();
+  const { toast, confirm } = useFeedback();
+  const [name, setName] = useState(`${board.name} — תבנית`.slice(0, LIMITS.boardName));
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  if (user?.role !== 'admin' && user?.role !== 'manager') return null;
+  const mine = (templates.data?.custom ?? []).filter((t) => user.role === 'admin' || t.createdBy === user.id);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return setError('יש לתת שם לתבנית');
+    setError(null);
+    save.mutate(
+      { boardId: board.id, name: name.trim(), description: description.trim() || undefined },
+      { onSuccess: (t) => toast(`התבנית "${t.name}" נשמרה. היא תופיע בחלון "לוח חדש".`), onError: (err) => setError(errorMessage(err)) },
+    );
+  };
+
+  return (
+    <section className="card" aria-labelledby="tpl-h">
+      <h2 id="tpl-h">שמירה כתבנית</h2>
+      <p className="muted">
+        נשמר <strong>המבנה בלבד</strong>: קבוצות ועמודות עם ההגדרות שלהן. פריטים, חברים, קבצים, עדכונים ואוטומציות אינם נשמרים, וגם לא קישור לצ׳קליסט ללוח פעולות מתקנות. התבנית תהיה זמינה לכל המנהלים ביצירת לוח חדש.
+      </p>
+      <form onSubmit={submit} noValidate>
+        {error && (
+          <div className="form-error" role="alert">
+            {error}
+          </div>
+        )}
+        <div className="field">
+          <label htmlFor="tpl-name">שם התבנית</label>
+          <input id="tpl-name" className="input" value={name} maxLength={LIMITS.boardName} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div className="field">
+          <label htmlFor="tpl-desc">תיאור (אופציונלי)</label>
+          <textarea id="tpl-desc" className="textarea" rows={2} value={description} maxLength={LIMITS.boardDescription} onChange={(e) => setDescription(e.target.value)} aria-describedby="tpl-desc-hint" />
+          <span id="tpl-desc-hint" className="hint">
+            אין לכלול שמות אנשים או מידע אישי — התבנית גלויה לכל המנהלים.
+          </span>
+        </div>
+        <button type="submit" className="btn btn-primary" disabled={save.isPending}>
+          {save.isPending ? 'שומר…' : 'שמירה כתבנית'}
+        </button>
+      </form>
+      {mine.length > 0 && (
+        <>
+          <h3 id="tpl-mine-h" style={{ marginBlock: 'var(--space-4) var(--space-2)' }}>
+            {user.role === 'admin' ? 'תבניות הארגון' : 'תבניות ששמרת'}
+          </h3>
+          <ul className="list-plain" aria-labelledby="tpl-mine-h">
+            {mine.map((t) => (
+              <li key={t.id} className="tpl-row">
+                <span style={{ flex: 1 }}>
+                  <strong>{t.name}</strong>
+                  <br />
+                  <small className="muted">
+                    {t.groupCount} קבוצות, {t.columnCount} עמודות{t.createdByName ? ` · ${t.createdByName}` : ''}
+                  </small>
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  aria-label={`מחיקת התבנית ${t.name}`}
+                  disabled={remove.isPending}
+                  onClick={async () => {
+                    if (!(await confirm({ title: 'מחיקת תבנית', message: `למחוק את התבנית "${t.name}"? לוחות שכבר נוצרו ממנה לא ישתנו.`, confirmLabel: 'מחיקה', danger: true }))) return;
+                    remove.mutate(t.id, { onSuccess: () => toast('התבנית נמחקה'), onError: (e) => toast(errorMessage(e), 'error') });
+                  }}
+                >
+                  <Icon name="trash" size={16} /> מחיקה
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </section>
   );
 }

@@ -1,4 +1,4 @@
-import {
+import { isReadonlyColumnType,
   findDueColumn,
   findPrimaryStatusColumn,
   type BoardDetail,
@@ -115,7 +115,7 @@ export function defaultAction(b: BoardDetail, type: RuleAction['type']): RuleAct
     case 'assign':
       return { type, columnId: first(b, 'person')?.id ?? '', userIds: [], mode: 'replace' };
     case 'clear':
-      return { type, columnId: b.columns.find((c) => c.type !== 'auto_id')?.id ?? '' };
+      return { type, columnId: b.columns.find((c) => !isReadonlyColumnType(c.type))?.id ?? '' };
     case 'set_date':
       return { type, columnId: (findDueColumn(b.columns) ?? first(b, 'date'))?.id ?? '', offsetDays: 7 };
     case 'move_group':

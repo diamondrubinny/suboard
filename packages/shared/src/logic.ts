@@ -44,6 +44,12 @@ export function formatDateHe(iso: string | null | undefined): string {
   return `${d}/${m}/${y}`;
 }
 
+/** "11/11/2026, 14:05" — date and time in the given time zone (default Israel). */
+export function formatDateTimeHe(iso: string | null | undefined, timeZone = 'Asia/Jerusalem'): string {
+  if (!iso || Number.isNaN(Date.parse(iso))) return '';
+  return new Intl.DateTimeFormat('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false, timeZone }).format(new Date(iso));
+}
+
 /** "INC-0042" for an auto_id column with prefix "INC"; "#42" without a prefix. */
 export function formatAutoId(seq: number, prefix?: string): string {
   return prefix ? `${prefix}-${String(seq).padStart(4, '0')}` : `#${seq}`;

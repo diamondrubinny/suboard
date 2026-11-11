@@ -3536,3 +3536,54 @@ kbd {
     display: none;
   }
 }
+
+/* ---------- wave I: column widths, templates ---------- */
+.board-table thead th.th-resizable {
+  position: sticky; /* already sticky; the handle is positioned against it */
+}
+.board-table thead th.th-resizable .sort-btn {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.col-resizer {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0; /* inside its own header: the next header would cover anything beyond */
+  inline-size: 10px;
+  cursor: col-resize;
+  z-index: 3;
+  touch-action: none;
+}
+.col-resizer::after {
+  content: '';
+  position: absolute;
+  inset-block: 25%;
+  inset-inline-end: 0;
+  inline-size: 2px;
+  border-radius: 2px;
+  background: transparent;
+}
+.board-table thead th:hover .col-resizer::after,
+.col-resizer:focus-visible::after {
+  background: var(--line-strong);
+}
+.col-resizer:active::after {
+  background: var(--primary);
+}
+.col-resizer:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -1px;
+}
+.tpl-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+@media print {
+  .col-resizer {
+    display: none;
+  }
+}

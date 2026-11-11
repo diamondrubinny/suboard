@@ -667,3 +667,18 @@ export interface BoardFile {
   createdAt: string;
   isImage: boolean;
 }
+
+// ---------- Wave I ----------
+/** A board template saved from an existing board (structure only). */
+export interface CustomTemplate {
+  id: string;
+  name: string;
+  description: string;
+  /** Built-in template the source board was created from (keeps template-specific features). */
+  baseKey: string;
+  groupCount: number;
+  columnCount: number;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+}

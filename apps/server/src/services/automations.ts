@@ -1,4 +1,4 @@
-import {
+import { isReadonlyColumnType,
   addDaysIso,
   diffDaysIso,
   findPrimaryStatusColumn,
@@ -248,7 +248,7 @@ export class AutomationService {
         this.items.assertUsersOnBoard(boardId, a.userIds, 'שיוך', 'userIds');
       } else if (a.type === 'clear') {
         const c = this.column(cols, a.columnId, cols.map((x) => x.type), 'פעולה');
-        if (c.type === 'auto_id') throw badRequest(`העמודה "${c.title}" מחושבת אוטומטית`);
+        if (isReadonlyColumnType(c.type)) throw badRequest(`העמודה "${c.title}" מחושבת אוטומטית`);
       } else if (a.type === 'set_date') this.column(cols, a.columnId, ['date'], 'פעולה');
       else if (a.type === 'move_group') this.group(boardId, a.groupId);
       else if (a.type === 'notify') {

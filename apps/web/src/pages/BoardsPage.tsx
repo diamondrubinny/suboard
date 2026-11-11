@@ -16,6 +16,8 @@ function CreateBoardDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const navigate = useNavigate();
   const { toast } = useFeedback();
   const [templateKey, setTemplateKey] = useState('incidents');
+  /** Set when an organisation template is chosen (takes precedence over templateKey). */
+  const [customId, setCustomId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -32,7 +34,7 @@ function CreateBoardDialog({ open, onClose }: { open: boolean; onClose: () => vo
       return;
     }
     try {
-      const board = await create.mutateAsync(parsed.data);
+      const board = await create.mutateAsync({ ...parsed.data, ...(customId ? { customTemplateId: customId } : {}) });
       toast(`הלוח "${board.name}" נוצר`);
       onClose();
       navigate(`/boards/${board.id}`);
@@ -87,10 +89,36 @@ function CreateBoardDialog({ open, onClose }: { open: boolean; onClose: () => vo
             תבנית
           </legend>
           {templates.isPending && <LoadingState />}
+          {templates.data && templates.data.custom.length > 0 && (
+            <>
+              <p className="label" id="tpl-org" style={{ margin: '0 0 0.3rem' }}>
+                תבניות הארגון
+              </p>
+              <div className="grid" style={{ gap: '0.4rem', marginBottom: '0.8rem' }} role="group" aria-labelledby="tpl-org">
+                {templates.data.custom.map((t) => (
+                  <label key={t.id} className="card" style={{ display: 'flex', gap: '0.6rem', padding: '0.6rem 0.8rem', cursor: 'pointer', alignItems: 'flex-start' }}>
+                    <input type="radio" name="template" value={`custom:${t.id}`} checked={customId === t.id} onChange={() => setCustomId(t.id)} style={{ marginTop: '0.3rem' }} />
+                    <Icon name="clipboard" />
+                    <span>
+                      <strong>{t.name}</strong>
+                      <br />
+                      <small className="muted">
+                        {t.description ? `${t.description} · ` : ''}
+                        {t.groupCount} קבוצות, {t.columnCount} עמודות{t.createdByName ? ` · נשמרה ע"י ${t.createdByName}` : ''}
+                      </small>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <p className="label" id="tpl-builtin" style={{ margin: '0 0 0.3rem' }}>
+                תבניות מובנות
+              </p>
+            </>
+          )}
           <div className="grid" style={{ gap: '0.4rem' }}>
-            {templates.data?.map((t) => (
+            {templates.data?.templates.map((t) => (
               <label key={t.key} className="card" style={{ display: 'flex', gap: '0.6rem', padding: '0.6rem 0.8rem', cursor: 'pointer', alignItems: 'flex-start' }}>
-                <input type="radio" name="template" value={t.key} checked={templateKey === t.key} onChange={() => setTemplateKey(t.key)} style={{ marginTop: '0.3rem' }} />
+                <input type="radio" name="template" value={t.key} checked={!customId && templateKey === t.key} onChange={() => (setCustomId(null), setTemplateKey(t.key))} style={{ marginTop: '0.3rem' }} />
                 <Icon name={t.icon as IconName} />
                 <span>
                   <strong>{t.name}</strong>

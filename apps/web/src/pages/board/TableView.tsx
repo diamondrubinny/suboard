@@ -1,5 +1,5 @@
-import { PALETTE, todayIso, isOverdue, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Group, type Item, type ViewConfig } from '@suboard/shared';
-import { useState } from 'react';
+import { COLUMN_WIDTH, PALETTE, todayIso, isOverdue, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Group, type Item, type ViewConfig } from '@suboard/shared';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { errorMessage } from '../../api/client';
 import { useCreateItem, useGroupMutations, useUpdateItem } from '../../api/hooks';
 import { CellEditor } from '../../components/cells/CellEditor';
@@ -16,6 +16,8 @@ interface Props {
   filtered: boolean;
   config: ViewConfig;
   onSort: (sort: ViewConfig['sort']) => void;
+  /** New width (px) for a column, or null to reset it. */
+  onResize: (columnId: string, width: number | null) => void;
   selected: Set<string>;
   onSelect: (ids: string[], on: boolean) => void;
 }
@@ -111,25 +113,116 @@ function ItemNameInput({ item, onCommit }: { item: Item; onCommit: (name: string
   );
 }
 
-/** Column header that sorts on click: none → ascending → descending → none (aria-sort reflects it). */
-function SortHeader({ id, title, config, onSort, className }: { id: string; title: string; config: ViewConfig; onSort: Props['onSort']; className: string }) {
+/**
+ * Column header that sorts on click: none → ascending → descending → none (aria-sort reflects it),
+ * with a resize handle on its inline-end edge (mouse / touch drag, or keyboard on the focused handle).
+ */
+function SortHeader({
+  id,
+  title,
+  config,
+  onSort,
+  onResize,
+  className,
+}: {
+  id: string;
+  title: string;
+  config: ViewConfig;
+  onSort: Props['onSort'];
+  onResize: Props['onResize'];
+  className: string;
+}) {
   const dir = config.sort?.by === id ? config.sort.dir : undefined;
   const next = (): ViewConfig['sort'] => (!dir ? { by: id as never, dir: 'asc' } : dir === 'asc' ? { by: id as never, dir: 'desc' } : undefined);
+  const width = config.widths?.[id];
+  const thRef = useRef<HTMLTableCellElement>(null);
+  // Rendered width for aria-valuenow when no width is set (a focusable separator must report a value).
+  const [measured, setMeasured] = useState<number | null>(null);
+  useEffect(() => {
+    const el = thRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setMeasured(Math.round(el.getBoundingClientRect().width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const clamp = (w: number) => Math.round(Math.min(COLUMN_WIDTH.max, Math.max(COLUMN_WIDTH.min, w)));
+  const current = () => width ?? Math.round(thRef.current?.getBoundingClientRect().width ?? 160);
+  const rtl = () => getComputedStyle(thRef.current ?? document.documentElement).direction === 'rtl';
+
+  const onPointerDown = (e: PointerEvent<HTMLSpanElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    const startX = e.clientX;
+    const start = current();
+    const isRtl = rtl();
+    let w = start;
+    const move = (ev: globalThis.PointerEvent) => {
+      w = clamp(start + (isRtl ? startX - ev.clientX : ev.clientX - startX));
+      // Live preview without re-rendering the whole table; committed on release.
+      if (thRef.current) Object.assign(thRef.current.style, { width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` });
+    };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+      if (w !== start) onResize(id, w);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  };
+
+  const onKeyDown = (e: KeyboardEvent<HTMLSpanElement>) => {
+    // In RTL the column's end edge is on the left, so ArrowLeft widens (as dragging left would).
+    const wider = rtl() ? 'ArrowLeft' : 'ArrowRight';
+    const narrower = rtl() ? 'ArrowRight' : 'ArrowLeft';
+    let w: number | null | undefined;
+    if (e.key === wider || e.key === 'ArrowUp') w = clamp(current() + COLUMN_WIDTH.step);
+    else if (e.key === narrower || e.key === 'ArrowDown') w = clamp(current() - COLUMN_WIDTH.step);
+    else if (e.key === 'Home') w = null;
+    else return;
+    e.preventDefault();
+    onResize(id, w);
+  };
+
   return (
-    <th scope="col" className={className} aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'}>
+    <th
+      ref={thRef}
+      scope="col"
+      className={`${className} th-resizable`}
+      style={width ? { width, minWidth: width, maxWidth: width } : undefined}
+      aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'}
+    >
       <button type="button" className="sort-btn" onClick={() => onSort(next())}>
         {title}
         <span aria-hidden="true" className="sort-ind">
           {dir === 'asc' ? '▲' : dir === 'desc' ? '▼' : '↕'}
         </span>
       </button>
+      <span
+        role="separator"
+        aria-orientation="vertical"
+        tabIndex={0}
+        className="col-resizer"
+        aria-label={`רוחב העמודה ${title}`}
+        aria-valuemin={COLUMN_WIDTH.min}
+        aria-valuemax={COLUMN_WIDTH.max}
+        aria-valuenow={width ?? measured ?? COLUMN_WIDTH.min}
+        aria-valuetext={width ? `${width} פיקסלים` : 'ברירת מחדל'}
+        title="גרירה או חצים לשינוי רוחב, לחיצה כפולה או Home לאיפוס"
+        onPointerDown={onPointerDown}
+        onKeyDown={onKeyDown}
+        onDoubleClick={() => onResize(id, null)}
+      />
     </th>
   );
 }
 
 const narrow = (c: Column) => ['checkbox', 'number', 'rating', 'auto_id', 'progress'].includes(c.type);
 
-export function TableView({ board, items, users, onOpenItem, filtered, config, onSort, selected, onSelect }: Props) {
+export function TableView({ board, items, users, onOpenItem, filtered, config, onSort, onResize, selected, onSelect }: Props) {
   const canEdit = board.myRole !== 'viewer';
   const assignable = board.members.map((m) => ({ id: m.userId, name: m.name }));
   const updateItem = useUpdateItem(board.id);
@@ -189,6 +282,8 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
               label={`${c.title} — ${item.name}`}
               overdue={overdue && c.settings.role === 'due'}
               seq={item.seq}
+              createdBy={item.createdBy}
+              updatedAt={item.updatedAt}
               onChange={(v) => setValue(item, c.id, v)}
               onOpenItem={() => onOpenItem(item.id)}
             />
@@ -247,9 +342,9 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                           <input type="checkbox" checked={allSelected} aria-label={`בחירת כל הפריטים בקבוצה ${group.name}`} onChange={(e) => onSelect(groupIds, e.target.checked)} />
                         )}
                       </th>
-                      <SortHeader id="name" title="פריט" config={config} onSort={onSort} className="col-name" />
+                      <SortHeader id="name" title="פריט" config={config} onSort={onSort} onResize={onResize} className="col-name" />
                       {columns.map((c) => (
-                        <SortHeader key={c.id} id={c.id} title={c.title} config={config} onSort={onSort} className={narrow(c) ? 'cell-narrow' : 'cell'} />
+                        <SortHeader key={c.id} id={c.id} title={c.title} config={config} onSort={onSort} onResize={onResize} className={narrow(c) ? 'cell-narrow' : 'cell'} />
                       ))}
                     </tr>
                   </thead>

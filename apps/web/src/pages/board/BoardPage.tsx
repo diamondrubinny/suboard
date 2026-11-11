@@ -1,4 +1,4 @@
-import { BOARD_ROLE_LABELS, findPrimaryStatusColumn, type SavedView, type ViewConfig } from '@suboard/shared';
+import { BOARD_ROLE_LABELS, findPrimaryStatusColumn, viewConfigSchema, type SavedView, type ViewConfig } from '@suboard/shared';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../../api/client';
@@ -30,6 +30,25 @@ function readView(boardId: string): ViewKind {
   }
 }
 
+const WIDTHS_KEY = 'suboard.widths';
+/** Personal column widths per board (a display preference; kept in this browser only). */
+function readWidths(boardId: string): ViewConfig['widths'] {
+  try {
+    const parsed = viewConfigSchema.shape.widths.safeParse(JSON.parse(localStorage.getItem(`${WIDTHS_KEY}.${boardId}`) ?? 'null') ?? undefined);
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function writeWidths(boardId: string, widths: ViewConfig['widths']) {
+  try {
+    if (widths && Object.keys(widths).length) localStorage.setItem(`${WIDTHS_KEY}.${boardId}`, JSON.stringify(widths));
+    else localStorage.removeItem(`${WIDTHS_KEY}.${boardId}`);
+  } catch {
+    /* storage unavailable: widths last for this visit only */
+  }
+}
+
 export function BoardPage() {
   const { boardId = '' } = useParams();
   const [params, setParams] = useSearchParams();
@@ -38,7 +57,7 @@ export function BoardPage() {
   const directory = useDirectory();
   const groups = useGroupMutations(boardId);
   const { toast } = useFeedback();
-  const [config, setConfig] = useState<ViewConfig>(() => ({ view: readView(boardId) }));
+  const [config, setConfig] = useState<ViewConfig>(() => ({ view: readView(boardId), widths: readWidths(boardId) }));
   const [activeView, setActiveView] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [newGroup, setNewGroup] = useState('');
@@ -61,7 +80,7 @@ export function BoardPage() {
   };
   const applyView = (v: SavedView | null) => {
     setActiveView(v?.id ?? null);
-    setConfig(v ? { ...v.config } : { view: readView(boardId) });
+    setConfig(v ? { ...v.config, widths: v.config.widths ?? readWidths(boardId) } : { view: readView(boardId), widths: readWidths(boardId) });
     setSelected(new Set());
   };
   const onSelect = (ids: string[], on: boolean) =>
@@ -231,6 +250,16 @@ export function BoardPage() {
           filtered={isFiltered}
           config={config}
           onSort={(sort) => patch({ sort })}
+          onResize={(columnId, width) =>
+            setConfig((c) => {
+              const widths = { ...(c.widths ?? {}) };
+              if (width === null) delete widths[columnId];
+              else widths[columnId] = width;
+              const next = Object.keys(widths).length ? widths : undefined;
+              writeWidths(boardId, next);
+              return { ...c, widths: next };
+            })
+          }
           selected={selected}
           onSelect={onSelect}
         />

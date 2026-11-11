@@ -1,4 +1,4 @@
-import {
+import { isReadonlyColumnType,
   createAutomationSchema,
   LIMITS,
   type Automation,
@@ -38,7 +38,7 @@ interface Draft {
 // ---------------------------------------------------------------- small field helpers
 function ColumnSelect({ board, types, value, onChange, label }: { board: BoardDetail; types: Column['type'][] | 'any'; value: string; onChange: (id: string) => void; label: string }) {
   const id = useId();
-  const cols = board.columns.filter((c) => (types === 'any' ? c.type !== 'auto_id' : types.includes(c.type)));
+  const cols = board.columns.filter((c) => (types === 'any' ? !isReadonlyColumnType(c.type) : types.includes(c.type)));
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>

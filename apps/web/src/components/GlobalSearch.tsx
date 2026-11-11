@@ -225,6 +225,7 @@ const SHORTCUTS: [string[], string][] = [
   [['Enter'], 'פתיחת התוצאה המסומנת'],
   [['←', '→'], 'מעבר בין לשוניות (Home / End — הראשונה / האחרונה)'],
   [['Tab'], 'מעבר בין רכיבים; הקישור "דילוג לתוכן" מופיע ראשון'],
+  [['←', '→'], 'על ידית רוחב העמודה בטבלה: הרחבה / הצרה (Home — רוחב ברירת מחדל)'],
 ];
 
 export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {

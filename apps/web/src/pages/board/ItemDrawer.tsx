@@ -194,6 +194,8 @@ function DetailsPanel({
               label={c.title}
               mode="drawer"
               seq={item.seq}
+              createdBy={item.createdBy}
+              updatedAt={item.updatedAt}
               overdue={overdue && c.settings.role === 'due'}
               onChange={(v) => save({ values: { [c.id]: v } })}
             />
