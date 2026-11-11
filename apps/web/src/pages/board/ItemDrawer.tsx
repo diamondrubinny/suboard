@@ -338,7 +338,18 @@ function SubitemsSection({ board, parentId, users, onOpenItem }: { board: BoardD
                   done={done}
                   disabled={!canEdit}
                   label={`בוצע: ${k.name}`}
-                  onToggle={(on) => setValue(k, toggle.column.id, on ? toggle.doneId : toggle.openId, on ? `"${k.name}" סומן כבוצע` : `"${k.name}" נפתח מחדש`)}
+                  onToggle={(on) => {
+                    setValue(k, toggle.column.id, on ? toggle.doneId : toggle.openId, on ? `"${k.name}" סומן כבוצע` : `"${k.name}" נפתח מחדש`);
+                    // The last open sub-item was just closed: offer to close the parent too (never automatic).
+                    const othersDone = kids.every((x) => x.id === k.id || isItemDone(x, status));
+                    if (on && othersDone && !isItemDone(parent, status)) {
+                      window.setTimeout(
+                        () =>
+                          toast(`כל תת-הפריטים של "${parent.name}" בוצעו`, 'info', { label: 'סימון הפריט כבוצע', onClick: () => setValue(parent, toggle.column.id, toggle.doneId, `"${parent.name}" סומן כבוצע`) }, 'undo'),
+                        600,
+                      );
+                    }
+                  }}
                 />
               )}
               <button type="button" className="subtask-name" onClick={() => onOpenItem(k.id)}>

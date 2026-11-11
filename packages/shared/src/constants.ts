@@ -157,6 +157,9 @@ export const REACTION_LABELS: Record<Reaction, string> = { '👍': 'אהבתי',
 /** Maximum number of organisation board templates. */
 export const MAX_CUSTOM_TEMPLATES = 100;
 
+/** How deep sub-items may nest below a top-level item (item → sub-item → … ). */
+export const MAX_SUBITEM_DEPTH = 5;
+
 /** Table column width bounds (px) for the resize handle. */
 export const COLUMN_WIDTH = { min: 80, max: 640, step: 16 } as const;
 

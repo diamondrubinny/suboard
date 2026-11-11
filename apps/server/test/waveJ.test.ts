@@ -30,13 +30,18 @@ const add = async (name: string, parentId?: string, values: Record<string, unkno
 };
 const live = async () => ((await m.get(`/api/boards/${board.id}`)).json().board as BoardDetail).items;
 
-describe('J1 two levels of sub-items', () => {
-  it('nests two levels, refuses a third, and keeps the family together', async () => {
+describe('J1 nested sub-items', () => {
+  it('nests several levels, refuses beyond the limit, and keeps the family together', async () => {
     const top = (await add('החלפת מנדף')).json().item;
     const sub = (await add('הזמנת קבלן', top.id)).json().item;
     const subsub = (await add('קבלת הצעת מחיר', sub.id)).json().item;
     expect(subsub.parentId).toBe(sub.id);
-    expect((await add('עמוק מדי', subsub.id)).statusCode).toBe(400);
+    // deeper levels are allowed up to the limit (5 below the top item), then refused
+    const l3 = (await add('רמה 3', subsub.id)).json().item;
+    const l4 = (await add('רמה 4', l3.id)).json().item;
+    const l5 = (await add('רמה 5', l4.id)).json().item;
+    expect((await add('עמוק מדי', l5.id)).statusCode).toBe(400);
+    await m.del(`/api/items/${l3.id}`); // with its descendants
 
     // group move takes every descendant
     const g2 = board.groups[1]!.id;
@@ -57,7 +62,10 @@ describe('J1 two levels of sub-items', () => {
     await m.del(`/api/items/${top.id}`);
     expect((await live()).some((i) => [top.id, sub.id, subsub.id].includes(i.id))).toBe(false);
     const trash = (await m.get(`/api/boards/${board.id}/trash`)).json().items as { id: string }[];
-    expect(trash.map((t) => t.id)).toEqual([top.id]); // descendants are not listed separately
+    const trashed = trash.map((t) => t.id);
+    expect(trashed).toContain(top.id);
+    expect(trashed).not.toContain(sub.id); // descendants deleted with it are not listed separately
+    expect(trashed).not.toContain(subsub.id);
     await m.post(`/api/items/${top.id}/restore`);
     expect((await live()).filter((i) => [top.id, sub.id, subsub.id].includes(i.id))).toHaveLength(3);
 

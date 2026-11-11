@@ -1,4 +1,4 @@
-import { isReadonlyColumnType, cellValueSchema, LIMITS, REACTIONS, type CellValue, type Reaction, type UpdateReaction, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
+import { MAX_SUBITEM_DEPTH, isReadonlyColumnType, cellValueSchema, LIMITS, REACTIONS, type CellValue, type Reaction, type UpdateReaction, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
 import { nowIso, type DB } from '../db/index.js';
 import { newId } from '../lib/crypto.js';
 import { AppError, badRequest, forbidden, notFound } from '../lib/errors.js';
@@ -101,11 +101,18 @@ export class ItemService {
     return (this.db.prepare('SELECT * FROM items WHERE parent_id = ? AND deleted_at IS NULL ORDER BY position').all(itemId) as ItemRow[]).map(toItem);
   }
 
-  /** Live sub-items and their sub-items (two levels), parents before children. */
+  /** Every live descendant (all levels), parents before their children. */
   private descendants(itemId: string): Item[] {
     const out: Item[] = [];
-    for (const c of this.children(itemId)) out.push(c, ...this.children(c.id));
+    for (const c of this.children(itemId)) out.push(c, ...this.descendants(c.id));
     return out;
+  }
+
+  /** 0 for a top-level item, 1 for its sub-item, and so on. */
+  private depthOf(item: Item): number {
+    let d = 0;
+    for (let cur = item; cur.parentId && d <= MAX_SUBITEM_DEPTH; d++) cur = this.getRow(cur.parentId);
+    return d;
   }
 
   private assertGroupInBoard(groupId: string, boardId: string): void {
@@ -230,8 +237,7 @@ export class ItemService {
     if (input.parentId) {
       const parent = this.getRow(input.parentId);
       if (parent.boardId !== boardId) throw badRequest('פריט האב אינו שייך ללוח', { parentId: 'פריט לא תקין' });
-      // Two levels: item → sub-item → sub-sub-item.
-      if (parent.parentId && this.getRow(parent.parentId).parentId) throw badRequest('ניתן להוסיף תתי-משימות עד שתי רמות', { parentId: 'עד שתי רמות' });
+      if (this.depthOf(parent) >= MAX_SUBITEM_DEPTH) throw badRequest(`ניתן לקנן תת-פריטים עד ${MAX_SUBITEM_DEPTH} רמות`, { parentId: `עד ${MAX_SUBITEM_DEPTH} רמות` });
       groupId = parent.groupId;
     } else {
       this.assertGroupInBoard(groupId, boardId);
@@ -445,10 +451,12 @@ export class ItemService {
       // The item, and every descendant that went to the trash in the same action.
       this.db
         .prepare(
-          `UPDATE items SET deleted_at = NULL WHERE id = ? OR (deleted_at = ? AND (parent_id = ?
-             OR parent_id IN (SELECT id FROM items WHERE parent_id = ?)))`,
+          `WITH RECURSIVE tree(id) AS (
+             SELECT ? UNION ALL SELECT i.id FROM items i JOIN tree t ON i.parent_id = t.id WHERE i.deleted_at = ?
+           )
+           UPDATE items SET deleted_at = NULL WHERE id IN (SELECT id FROM tree)`,
         )
-        .run(itemId, row.deleted_at, itemId, itemId);
+        .run(itemId, row.deleted_at);
       this.activity.record(row.board_id, actor.id, 'item_restored', { name: row.name }, itemId);
       this.boards.touch(row.board_id);
     })();
@@ -485,10 +493,10 @@ export class ItemService {
     this.db.transaction(() => {
       // A copy stays next to the original (same parent), with its own sub-items.
       newIdValue = this.insertItem(actor, boardId, item.groupId, item.parentId, `${item.name} (עותק)`.slice(0, LIMITS.itemName), item.values);
-      for (const child of this.children(itemId)) {
-        const childId = this.insertItem(actor, boardId, item.groupId, newIdValue, child.name, child.values);
-        if (!item.parentId) for (const g of this.children(child.id)) this.insertItem(actor, boardId, item.groupId, childId, g.name, g.values);
-      }
+      const copyKids = (fromId: string, toId: string) => {
+        for (const child of this.children(fromId)) copyKids(child.id, this.insertItem(actor, boardId, item.groupId, toId, child.name, child.values));
+      };
+      copyKids(itemId, newIdValue);
       this.activity.record(boardId, actor.id, 'item_duplicated', { fromItemId: itemId, name: item.name }, newIdValue);
       this.boards.touch(boardId);
     })();

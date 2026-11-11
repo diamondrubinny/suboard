@@ -866,7 +866,7 @@ table.board-table {
   background: var(--primary-tint);
 }
 .board-table .col-name {
-  min-width: 260px;
+  min-width: 340px; /* room for the sub-item toggle, name, "+ sub-item" and "open" at a few nesting levels */
   position: sticky;
   inset-inline-start: 0;
   background: var(--surface);
@@ -1623,9 +1623,6 @@ th[aria-sort='descending'] .sort-ind {
 .board-table tr.sub-row th.col-name,
 .board-table tr.sub-row td {
   background: var(--surface-sunken);
-}
-.board-table tr.sub-row .name-cell {
-  padding-inline-start: var(--space-6);
 }
 .group-name-input {
   font-weight: 700;
@@ -3548,8 +3545,21 @@ kbd {
   block-size: 100%;
   background: var(--success);
 }
-.board-table tr.sub-row-2 .name-cell {
-  padding-inline-start: calc(var(--space-6) * 2);
+/* Nested sub-items: one indent step per level (--depth is set on the row). */
+.board-table tr.sub-row .name-cell {
+  padding-inline-start: calc(var(--space-5) * var(--depth, 1));
+}
+.board-table tr.add-row.sub-row .col-name {
+  padding-inline-start: calc(0.9rem + var(--space-5) * var(--depth, 1));
+}
+.add-sub-btn {
+  color: var(--ink-muted);
+  min-width: 1.9rem;
+  min-height: 1.9rem;
+  flex: none;
+}
+.add-sub-btn:hover {
+  color: var(--primary-ink);
 }
 .toolbar.subitems-all {
   margin-block-end: var(--space-2);

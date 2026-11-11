@@ -52,10 +52,34 @@ function GroupNameInput({ group, boardId, canEdit }: { group: Group; boardId: st
 }
 
 /** "+ new item" (or "+ sub-item") row; keeps focus in the input to add several in a row. */
-function AddRow({ boardId, groupId, parentId, colSpan, label, sub }: { boardId: string; groupId: string; parentId?: string; colSpan: number; label: string; sub?: boolean }) {
+function AddRow({
+  boardId,
+  groupId,
+  parentId,
+  colSpan,
+  label,
+  sub,
+  depth = 1,
+  focus = 0,
+}: {
+  boardId: string;
+  groupId: string;
+  parentId?: string;
+  colSpan: number;
+  label: string;
+  sub?: boolean;
+  /** Nesting level of the rows this input adds (for the indent). */
+  depth?: number;
+  /** Changes each time the parent's "+ sub-item" button is pressed: the input takes focus. */
+  focus?: number;
+}) {
   const create = useCreateItem(boardId);
   const { toast } = useFeedback();
   const [name, setName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (focus) inputRef.current?.focus();
+  }, [focus]);
   const submit = () => {
     const n = name.trim();
     if (!n || create.isPending) return;
@@ -65,7 +89,7 @@ function AddRow({ boardId, groupId, parentId, colSpan, label, sub }: { boardId: 
     );
   };
   return (
-    <tr className={sub ? 'add-row sub-row' : 'add-row'}>
+    <tr className={sub ? 'add-row sub-row' : 'add-row'} style={sub ? ({ ['--depth' as string]: depth } as React.CSSProperties) : undefined}>
       <td className="col-select" />
       <td className="col-name">
         <input
@@ -74,6 +98,7 @@ function AddRow({ boardId, groupId, parentId, colSpan, label, sub }: { boardId: 
           aria-label={label}
           value={name}
           maxLength={300}
+          ref={inputRef}
           disabled={create.isPending}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
@@ -230,6 +255,8 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
   const { toast } = useFeedback();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  /** Parent whose "+ sub-item" input should take focus (set by the row's + button). */
+  const [focusAdd, setFocusAdd] = useState<{ id: string; n: number } | null>(null);
   const today = todayIso();
   const hasDone = doneToggle(board) !== null;
   const hidden = new Set(config.hidden ?? []);
@@ -241,7 +268,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
   const { setValue, rename } = useUndoableUpdate(board);
   const topOf = (i: Item): string => {
     let cur = i;
-    for (let n = 0; n < MAX_DEPTH && cur.parentId; n++) cur = board.items.find((x) => x.id === cur.parentId) ?? cur;
+    for (let n = 0; n <= MAX_DEPTH && cur.parentId; n++) cur = board.items.find((x) => x.id === cur.parentId) ?? cur;
     return cur.id;
   };
   const withKids = board.items.filter((i) => depthOf(board, i) < MAX_DEPTH && board.items.some((c) => c.parentId === i.id)).map((i) => i.id);
@@ -255,7 +282,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
     const isOpen = expanded[item.id] ?? false;
     const prog = canNest ? subtaskProgress(board, item.id) : { done: 0, total: 0 };
     return (
-      <tr key={item.id} className={depth === 2 ? 'sub-row sub-row-2' : depth === 1 ? 'sub-row' : undefined}>
+      <tr key={item.id} className={depth > 0 ? 'sub-row' : undefined} style={depth > 0 ? ({ ['--depth' as string]: depth } as React.CSSProperties) : undefined} data-depth={depth}>
         <td className="col-select">
           {canEdit && (
             <input type="checkbox" checked={selected.has(item.id)} aria-label={`בחירת ${item.name}`} onChange={(e) => onSelect([item.id], e.target.checked)} />
@@ -294,6 +321,20 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
               </button>
             )}
             {canEdit ? <ItemNameInput item={item} onCommit={(n) => rename(item, n)} /> : <span className="cell-readonly">{item.name}</span>}
+            {canEdit && canNest && (
+              <button
+                type="button"
+                className="icon-btn add-sub-btn"
+                aria-label={`הוספת תת-פריט ל${item.name}`}
+                title="הוספת תת-פריט"
+                onClick={() => {
+                  setExpanded((x) => ({ ...x, [item.id]: true }));
+                  setFocusAdd((f) => ({ id: item.id, n: (f?.n ?? 0) + 1 }));
+                }}
+              >
+                <Icon name="plus" size={16} />
+              </button>
+            )}
             <button type="button" className="icon-btn" onClick={() => onOpenItem(item.id)} aria-label={`פתיחת ${item.parentId ? 'תת-הפריט' : 'הפריט'} ${item.name}`}>
               <Icon name="open" size={16} />
             </button>
@@ -321,6 +362,30 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
     );
   };
 
+  /** A row, then (when expanded) its sub-items recursively and the "+ sub-item" input. */
+  const renderTree = (item: Item, color: string, groupId: string, depth: number): React.ReactNode[] => {
+    const open = (expanded[item.id] ?? false) && depth < MAX_DEPTH;
+    return [
+      renderRow(item, color),
+      ...(open ? childrenOf(item.id).flatMap((child) => renderTree(child, color, groupId, depth + 1)) : []),
+      ...(open && canEdit
+        ? [
+            <AddRow
+              key={`add-${item.id}`}
+              boardId={board.id}
+              groupId={groupId}
+              parentId={item.id}
+              colSpan={columns.length}
+              label={`תת-פריט חדש ל${item.name}`}
+              sub
+              depth={depth + 1}
+              focus={focusAdd?.id === item.id ? focusAdd.n : 0}
+            />,
+          ]
+        : []),
+    ];
+  };
+
   return (
     <>
       {withKids.length > 0 && (
@@ -343,10 +408,9 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
         const color = PALETTE[group.color]?.bg ?? '#9AA0B4';
         const tableId = `group-table-${group.id}`;
         if (filtered && tops.length === 0) return null;
-        const groupIds = tops.flatMap((t) => [
-          t.id,
-          ...(expanded[t.id] ? childrenOf(t.id).flatMap((c) => [c.id, ...(expanded[c.id] ? childrenOf(c.id).map((g) => g.id) : [])]) : []),
-        ]);
+        // Rows currently on screen, at any depth (for "select all in the group").
+        const shownIds = (id: string): string[] => [id, ...(expanded[id] ? childrenOf(id).flatMap((c) => shownIds(c.id)) : [])];
+        const groupIds = tops.flatMap((t) => shownIds(t.id));
         const allSelected = groupIds.length > 0 && groupIds.every((id) => selected.has(id));
         return (
           <section key={group.id} className="group-section" aria-label={`קבוצה: ${group.name}`}>
@@ -387,24 +451,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                     </tr>
                   </thead>
                   <tbody>
-                    {tops.map((item) => {
-                      const open = expanded[item.id] ?? false;
-                      return [
-                        renderRow(item, color),
-                        ...(open
-                          ? childrenOf(item.id).flatMap((child) => [
-                              renderRow(child, color),
-                              ...(expanded[child.id] ? childrenOf(child.id).map((g) => renderRow(g, color)) : []),
-                              ...(expanded[child.id] && canEdit
-                                ? [<AddRow key={`add-${child.id}`} boardId={board.id} groupId={group.id} parentId={child.id} colSpan={columns.length} label={`תת-פריט חדש ל${child.name}`} sub />]
-                                : []),
-                            ])
-                          : []),
-                        ...(open && canEdit
-                          ? [<AddRow key={`add-${item.id}`} boardId={board.id} groupId={group.id} parentId={item.id} colSpan={columns.length} label={`תת-פריט חדש ל${item.name}`} sub />]
-                          : []),
-                      ];
-                    })}
+                    {tops.map((item) => renderTree(item, color, group.id, 0))}
                     {tops.length === 0 && (
                       <tr>
                         <td colSpan={columns.length + 2} className="muted" style={{ padding: 'var(--space-3)' }}>

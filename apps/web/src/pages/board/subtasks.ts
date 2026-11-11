@@ -1,15 +1,15 @@
-import { findPrimaryStatusColumn, isItemDone, type BoardDetail, type CellValue, type Column, type Item } from '@suboard/shared';
+import { findPrimaryStatusColumn, isItemDone, MAX_SUBITEM_DEPTH, type BoardDetail, type CellValue, type Column, type Item } from '@suboard/shared';
 import { errorMessage } from '../../api/client';
 import { useUpdateItem } from '../../api/hooks';
 import { useFeedback } from '../../components/Feedback';
 
-/** Maximum nesting below a top-level item (item → sub-item → sub-sub-item). */
-export const MAX_DEPTH = 2;
+/** Maximum nesting below a top-level item (item → sub-item → sub-item of a sub-item → …). */
+export const MAX_DEPTH = MAX_SUBITEM_DEPTH;
 
 export function depthOf(board: BoardDetail, item: Item): number {
   let d = 0;
   let cur: Item | undefined = item;
-  while (cur?.parentId && d < 5) {
+  while (cur?.parentId && d <= MAX_SUBITEM_DEPTH) {
     cur = board.items.find((i) => i.id === cur!.parentId);
     d++;
   }
