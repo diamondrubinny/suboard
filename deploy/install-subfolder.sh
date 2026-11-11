@@ -11,8 +11,8 @@
 #     generated secrets — only on the first run, never overwritten
 #   - systemd service listening on 127.0.0.1:3000 only (never exposed directly)
 #   - first administrator with a random one-time password, printed once
-#   - writes a reverse-proxy snippet for nginx or Apache — YOU include it in the site's config
-#     (the script never edits your existing web server configuration)
+#   - writes a reverse-proxy snippet for nginx or Apache and adds ONE include line to the HTTPS block of
+#     this domain (backup kept, config tested, rolled back on failure). SUBOARD_WIRE=0 to do it by hand.
 set -euo pipefail
 
 PUBLIC_URL="${1:-}"
@@ -149,7 +149,8 @@ cat > /etc/suboard/nginx-location.conf <<EOF
 # Include inside the existing  server { listen 443 ssl; server_name ${ORIGIN#https://}; ... }  block:
 #   include /etc/suboard/nginx-location.conf;
 location = $BASE_PATH { return 301 $BASE_PATH/; }
-location $BASE_PATH/ {
+# ^~ : regex locations of the existing site (e.g. caching *.js / *.css, PHP) must not take /test/ requests.
+location ^~ $BASE_PATH/ {
     client_max_body_size 12m;
     proxy_pass http://127.0.0.1:$PORT;
     proxy_http_version 1.1;
@@ -169,6 +170,95 @@ RequestHeader set X-Forwarded-Proto "https"
 LimitRequestBody 12582912
 EOF
 
+# ---- Connect to the existing web server automatically (SUBOARD_WIRE=0 to skip).
+# Edits only the HTTPS server block of this domain: a backup is kept, the config is tested, and the
+# change is rolled back if the test fails.
+WIRED=""
+HOST="${ORIGIN#https://}"
+wire() { # $1 = nginx|apache
+  python3 - "$1" "$HOST" <<'PY'
+import glob, os, re, sys, time
+kind, host = sys.argv[1], sys.argv[2]
+if kind == 'nginx':
+    files = glob.glob('/etc/nginx/sites-enabled/*') + glob.glob('/etc/nginx/conf.d/*.conf')
+    line = '    include /etc/suboard/nginx-location.conf;  # SUBoard'
+else:
+    files = glob.glob('/etc/apache2/sites-enabled/*.conf')
+    line = '    Include /etc/suboard/apache-location.conf  # SUBoard'
+host_re = re.compile(r'(server_name|ServerName|ServerAlias)\s[^;\n]*(?<![\w.-])' + re.escape(host) + r'(?![\w.-])')
+done = []
+for f in sorted({os.path.realpath(x) for x in files if os.path.isfile(x)}):
+    text = open(f).read()
+    if '/etc/suboard/' in text:
+        print('already:' + f); sys.exit(0)
+    lines = text.split('\n')
+    out, i, changed = [], 0, False
+    if kind == 'nginx':
+        # brace-matched "server { ... }" blocks
+        depth, start = 0, None
+        blocks = []
+        for n, l in enumerate(lines):
+            code = l.split('#', 1)[0]
+            if start is None and re.match(r'\s*server\s*\{', code) and depth == 0:
+                start = n
+            depth += code.count('{') - code.count('}')
+            if start is not None and depth == 0:
+                blocks.append((start, n)); start = None
+        for a, b in reversed(blocks):
+            body = '\n'.join(lines[a:b + 1])
+            if re.search(r'listen\s+[^;]*443', body) and host_re.search(body):
+                lines.insert(b, line); changed = True
+                break
+    else:
+        start = None
+        for n, l in enumerate(lines):
+            if re.match(r'\s*<VirtualHost\s+[^>]*:443\s*>', l): start = n
+            if start is not None and re.match(r'\s*</VirtualHost>', l):
+                body = '\n'.join(lines[start:n])
+                if host_re.search(body):
+                    lines.insert(n, line); changed = True
+                    break
+                start = None
+    if changed:
+        # Backups outside the web server's include folders (a copy in sites-enabled would be loaded).
+        os.makedirs('/etc/suboard/backups', exist_ok=True)
+        bak = '/etc/suboard/backups/' + os.path.basename(f) + '.' + time.strftime('%Y%m%d%H%M%S')
+        open(bak, 'w').write(text)
+        open(f, 'w').write('\n'.join(lines))
+        print('wired:' + f + '|' + bak); sys.exit(0)
+print('notfound:'); sys.exit(0)
+PY
+}
+if [ "${SUBOARD_WIRE:-1}" = "1" ]; then
+  if command -v nginx >/dev/null && systemctl is-active --quiet nginx; then
+    R="$(wire nginx)"
+    case "$R" in
+      wired:*) F="${R#wired:}"; FILE="${F%%|*}"; BAK="${F#*|}"
+        if nginx -t 2>/dev/null; then systemctl reload nginx; WIRED="nginx ($FILE; backup $BAK)"
+        else cp "$BAK" "$FILE"; echo "WARN: nginx test failed — change rolled back ($FILE)"; fi ;;
+      already:*) systemctl reload nginx; WIRED="nginx (already connected)" ;;
+      *) echo "WARN: no HTTPS server block for $HOST found in /etc/nginx — connect it by hand (below)" ;;
+    esac
+  elif command -v apache2ctl >/dev/null && systemctl is-active --quiet apache2; then
+    a2enmod proxy proxy_http headers >/dev/null
+    R="$(wire apache)"
+    case "$R" in
+      wired:*) F="${R#wired:}"; FILE="${F%%|*}"; BAK="${F#*|}"
+        if apache2ctl configtest 2>/dev/null; then systemctl reload apache2; WIRED="Apache ($FILE; backup $BAK)"
+        else cp "$BAK" "$FILE"; echo "WARN: Apache test failed — change rolled back ($FILE)"; fi ;;
+      already:*) systemctl reload apache2; WIRED="Apache (already connected)" ;;
+      *) echo "WARN: no <VirtualHost *:443> for $HOST found in /etc/apache2 — connect it by hand (below)" ;;
+    esac
+  fi
+fi
+if [ -n "$WIRED" ] && curl -fsk --resolve "$HOST:443:127.0.0.1" "https://$HOST$BASE_PATH/api/auth/sso/config" | grep -q '"localLogin"'; then
+  cat <<EOF
+
+============================================================
+DONE — connected through $WIRED.
+Open: $PUBLIC_URL/
+EOF
+else
 cat <<EOF
 
 ============================================================
@@ -182,6 +272,7 @@ Last step — connect it to $PUBLIC_URL in your existing web server:
 
 Then open: $PUBLIC_URL/
 EOF
+fi
 if [ -n "$ADMIN_PW" ]; then
 cat <<EOF
 Administrator : $ADMIN_EMAIL
