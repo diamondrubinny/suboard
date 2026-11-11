@@ -24,7 +24,6 @@ import { InvestigationService } from './investigations.js';
 import { LinkService } from './links.js';
 import { AnalyticsService } from './analytics.js';
 import { TrainingService } from './trainings.js';
-import { PermitService } from './permits.js';
 import { PlanService, ProcedureService } from './procedures.js';
 import { SsoService } from './sso.js';
 import { FavoriteService } from './favorites.js';
@@ -64,7 +63,6 @@ export interface Services {
   dependencies: DependencyService;
   monthly: MonthlyReportJob;
   trainings: TrainingService;
-  permits: PermitService;
   procedures: ProcedureService;
   plans: PlanService;
   sso: SsoService;
@@ -117,7 +115,6 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const dependencies = new DependencyService(db, access, boards, activity);
   const monthly = new MonthlyReportJob(db, config, analytics, notifications);
   const trainings = new TrainingService(db, config, audit, notifications);
-  const permits = new PermitService(db, notifications);
   const procedures = new ProcedureService(db, notifications);
   const plans = new PlanService(db, access);
   const sso = new SsoService(db, config, auth, audit);
@@ -128,6 +125,6 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const passwordReset = new PasswordResetService(db, config, audit, auth, mailer);
   return {
     audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
-    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, permits, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset,
+    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset,
   };
 }

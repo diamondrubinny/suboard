@@ -39,7 +39,6 @@ const KIND_TEXT: Record<NotificationKind, string> = {
   effectiveness: 'בדיקת אפקטיביות',
   monthly: 'מבט מנהל חודשי',
   training: 'הדרכה',
-  permit: 'היתר עבודה',
   procedure: 'נוהל',
   followed: 'פריט במעקב',
   reply: 'תשובה לעדכון',
@@ -126,11 +125,11 @@ export class NotificationService {
   }
 
   /**
-   * Notification for a module outside boards (trainings, permits, procedures). `detail` carries the
+   * Notification for a module outside boards (trainings, procedures). `detail` carries the
    * target id the UI links to; `href` is the in-app path used in the e-mail. Optional `dedupeKey`
    * makes it once-only (same user, kind and key).
    */
-  onModule(userId: string, kind: 'training' | 'permit' | 'procedure', title: string, detail: string, text: string, href: string, dedupeKey?: string): boolean {
+  onModule(userId: string, kind: 'training' | 'procedure', title: string, detail: string, text: string, href: string, dedupeKey?: string): boolean {
     if (dedupeKey && this.db.prepare('SELECT 1 FROM notifications WHERE user_id = ? AND kind = ? AND day = ?').get(userId, kind, dedupeKey)) return false;
     const id = newId();
     this.db

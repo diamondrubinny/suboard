@@ -1,4 +1,4 @@
-import type { BoardRole, CauseCategory, ColorKey, ColumnType, GlobalRole, PermitType, Reaction } from './constants.js';
+import type { BoardRole, CauseCategory, ColorKey, ColumnType, GlobalRole, Reaction } from './constants.js';
 import type { ColumnSettings, ComplianceSettings, Widget, RecurrenceSchedule, RuleAction, RuleCondition, RuleTrigger } from './schemas.js';
 
 /** API data-transfer objects (JSON shapes returned by the server). */
@@ -203,7 +203,7 @@ export interface MfaSetup {
   qrSvg: string;
 }
 
-export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly' | 'training' | 'permit' | 'procedure' | 'followed' | 'reply';
+export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly' | 'training' | 'procedure' | 'followed' | 'reply';
 
 export interface AppNotification {
   id: string;
@@ -549,50 +549,6 @@ export interface MyTraining {
   training: Training;
   cell: TrainingCell;
   history: { id: string; completedOn: string; note: string }[];
-}
-
-export type PermitStatus = 'pending' | 'approved' | 'rejected' | 'cancelled' | 'closed' | 'expired';
-export interface PermitApproval {
-  order: number;
-  userId: string;
-  userName: string;
-  decision: 'approved' | 'rejected' | null;
-  comment: string;
-  decidedAt: string | null;
-}
-export interface PermitConflict {
-  permitId: string;
-  number: string;
-  title: string;
-  type: PermitType;
-  startsAt: string;
-  endsAt: string;
-  status: PermitStatus;
-  severity: 'warn' | 'block';
-}
-export interface Permit {
-  id: string;
-  number: string;
-  type: PermitType;
-  title: string;
-  location: string;
-  description: string;
-  contractor: string;
-  startsAt: string;
-  endsAt: string;
-  status: PermitStatus;
-  /** Approved and inside its time window right now. */
-  active: boolean;
-  requesterId: string;
-  requesterName: string;
-  precautions: string[];
-  conflictNote: string;
-  approvals: PermitApproval[];
-  /** Whose turn it is to approve (null when not pending). */
-  nextApproverId: string | null;
-  events: { at: string; userName: string | null; action: string; comment: string }[];
-  conflicts: PermitConflict[];
-  createdAt: string;
 }
 
 export interface ProcedureVersion {

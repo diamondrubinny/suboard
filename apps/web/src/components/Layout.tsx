@@ -153,11 +153,6 @@ export function Layout() {
                 </li>
               )}
               <li>
-                <NavLink to="/permits" className="nav-link">
-                  <Icon name="lock" /> היתרי עבודה
-                </NavLink>
-              </li>
-              <li>
                 <NavLink to={user.role === 'member' ? '/trainings/me' : '/trainings'} className="nav-link">
                   <Icon name="school" /> הדרכות
                 </NavLink>

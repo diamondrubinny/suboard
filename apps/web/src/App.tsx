@@ -27,6 +27,7 @@ const FormsAdminPage = lazy(() => import('./pages/field/FormPages').then((m) => 
 const ForgotPasswordPage = lazy(() => import('./pages/PasswordResetPages').then((m) => ({ default: m.ForgotPasswordPage })));
 const ResetPasswordPage = lazy(() => import('./pages/PasswordResetPages').then((m) => ({ default: m.ResetPasswordPage })));
 const MyWorkPage = lazy(() => import('./pages/MyWorkPage').then((m) => ({ default: m.MyWorkPage })));
+const FormBuilderPage = lazy(() => import('./pages/field/FormBuilderPage').then((m) => ({ default: m.FormBuilderPage })));
 const FilesPage = lazy(() => import('./pages/board/FilesPage').then((m) => ({ default: m.FilesPage })));
 const DashboardsPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.DashboardsPage })));
 const CustomDashboardPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.CustomDashboardPage })));
@@ -34,9 +35,6 @@ const WorkloadPage = lazy(() => import('./pages/dashboards/ReportPages').then((m
 const MonthlyReportPage = lazy(() => import('./pages/dashboards/ReportPages').then((m) => ({ default: m.MonthlyReportPage })));
 const TrainingsPage = lazy(() => import('./pages/modules/TrainingPages').then((m) => ({ default: m.TrainingsPage })));
 const MyTrainingsPage = lazy(() => import('./pages/modules/TrainingPages').then((m) => ({ default: m.MyTrainingsPage })));
-const PermitsPage = lazy(() => import('./pages/modules/PermitPages').then((m) => ({ default: m.PermitsPage })));
-const PermitNewPage = lazy(() => import('./pages/modules/PermitPages').then((m) => ({ default: m.PermitNewPage })));
-const PermitDetailPage = lazy(() => import('./pages/modules/PermitPages').then((m) => ({ default: m.PermitDetailPage })));
 const ProceduresPage = lazy(() => import('./pages/modules/ProcedurePages').then((m) => ({ default: m.ProceduresPage })));
 const ProcedurePage = lazy(() => import('./pages/modules/ProcedurePages').then((m) => ({ default: m.ProcedurePage })));
 const FloorPlansPage = lazy(() => import('./pages/modules/FloorPlanPage').then((m) => ({ default: m.FloorPlansPage })));
@@ -93,9 +91,6 @@ export function App() {
                   <Route path="workload" element={lazyPage(<WorkloadPage />)} />
                   <Route path="trainings" element={lazyPage(<TrainingsPage />)} />
                   <Route path="trainings/me" element={lazyPage(<MyTrainingsPage />)} />
-                  <Route path="permits" element={lazyPage(<PermitsPage />)} />
-                  <Route path="permits/new" element={lazyPage(<PermitNewPage />)} />
-                  <Route path="permits/:permitId" element={lazyPage(<PermitDetailPage />)} />
                   <Route path="procedures" element={lazyPage(<ProceduresPage />)} />
                   <Route path="procedures/:procedureId" element={lazyPage(<ProcedurePage />)} />
                   <Route path="boards/:boardId/plans" element={lazyPage(<FloorPlansPage />)} />
@@ -103,6 +98,7 @@ export function App() {
                   <Route path="boards/:boardId/plans/:attachmentId" element={lazyPage(<FloorPlanPage />)} />
                   <Route path="reports/monthly" element={lazyPage(<MonthlyReportPage />)} />
                   <Route path="forms" element={lazyPage(<FormsPage />)} />
+                  <Route path="forms/new" element={lazyPage(<FormBuilderPage />)} />
                   <Route path="forms/:formId" element={lazyPage(<FormFillPage />)} />
                   <Route path="profile" element={<ProfilePage />} />
                   <Route element={<RequireAuth admin />}>

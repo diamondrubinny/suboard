@@ -12,7 +12,6 @@ const TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
   mentioned: (n) => `${n.actorName ?? 'מישהו'} הזכיר/ה אותך ב"${n.title}"`,
   automation: (n) => `${n.detail ?? 'אוטומציה'}: "${n.title}"`,
   training: (n) => (n.detail === 'expired' ? `תוקף ההדרכה "${n.title}" פג` : `ההדרכה "${n.title}" פגה בקרוב`),
-  permit: (n) => `היתר עבודה ${n.title} — עודכן`,
   procedure: (n) => `נוהל ${n.title} — נדרש אישור קריאה`,
   monthly: (n) => `${n.title} מוכן`,
   effectiveness: (n) => `הגיע מועד בדיקת אפקטיביות: "${n.title}"`,
@@ -33,8 +32,6 @@ function notifLink(n: AppNotification): string | null {
       return `/reports/monthly?month=${n.detail ?? ''}`;
     case 'training':
       return '/trainings/me';
-    case 'permit':
-      return n.detail ? `/permits/${n.detail}` : '/permits';
     case 'procedure':
       return n.detail ? `/procedures/${n.detail}` : '/procedures';
     case 'report':

@@ -1,5 +1,8 @@
 import {
+  COLOR_KEYS,
   FORM_FIELD_TYPES,
+  QUESTION_TYPES,
+  quickFormSchema,
   findPrimaryStatusColumn,
   formatAutoId,
   isItemDone,
@@ -14,7 +17,10 @@ import {
 } from '@suboard/shared';
 import { nowIso, parseJson, type DB } from '../db/index.js';
 import { newId } from '../lib/crypto.js';
-import { badRequest, notFound } from '../lib/errors.js';
+import type { z } from 'zod';
+import { badRequest, forbidden, notFound } from '../lib/errors.js';
+
+type QuickFormOutput = z.output<typeof quickFormSchema>;
 import type { AccessService, Actor } from './access.js';
 import type { ActivityService } from './activity.js';
 import type { AttachmentService } from './attachments.js';
@@ -128,6 +134,41 @@ export class FormService {
       .run(id, boardId, name, JSON.stringify(config), enabled ? 1 : 0, actor.id, ts, ts);
     this.activity.record(boardId, actor.id, 'form_created', { name });
     return this.row(id);
+  }
+
+  /**
+   * Form builder: one action creates a responses board (a column per question, plus the blank
+   * template's status / owner / due columns for handling), and the form itself, open to every
+   * signed-in user. Rolled back as a whole if any part fails.
+   */
+  createQuick(actor: Actor, input: QuickFormOutput): { form: BoardForm; boardId: string } {
+    if (actor.role === 'member') throw forbidden('רק מנהלים יכולים ליצור טפסים חדשים');
+    let out: { form: BoardForm; boardId: string } | null = null;
+    this.db.transaction(() => {
+      const board = this.boards.create(actor, { name: input.name, description: input.description, templateKey: 'blank' });
+      const fields: FormField[] = [];
+      input.questions.forEach((q, qi) => {
+        const type = QUESTION_TYPES[q.type];
+        const settings =
+          type === 'status' || type === 'tags'
+            ? { options: (q.options ?? []).map((label, i) => ({ id: `o${qi}_${i}`, label, color: COLOR_KEYS[i % COLOR_KEYS.length]! })) }
+            : undefined;
+        const col = this.boards.createColumn(actor, board.id, { title: q.title, type, ...(settings ? { settings } : {}) });
+        fields.push({ columnId: col.id, required: q.required, ...(q.help ? { help: q.help } : {}) });
+      });
+      const form = this.create(actor, board.id, {
+        name: input.name,
+        description: input.description,
+        groupId: board.groups[0]!.id,
+        nameLabel: input.nameLabel,
+        fields,
+        audience: 'all_users',
+        allowPhotos: input.allowPhotos,
+        enabled: true,
+      });
+      out = { form, boardId: board.id };
+    })();
+    return out!;
   }
 
   update(actor: Actor, id: string, patch: Partial<FormInput>): BoardForm {

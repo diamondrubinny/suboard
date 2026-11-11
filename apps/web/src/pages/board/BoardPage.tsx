@@ -156,6 +156,11 @@ export function BoardPage() {
           <Link to={`/boards/${b.id}/qr`} className="btn btn-ghost">
             <Icon name="grid" /> מדבקות QR
           </Link>
+          {b.myRole === 'owner' && (
+            <Link to={`/boards/${b.id}/forms`} className="btn">
+              <Icon name="clipboard" /> טפסים
+            </Link>
+          )}
           <Link to={`/boards/${b.id}/automations`} className="btn">
             <Icon name="bolt" /> אוטומציות
           </Link>

@@ -1,10 +1,7 @@
 import {
-  createPermitSchema,
   createProcedureSchema,
   createTrainingSchema,
   idSchema,
-  permitActionSchema,
-  permitCheckSchema,
   pinsSchema,
   procedureVersionSchema,
   trainingRecordSchema,
@@ -12,18 +9,16 @@ import {
   updateProcedureSchema,
   updateTrainingSchema,
 } from '@suboard/shared';
-import { z } from 'zod';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { contentDisposition } from '../lib/filetype.js';
 import { actorOf } from '../plugins/auth.js';
 import type { Services } from '../services/index.js';
 
 const param = (req: FastifyRequest, name: string): string => idSchema.parse((req.params as Record<string, string>)[name]);
-const scopeQuery = z.object({ scope: z.enum(['mine', 'approvals', 'all']).default('all') });
 
-/** Wave E routes: trainings, work permits, procedures, floor-plan pins. */
+/** Wave E routes: trainings, procedures, floor-plan pins. */
 export async function moduleRoutes(app: FastifyInstance, { services }: { services: Services }) {
-  const { trainings, permits, procedures, plans } = services;
+  const { trainings, procedures, plans } = services;
   const writes = { config: { rateLimit: { max: 60, timeWindow: 60_000 } } };
 
   // ---- trainings (managers; everyone: their own)
@@ -48,16 +43,6 @@ export async function moduleRoutes(app: FastifyInstance, { services }: { service
       .send(trainings.matrixCsv(actorOf(req), req.ip)),
   );
   app.get('/me/trainings', async (req) => ({ trainings: trainings.mine(actorOf(req)) }));
-
-  // ---- work permits
-  app.get('/permits', async (req) => ({ permits: permits.list(actorOf(req), scopeQuery.parse(req.query).scope) }));
-  app.post('/permits/check', async (req) => ({ conflicts: permits.check(actorOf(req), permitCheckSchema.parse(req.body)) }));
-  app.post('/permits', writes, async (req, reply) => reply.code(201).send({ permit: permits.create(actorOf(req), createPermitSchema.parse(req.body)) }));
-  app.get('/permits/:id', async (req) => ({ permit: permits.get(actorOf(req), param(req, 'id')) }));
-  app.post('/permits/:id/approve', writes, async (req) => ({ permit: permits.decide(actorOf(req), param(req, 'id'), 'approved', permitActionSchema.parse(req.body).comment) }));
-  app.post('/permits/:id/reject', writes, async (req) => ({ permit: permits.decide(actorOf(req), param(req, 'id'), 'rejected', permitActionSchema.parse(req.body).comment) }));
-  app.post('/permits/:id/close', writes, async (req) => ({ permit: permits.finish(actorOf(req), param(req, 'id'), 'closed', permitActionSchema.parse(req.body).comment) }));
-  app.post('/permits/:id/cancel', writes, async (req) => ({ permit: permits.finish(actorOf(req), param(req, 'id'), 'cancelled', permitActionSchema.parse(req.body).comment) }));
 
   // ---- procedures
   app.get('/procedures', async (req) => ({ procedures: procedures.list(actorOf(req)) }));

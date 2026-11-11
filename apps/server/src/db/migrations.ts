@@ -558,4 +558,15 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE INDEX idx_password_resets_user ON password_resets(user_id, created_at);
     `,
   },
+  {
+    version: 12,
+    name: 'remove_work_permits',
+    sql: /* sql */ `
+      -- The work-permits module was removed (owner's decision, 11/11/2026). Its data goes with it.
+      DROP TABLE IF EXISTS permit_events;
+      DROP TABLE IF EXISTS permit_approvals;
+      DROP TABLE IF EXISTS permits;
+      DELETE FROM notifications WHERE kind = 'permit';
+    `,
+  },
 ];

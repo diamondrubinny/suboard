@@ -251,50 +251,6 @@ export const TEMPLATES: TemplateDef[] = [
     ],
   },
   {
-    key: 'permits',
-    name: 'היתרי עבודה',
-    description: 'עבודה בחום, בגובה, במקום מוקף ועבודות קבלנים.',
-    icon: 'badge',
-    groups: [
-      { name: 'בקשות', color: 'amber' },
-      { name: 'פעילים', color: 'blue' },
-      { name: 'סגורים', color: 'gray' },
-    ],
-    columns: [
-      {
-        title: 'סטטוס',
-        type: 'status',
-        settings: {
-          options: [
-            opt('pending', 'ממתין לאישור', 'amber'),
-            opt('approved', 'מאושר', 'blue'),
-            opt('active', 'פעיל', 'teal'),
-            opt('closed', 'נסגר', 'green', true),
-            opt('rejected', 'נדחה', 'red', true),
-          ],
-        },
-      },
-      {
-        title: 'סוג היתר',
-        type: 'status',
-        settings: {
-          options: [
-            opt('hot', 'עבודה בחום', 'red'),
-            opt('height', 'עבודה בגובה', 'navy'),
-            opt('confined', 'מקום מוקף', 'purple'),
-            opt('electrical', 'חשמל', 'amber'),
-            opt('contractor', 'קבלן כללי', 'gray'),
-          ],
-        },
-      },
-      { title: 'מבצע / קבלן', type: 'text' },
-      { title: 'מאשר', type: 'person' },
-      { title: 'מתאריך', type: 'date' },
-      { title: 'עד תאריך', type: 'date', settings: { role: 'due' } },
-      { title: 'אמצעי בטיחות נדרשים', type: 'long_text' },
-    ],
-  },
-  {
     key: 'hazmat',
     name: 'מלאי חומרים מסוכנים',
     description: 'מלאי חומ"ס לכל מעבדה: כמויות, סיווגי GHS, תפוגה וסקירת גיליונות בטיחות (SDS).',

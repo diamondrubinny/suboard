@@ -1,4 +1,5 @@
 import type {
+  QuickFormInput,
   MyWorkItem,
   CustomTemplate,
   ActiveSession,
@@ -6,10 +7,7 @@ import type {
   FollowState,
   Reaction,
   RecentBoard,
-  CreatePermitInput,
   MyTraining,
-  Permit,
-  PermitConflict,
   PlanPin,
   Procedure,
   ProcedureAckReport,
@@ -111,8 +109,6 @@ export const qk = {
   trainings: ['trainings'] as const,
   trainingMatrix: ['training-matrix'] as const,
   myTrainings: ['my-trainings'] as const,
-  permits: (scope: string) => ['permits', scope] as const,
-  permit: (id: string) => ['permit', id] as const,
   procedures: ['procedures'] as const,
   procedure: (id: string) => ['procedure', id] as const,
   procedureAcks: (id: string) => ['procedure-acks', id] as const,
@@ -758,29 +754,6 @@ export function useTrainingMutations() {
   };
 }
 
-export const usePermits = (scope: 'mine' | 'approvals' | 'all') =>
-  useQuery({ queryKey: qk.permits(scope), queryFn: () => api<{ permits: Permit[] }>(`/permits?scope=${scope}`).then((r) => r.permits) });
-export const usePermit = (id: string) => useQuery({ queryKey: qk.permit(id), queryFn: () => api<{ permit: Permit }>(`/permits/${id}`).then((r) => r.permit), retry: false });
-
-export function usePermitMutations() {
-  const qc = useQueryClient();
-  const done = (p: Permit) => {
-    qc.setQueryData(qk.permit(p.id), p);
-    void qc.invalidateQueries({ queryKey: ['permits'] });
-    void qc.invalidateQueries({ queryKey: qk.notifications });
-  };
-  const act = (action: 'approve' | 'reject' | 'close' | 'cancel') =>
-    useMutation({ mutationFn: ({ id, comment }: { id: string; comment?: string }) => api<{ permit: Permit }>(`/permits/${id}/${action}`, 'POST', { comment: comment ?? '' }).then((r) => r.permit), onSuccess: done });
-  return {
-    create: useMutation({ mutationFn: (input: CreatePermitInput) => api<{ permit: Permit }>('/permits', 'POST', input).then((r) => r.permit), onSuccess: done }),
-    check: useMutation({ mutationFn: (input: { location: string; type: string; startsAt: string; endsAt: string }) => api<{ conflicts: PermitConflict[] }>('/permits/check', 'POST', input).then((r) => r.conflicts) }),
-    approve: act('approve'),
-    reject: act('reject'),
-    close: act('close'),
-    cancel: act('cancel'),
-  };
-}
-
 export const useProcedures = () => useQuery({ queryKey: qk.procedures, queryFn: () => api<{ procedures: Procedure[] }>('/procedures').then((r) => r.procedures) });
 export const useProcedure = (id: string) => useQuery({ queryKey: qk.procedure(id), queryFn: () => api<{ procedure: Procedure }>(`/procedures/${id}`).then((r) => r.procedure), retry: false });
 export const useProcedureAcks = (id: string, enabled: boolean) =>
@@ -875,6 +848,19 @@ export function useCompleteWork() {
       void qc.invalidateQueries({ queryKey: qk.myWork });
       void qc.invalidateQueries({ queryKey: qk.board(v.boardId) });
       void qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
+  });
+}
+
+// ------------------------------------------------------------------ wave K
+/** Form builder: creates the responses board and the form in one call. */
+export function useQuickForm() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: QuickFormInput) => api<{ form: BoardForm; boardId: string }>('/forms/quick', 'POST', input),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.forms });
+      void qc.invalidateQueries({ queryKey: qk.boards });
     },
   });
 }

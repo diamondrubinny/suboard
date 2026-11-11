@@ -42,7 +42,6 @@ async function main() {
     ['effectiveness checks', () => app.services.investigations.runDue()],
     ['monthly management report', () => app.services.monthly.run()],
     ['training reminders', () => app.services.trainings.runReminders()],
-    ['permit expiry', () => app.services.permits.expireDue()],
     ['rescan uploads', () => app.services.attachments.rescanPending()],
   ];
   const frequent = async () => {

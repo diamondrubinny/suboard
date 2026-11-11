@@ -1,6 +1,10 @@
 import { appLink } from '../../api/base';
 import {
   createFormSchema,
+  findPrimaryStatusColumn,
+  QUESTION_TYPE_LABELS,
+  QUESTION_TYPES,
+  type QuestionType,
   FORM_FIELD_TYPES,
   formatDateHe,
   LIMITS,
@@ -14,7 +18,7 @@ import {
 import { useId, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../../api/client';
-import { useAvailableForms, useBoard, useBoardForms, useFormForFill, useFormMutations, useMySubmissions, useSubmitForm } from '../../api/hooks';
+import { useAvailableForms, useBoard, useBoardForms, useColumnMutations, useFormForFill, useFormMutations, useMySubmissions, useSubmitForm } from '../../api/hooks';
 import { CameraButton } from '../../components/CameraButton';
 import { CellEditor } from '../../components/cells/CellEditor';
 import { Dialog } from '../../components/Dialog';
@@ -22,6 +26,11 @@ import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback
 import { Icon } from '../../components/Icon';
 import { usePageTitle } from '../../components/Layout';
 import { StatusPill } from '../../components/StatusPill';
+import { useAuth } from '../../auth/AuthContext';
+import { ShareFormDialog } from './ShareFormDialog';
+
+/** Question kinds that need no options editor (choice questions are edited in the board's column settings). */
+const SIMPLE_QUESTIONS: QuestionType[] = ['text', 'long_text', 'number', 'date', 'yes_no', 'rating', 'email', 'phone', 'link'];
 
 // ---------------------------------------------------------------- management
 export function FormsAdminPage() {
@@ -31,6 +40,8 @@ export function FormsAdminPage() {
   const { update, remove } = useFormMutations(boardId);
   const { toast, confirm } = useFeedback();
   const [editing, setEditing] = useState<BoardForm | 'new' | null>(null);
+  const [sharing, setSharing] = useState<{ form: BoardForm; created: boolean } | null>(null);
+  const { create } = useFormMutations(boardId);
   usePageTitle(`טפסים — ${board.data?.name ?? 'לוח'}`);
   if (board.isPending) return <LoadingState />;
   if (board.isError) return <ErrorState message={errorMessage(board.error)} onRetry={() => board.refetch()} />;
@@ -54,8 +65,23 @@ export function FormsAdminPage() {
           </p>
         </div>
         <div className="actions">
-          <button type="button" className="btn btn-primary" onClick={() => setEditing('new')}>
-            <Icon name="plus" /> טופס חדש
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={create.isPending}
+            title="טופס עם כל השדות המתאימים בלוח, פתוח לכל המשתמשים המחוברים — מוכן לשיתוף מיד"
+            onClick={() => {
+              const fields = b.columns.filter((c) => (FORM_FIELD_TYPES as readonly string[]).includes(c.type) && c.id !== findPrimaryStatusColumn(b.columns)?.id).slice(0, LIMITS.formFields);
+              create.mutate(
+                { name: `דיווח — ${b.name}`.slice(0, 80), description: '', groupId: b.groups[0]!.id, nameLabel: 'נושא', fields: fields.map((c) => ({ columnId: c.id, required: false })), audience: 'all_users', allowPhotos: true, enabled: true },
+                { onSuccess: (form) => setSharing({ form, created: true }), onError: (err) => toast(errorMessage(err), 'error') },
+              );
+            }}
+          >
+            <Icon name="bolt" /> טופס בקליק
+          </button>
+          <button type="button" className="btn" onClick={() => setEditing('new')}>
+            <Icon name="plus" /> טופס מותאם
           </button>
           <Link to={`/boards/${b.id}/settings`} className="btn">
             חזרה להגדרות
@@ -90,6 +116,9 @@ export function FormsAdminPage() {
               <Link className="btn btn-sm" to={`/forms/${f.id}`}>
                 תצוגה ומילוי<span className="sr-only"> של {f.name}</span>
               </Link>
+              <button type="button" className="btn btn-sm btn-primary" onClick={() => setSharing({ form: f, created: false })}>
+                שיתוף וקוד QR<span className="sr-only"> של {f.name}</span>
+              </button>
               <button type="button" className="btn btn-sm" onClick={() => setEditing(f)}>
                 עריכה<span className="sr-only"> של {f.name}</span>
               </button>
@@ -109,6 +138,13 @@ export function FormsAdminPage() {
         ))}
       </ul>
       {editing && <FormEditor key={editing === 'new' ? 'new' : editing.id} board={b} form={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      <ShareFormDialog form={sharing?.form ?? null} created={sharing?.created} onClose={() => setSharing(null)}>
+        {sharing?.created && (
+          <button type="button" className="btn" onClick={() => (setEditing(sharing.form), setSharing(null))}>
+            עריכת השדות
+          </button>
+        )}
+      </ShareFormDialog>
     </>
   );
 }
@@ -124,6 +160,8 @@ function FormEditor({ board, form, onClose }: { board: BoardDetail; form: BoardF
   const [allowPhotos, setAllowPhotos] = useState(form?.allowPhotos ?? false);
   const [fields, setFields] = useState<FormField[]>(form?.fields ?? []);
   const [error, setError] = useState<string | null>(null);
+  const columns = useColumnMutations(board.id);
+  const [newQ, setNewQ] = useState<{ title: string; type: QuestionType }>({ title: '', type: 'text' });
   const ids = { n: useId(), d: useId(), g: useId(), nl: useId() };
   const allowed: readonly ColumnType[] = audience === 'all_users' ? FORM_FIELD_TYPES : MEMBER_FORM_FIELD_TYPES;
   const pending = create.isPending || update.isPending;
@@ -195,6 +233,14 @@ function FormEditor({ board, form, onClose }: { board: BoardDetail; form: BoardF
           <legend>
             <span className="rule-kw">שדות</span>
           </legend>
+          <div className="toolbar">
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFields(board.columns.filter((c) => allowed.includes(c.type)).map((c) => fields.find((f) => f.columnId === c.id) ?? { columnId: c.id, required: false }))}>
+              בחירת כל השדות
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setFields([])} disabled={fields.length === 0}>
+              ניקוי
+            </button>
+          </div>
           {board.columns.map((c) => {
             const ok = allowed.includes(c.type);
             const f = fields.find((x) => x.columnId === c.id);
@@ -217,6 +263,36 @@ function FormEditor({ board, form, onClose }: { board: BoardDetail; form: BoardF
             );
           })}
         </fieldset>
+        <form
+          className="new-question"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const title = newQ.title.trim();
+            if (!title) return;
+            columns.create.mutate(
+              { title, type: QUESTION_TYPES[newQ.type] },
+              { onSuccess: (col) => (setFields((f) => [...f, { columnId: col.id, required: false }]), setNewQ({ title: '', type: 'text' }), toast(`השאלה "${title}" נוספה לטופס וכעמודה בלוח`)), onError: (err) => setError(errorMessage(err)) },
+            );
+          }}
+        >
+          <div className="field grow">
+            <label htmlFor="nq-title">שאלה חדשה (תיווצר גם עמודה בלוח)</label>
+            <input id="nq-title" className="input" maxLength={LIMITS.columnTitle} value={newQ.title} onChange={(e) => setNewQ({ ...newQ, title: e.target.value })} />
+          </div>
+          <div className="field">
+            <label htmlFor="nq-type">סוג תשובה</label>
+            <select id="nq-type" className="select" value={newQ.type} onChange={(e) => setNewQ({ ...newQ, type: e.target.value as QuestionType })}>
+              {SIMPLE_QUESTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {QUESTION_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button type="submit" className="btn" disabled={!newQ.title.trim() || columns.create.isPending}>
+            <Icon name="plus" size={16} /> הוספת שאלה
+          </button>
+        </form>
         <label className="check">
           <input type="checkbox" checked={allowPhotos} onChange={(e) => setAllowPhotos(e.target.checked)} /> לאפשר צירוף עד {LIMITS.formPhotos} תמונות (נסרקות לאיתור נוזקות)
         </label>
@@ -233,6 +309,7 @@ function FormEditor({ board, form, onClose }: { board: BoardDetail; form: BoardF
 // ---------------------------------------------------------------- list + my submissions
 export function FormsPage() {
   usePageTitle('טפסים ודיווחים');
+  const { user } = useAuth();
   const forms = useAvailableForms();
   const mine = useMySubmissions();
   return (
@@ -244,6 +321,13 @@ export function FormsPage() {
             דיווח מהיר ליחידת הבטיחות. אין להזין מידע רפואי או פרטים מזהים של נפגעים.
           </p>
         </div>
+        {user && user.role !== 'member' && (
+          <div className="actions">
+            <Link to="/forms/new" className="btn btn-primary">
+              <Icon name="plus" /> טופס חדש
+            </Link>
+          </div>
+        )}
       </div>
       <section aria-labelledby="forms-avail" className="card">
         <h2 id="forms-avail">טפסים זמינים</h2>

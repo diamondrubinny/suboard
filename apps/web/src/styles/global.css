@@ -2979,7 +2979,7 @@ td.today .cal-num {
 }
 
 /* ==========================================================================
-   Wave E: training matrix, work permits, procedures, floor plans
+   Wave E: training matrix, procedures, floor plans
    ========================================================================== */
 
 /* ---------- trainings: state in words, tint as a second cue ---------- */
@@ -3043,82 +3043,6 @@ td.today .cal-num {
   font-size: 0.7rem;
   font-weight: 500;
   color: var(--ink-muted);
-}
-
-/* ---------- permits ---------- */
-.permit-card.permit-active {
-  border-inline-start-color: var(--success);
-}
-.permit-card.permit-pending {
-  border-inline-start-color: var(--hue-sun);
-}
-.permit-card.permit-rejected,
-.permit-card.permit-expired,
-.permit-card.permit-cancelled {
-  border-inline-start-color: var(--line-strong);
-}
-.badge.permit-active {
-  background: var(--success);
-  color: var(--on-primary);
-  font-weight: 700;
-}
-.conflict-warn {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  border-inline-start: 4px solid var(--hue-sun);
-  background: var(--warning-tint);
-  margin: 0 0 var(--space-3);
-}
-.conflict-warn ul,
-.form-error ul {
-  margin: var(--space-1) 0 0;
-  padding-inline-start: 1.25rem;
-}
-.approver-list {
-  margin: 0;
-  padding-inline-start: 1.25rem;
-  display: grid;
-  gap: var(--space-1);
-}
-.approver-list li > span {
-  margin-inline-end: var(--space-2);
-}
-.approval-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--space-2);
-}
-.approval-step {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  border-inline-start: 4px solid var(--line-strong);
-  background: var(--surface-sunken);
-}
-.approval-step.approved {
-  border-inline-start-color: var(--success);
-  background: var(--success-tint);
-}
-.approval-step.rejected {
-  border-inline-start-color: var(--danger);
-  background: var(--danger-tint);
-}
-.approval-step.current {
-  border-inline-start-color: var(--primary);
-  background: var(--primary-tint);
-  font-weight: 600;
-}
-.precautions {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--space-1);
-}
-.precautions svg {
-  color: var(--success);
-  vertical-align: -0.15em;
 }
 
 /* ---------- procedures ---------- */
@@ -3220,9 +3144,6 @@ td.today .cal-num {
   }
 }
 @media print {
-  .permit-doc .card {
-    border: 1px solid #999;
-  }
   .train-chip {
     border: 1px solid #999;
   }
@@ -3730,6 +3651,179 @@ kbd {
 @media print {
   .date-shortcuts,
   .subitems-all {
+    display: none;
+  }
+}
+
+/* ---------- wave K: form builder, share dialog ---------- */
+.builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+.builder-edit {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+.builder-preview {
+  position: sticky;
+  inset-block-start: calc(var(--header-h) + var(--space-4));
+  max-block-size: calc(100vh - var(--header-h) - var(--space-6));
+  overflow: auto;
+}
+.preview-form {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--ground);
+}
+.preview-form h3 {
+  margin: 0;
+}
+.preview-form .field {
+  margin-block-end: var(--space-2);
+}
+.preview-input {
+  display: block;
+  min-block-size: 2.4rem;
+}
+.preview-input.tall {
+  min-block-size: 4.5rem;
+}
+.preview-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.question-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+.question-card fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-inline-size: 0;
+}
+.question-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.question-head .field {
+  margin-block-end: var(--space-3);
+}
+.question-head .grow {
+  flex: 1 1 14rem;
+  min-inline-size: 0;
+}
+.question-num {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  margin-block-start: 1.5rem;
+  border-radius: var(--radius-pill);
+  background: var(--primary-tint);
+  color: var(--primary-ink);
+  font-weight: 700;
+  flex: none;
+}
+.question-options {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-end: var(--space-3);
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--line);
+}
+.option-line {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+.option-line .input {
+  flex: 1;
+  min-inline-size: 0;
+}
+.question-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.question-foot .grow {
+  flex: 1;
+}
+.add-question {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.new-question {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  margin-block-end: var(--space-3);
+}
+.new-question .field {
+  margin: 0;
+}
+.new-question .grow {
+  flex: 1 1 12rem;
+  min-inline-size: 0;
+}
+.share-form {
+  display: grid;
+  gap: var(--space-3);
+}
+.share-link-row {
+  display: flex;
+  gap: var(--space-2);
+}
+.share-link-row .input {
+  flex: 1;
+  min-inline-size: 0;
+}
+.share-qr {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+.share-qr p {
+  flex: 1 1 12rem;
+  margin: 0;
+}
+@media (max-width: 900px) {
+  .builder {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .builder-preview {
+    position: static;
+    max-block-size: none;
+  }
+  .question-num {
+    margin-block-start: 0;
+  }
+}
+@media print {
+  /* Printing from the share dialog prints the QR sheet only. */
+  body:has(.share-form) .app-shell,
+  body:has(.share-form) .a11y-fab {
+    display: none !important;
+  }
+  .share-form .toolbar,
+  .share-form .share-link-row .btn {
     display: none;
   }
 }

@@ -26,7 +26,6 @@ function pagesFor(role: string | undefined): { label: string; to: string; icon: 
     { label: 'דשבורדים', to: '/dashboards', icon: 'chart', keywords: 'גרפים' },
     { label: 'עומס צוות', to: '/workload', icon: 'users' },
     { label: 'מבט מנהל', to: '/reports/monthly', icon: 'history', keywords: 'דוח חודשי', roles: ['admin', 'manager'] },
-    { label: 'היתרי עבודה', to: '/permits', icon: 'lock' },
     { label: 'הדרכות', to: role === 'member' ? '/trainings/me' : '/trainings', icon: 'school' },
     { label: 'נהלים', to: '/procedures', icon: 'clipboard' },
     { label: 'תאימות', to: '/compliance', icon: 'checks' },

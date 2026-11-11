@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BOARD_ROLES, CAUSE_CATEGORIES, PERMIT_TYPES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, REACTIONS, COLUMN_WIDTH, type ColorKey, type ColumnType } from './constants.js';
+import { BOARD_ROLES, CAUSE_CATEGORIES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, REACTIONS, COLUMN_WIDTH, type ColorKey, type ColumnType } from './constants.js';
 
 /** Trimmed, non-empty single-line string without control characters. */
 const line = (max: number) =>
@@ -520,6 +520,58 @@ export const updateFormSchema = z
     enabled: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+/** Question kinds offered by the form builder → the board column type that stores the answer. */
+export const QUESTION_TYPES = {
+  text: 'text',
+  long_text: 'long_text',
+  number: 'number',
+  date: 'date',
+  choice: 'status',
+  multi_choice: 'tags',
+  yes_no: 'checkbox',
+  rating: 'rating',
+  email: 'email',
+  phone: 'phone',
+  link: 'link',
+} as const satisfies Record<string, ColumnType>;
+export type QuestionType = keyof typeof QUESTION_TYPES;
+export const QUESTION_TYPE_LABELS: Record<QuestionType, string> = {
+  text: 'טקסט קצר',
+  long_text: 'טקסט ארוך',
+  number: 'מספר',
+  date: 'תאריך',
+  choice: 'בחירה אחת',
+  multi_choice: 'בחירה מרובה',
+  yes_no: 'כן / לא',
+  rating: 'דירוג (1–5)',
+  email: 'דוא"ל',
+  phone: 'טלפון',
+  link: 'קישור',
+};
+export const quickFormSchema = z.object({
+  name: line(80),
+  description: multiline(1000).default(''),
+  nameLabel: line(80).default('נושא'),
+  allowPhotos: z.boolean().default(false),
+  questions: z
+    .array(
+      z
+        .object({
+          title: line(LIMITS.columnTitle),
+          type: z.enum(Object.keys(QUESTION_TYPES) as [QuestionType, ...QuestionType[]]),
+          required: z.boolean().default(false),
+          help: z.string().trim().max(300).optional(),
+          options: z.array(line(40)).max(LIMITS.statusOptions).optional(),
+        })
+        .refine((q) => (q.type !== 'choice' && q.type !== 'multi_choice') || (q.options !== undefined && q.options.length >= 2), 'לשאלת בחירה נדרשות לפחות שתי אפשרויות')
+        .refine((q) => !q.options || new Set(q.options).size === q.options.length, 'אפשרויות כפולות'),
+    )
+    .min(1, 'יש להוסיף לפחות שאלה אחת')
+    .max(LIMITS.formFields)
+    .refine((qs) => new Set(qs.map((q) => q.title)).size === qs.length, 'לשתי שאלות אותה כותרת'),
+});
+export type QuickFormInput = z.input<typeof quickFormSchema>;
+
 export const submitFormSchema = z.object({ name: line(LIMITS.itemName), values: z.record(idSchema, z.unknown()).default({}) });
 
 // ---------- Wave D ----------
@@ -593,26 +645,6 @@ export const updateTrainingSchema = z
 export const trainingRequirementsSchema = z.object({ userIds: z.array(idSchema).max(2000) });
 export const trainingRecordSchema = z.object({ userIds: z.array(idSchema).min(1).max(500), completedOn: isoDateSchema, note: z.string().trim().max(200).default('') });
 
-export const createPermitSchema = z
-  .object({
-    type: z.enum(PERMIT_TYPES),
-    title: line(160),
-    location: line(160),
-    description: multiline(2000).default(''),
-    contractor: z.string().trim().max(120).default(''),
-    startsAt: isoDateTime,
-    endsAt: isoDateTime,
-    approverIds: z.array(idSchema).min(1, 'יש לבחור לפחות מאשר/ת אחד/ת').max(5),
-    precautions: z.array(z.string().max(40)).max(20).default([]),
-    /** Required when the permit conflicts with a blocking permit at the same place and time. */
-    conflictNote: z.string().trim().max(500).default(''),
-  })
-  .refine((p) => p.endsAt > p.startsAt, { message: 'סיום חייב להיות אחרי ההתחלה', path: ['endsAt'] })
-  .refine((p) => Date.parse(p.endsAt) - Date.parse(p.startsAt) <= 14 * 86_400_000, { message: 'היתר יכול להיות עד 14 יום', path: ['endsAt'] })
-  .refine((p) => new Set(p.approverIds).size === p.approverIds.length, { message: 'מאשר/ת כפול/ה', path: ['approverIds'] });
-export type CreatePermitInput = z.input<typeof createPermitSchema>;
-export const permitCheckSchema = z.object({ location: line(160), type: z.enum(PERMIT_TYPES), startsAt: isoDateTime, endsAt: isoDateTime });
-export const permitActionSchema = z.object({ comment: z.string().trim().max(500).default('') });
 
 export const createProcedureSchema = z.object({
   code: z.string().trim().regex(/^[A-Za-z0-9._-]{1,20}$/, 'קוד: אותיות לטיניות, ספרות ו-. _ - (עד 20)'),

@@ -1,4 +1,4 @@
-import { addDaysIso, PERMIT_PRECAUTIONS, todayIso, type BoardDetail } from '@suboard/shared';
+import { addDaysIso, todayIso, type BoardDetail } from '@suboard/shared';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loggedIn, setup, type Client, type TestCtx } from './helpers.js';
 
@@ -57,64 +57,13 @@ describe('E1 training matrix', () => {
   });
 });
 
-describe('E2 work permits', () => {
-  const base = () => ({
-    type: 'hot_work',
-    title: 'ריתוך מעקה',
-    location: 'בניין A, גג',
-    startsAt: hours(1),
-    endsAt: hours(5),
-    approverIds: [ids.m, ids.a],
-    precautions: PERMIT_PRECAUTIONS.hot_work.map((p) => p.id),
-  });
-
-  it('requires all precautions, separation of duties, ordered approvals', async () => {
-    expect((await e.post('/api/permits', { ...base(), precautions: [] })).statusCode).toBe(400);
-    expect((await e.post('/api/permits', { ...base(), approverIds: [ids.e] })).statusCode).toBe(400);
-    expect((await e.post('/api/permits', { ...base(), endsAt: hours(0.5), startsAt: hours(1) })).statusCode).toBe(400);
-    const r = await e.post('/api/permits', base());
-    expect(r.statusCode, r.body).toBe(201);
-    const p = r.json().permit;
-    expect(p.number).toBe('P-0001');
-    expect(p.nextApproverId).toBe(ids.m);
-    // Admin is second: not their turn yet.
-    expect((await a.post(`/api/permits/${p.id}/approve`, {})).statusCode).toBe(403);
-    // Outsiders cannot see it.
-    expect((await o.get(`/api/permits/${p.id}`)).statusCode).toBe(404);
-    expect((await o.get('/api/permits')).json().permits).toHaveLength(0);
-    expect((await m.get('/api/notifications')).json().notifications.some((n: { kind: string }) => n.kind === 'permit')).toBe(true);
-
-    expect((await m.post(`/api/permits/${p.id}/approve`, { comment: 'בסדר' })).json().permit.nextApproverId).toBe(ids.a);
-    expect((await a.get('/api/permits?scope=approvals')).json().permits).toHaveLength(1);
-    const done = (await a.post(`/api/permits/${p.id}/approve`, {})).json().permit;
-    expect(done.status).toBe('approved');
-    expect(done.events.map((x: { action: string }) => x.action)).toEqual(['requested', 'approved', 'approved']);
-    // Not started yet → cannot close; can cancel.
-    expect((await e.post(`/api/permits/${p.id}/close`, {})).statusCode).toBe(400);
-    expect((await e.post(`/api/permits/${p.id}/cancel`, { comment: 'נדחה' })).json().permit.status).toBe('cancelled');
-  });
-
-  it('rejection needs a reason; conflicts warn or block; expiry is automatic', async () => {
-    const p1 = (await e.post('/api/permits', base())).json().permit;
-    expect((await m.post(`/api/permits/${p1.id}/reject`, {})).statusCode).toBe(400);
-
-    // Same place (different spelling), overlapping window, chemical vs hot work → blocked without a reason.
-    const chem = { ...base(), type: 'chemical', location: '  בניין  A - גג ', precautions: PERMIT_PRECAUTIONS.chemical.map((x) => x.id), startsAt: hours(3), endsAt: hours(8) };
-    const check = (await o.post('/api/permits/check', chem)).json().conflicts;
-    expect(check).toHaveLength(1);
-    expect(check[0]).toMatchObject({ severity: 'block', title: '' }); // members do not see other permits' titles
-    expect((await o.post('/api/permits', chem)).statusCode).toBe(409);
-    const withNote = await o.post('/api/permits', { ...chem, conflictNote: 'תיאום עם מבקש הריתוך — עבודה בצד המזרחי בלבד' });
-    expect(withNote.statusCode, withNote.body).toBe(201);
-    // A second hot work at the same place only warns.
-    const warn = (await o.post('/api/permits/check', { ...base(), startsAt: hours(2), endsAt: hours(3) })).json().conflicts;
-    expect(warn.map((c: { severity: string }) => c.severity).sort()).toEqual(['block', 'warn']);
-
-    // Expire everything whose window ended.
-    await m.post(`/api/permits/${p1.id}/reject`, { comment: 'חסר צופה אש' });
-    ctx.db.prepare('UPDATE permits SET ends_at = ? WHERE id = ?').run(hours(-1), withNote.json().permit.id);
-    expect(ctx.app.services.permits.expireDue()).toBe(1);
-    expect((await o.get(`/api/permits/${withNote.json().permit.id}`)).json().permit.status).toBe('expired');
+describe('E2 work permits (removed)', () => {
+  it('the module is gone: no routes, no tables', async () => {
+    expect((await m.get('/api/permits')).statusCode).toBe(404);
+    expect((await m.post('/api/permits', {})).statusCode).toBe(404);
+    const tables = (ctx.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'permit%'").all() as { name: string }[]).map((t) => t.name);
+    expect(tables).toEqual([]);
+    expect((await m.get('/api/templates')).json().templates.some((t: { key: string }) => t.key === 'permits')).toBe(false);
   });
 });
 

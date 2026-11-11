@@ -72,7 +72,6 @@ export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOver
   services.investigations.setLogger(app.log);
   services.monthly.setLogger(app.log);
   services.trainings.setLogger(app.log);
-  services.permits.setLogger(app.log);
   services.sso.setLogger(app.log);
   app.decorate('services', services);
 

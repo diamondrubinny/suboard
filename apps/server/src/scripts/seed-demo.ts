@@ -2,7 +2,7 @@
  * Seeds fictitious demo data for local development / demos. Refuses to run in production.
  * Passwords are random per run and printed once to the console.
  */
-import { addDaysIso, PERMIT_PRECAUTIONS, todayIso } from '@suboard/shared';
+import { addDaysIso, todayIso } from '@suboard/shared';
 import { randomBytes } from 'node:crypto';
 import { loadConfig } from '../config.js';
 import { openDatabase } from '../db/index.js';
@@ -114,29 +114,14 @@ async function main() {
   const capaItems = s.boards.get(manager, capa.id).items.filter((i) => !i.parentId);
   if (capaItems.length >= 2) s.dependencies.set(manager, capaItems[1]!.id, [capaItems[0]!.id]);
 
-  // Wave E: trainings, a work permit, a procedure, hazmat inventory and a hazards board.
+  // Wave E: trainings, a procedure, hazmat inventory and a hazards board.
   const fireTraining = s.trainings.create(manager, { name: 'כיבוי אש ושימוש במטף', description: '', validityMonths: 12, allUsers: true });
   const chemTraining = s.trainings.create(manager, { name: 'עבודה בטוחה עם חומרים מסוכנים', description: '', validityMonths: 24, allUsers: false });
   s.trainings.setRequirements(manager, chemTraining.id, [member.id]);
   s.trainings.addRecords(manager, fireTraining.id, { userIds: [member.id], completedOn: d(-350), note: '' });
   s.trainings.addRecords(manager, fireTraining.id, { userIds: [manager.id], completedOn: d(-100), note: '' });
 
-  const tomorrow = new Date(Date.now() + 24 * 3600_000);
-  tomorrow.setMinutes(0, 0, 0);
-  s.permits.create(member, {
-    type: 'hot_work',
-    title: 'ריתוך מעקה בגג',
-    location: 'בניין A, גג',
-    description: 'ריתוך חשמלי של מעקה בטיחות.',
-    contractor: 'קבלן מסגרות (דמו)',
-    startsAt: tomorrow.toISOString(),
-    endsAt: new Date(tomorrow.getTime() + 4 * 3600_000).toISOString(),
-    approverIds: [manager.id],
-    precautions: PERMIT_PRECAUTIONS.hot_work.map((x) => x.id),
-    conflictNote: '',
-  });
-
-  const proc = s.procedures.create(manager, { code: 'SAF-001', title: 'עבודה בחום', category: 'היתרי עבודה', audience: 'all', userIds: [] });
+  const proc = s.procedures.create(manager, { code: 'SAF-001', title: 'עבודה בחום', category: 'עבודות מסוכנות', audience: 'all', userIds: [] });
   s.procedures.publish(manager, proc.id, {
     version: '1.0',
     effectiveOn: today,

@@ -1,6 +1,7 @@
 import {
   complianceSettingsSchema,
   createFormSchema,
+  quickFormSchema,
   idSchema,
   investigationSchema,
   linkedActionSchema,
@@ -58,6 +59,9 @@ export async function fieldRoutes(app: FastifyInstance, { services }: { services
   });
 
   // Forms — filling (audience checked in the service). `/forms/mine` must be registered before `/forms/:id`.
+  app.post('/forms/quick', { config: { rateLimit: { max: 20, timeWindow: 10 * 60_000 } } }, async (req, reply) =>
+    reply.code(201).send(forms.createQuick(actorOf(req), quickFormSchema.parse(req.body))),
+  );
   app.get('/forms', async (req) => ({ forms: forms.available(actorOf(req)) }));
   app.get('/forms/mine', async (req) => ({ submissions: forms.mine(actorOf(req)) }));
   app.get('/forms/:id', async (req) => ({ form: forms.forFill(actorOf(req), param(req, 'id')) }));
