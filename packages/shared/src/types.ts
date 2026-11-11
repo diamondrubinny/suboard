@@ -682,3 +682,14 @@ export interface CustomTemplate {
   createdByName: string | null;
   createdAt: string;
 }
+
+// ---------- Wave J ----------
+/** An open item or sub-item assigned to the current user ("My work"). */
+export interface MyWorkItem extends DashboardItemRef {
+  parentId: string | null;
+  parentName: string | null;
+  /** Set when the user may edit the board and the board has a "done" status: enables "mark done" in place. */
+  complete: { columnId: string; optionId: string } | null;
+  /** Current option id of the primary status (to undo "mark done"). */
+  statusId: string | null;
+}

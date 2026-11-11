@@ -101,6 +101,13 @@ export class ItemService {
     return (this.db.prepare('SELECT * FROM items WHERE parent_id = ? AND deleted_at IS NULL ORDER BY position').all(itemId) as ItemRow[]).map(toItem);
   }
 
+  /** Live sub-items and their sub-items (two levels), parents before children. */
+  private descendants(itemId: string): Item[] {
+    const out: Item[] = [];
+    for (const c of this.children(itemId)) out.push(c, ...this.children(c.id));
+    return out;
+  }
+
   private assertGroupInBoard(groupId: string, boardId: string): void {
     const g = this.db.prepare('SELECT 1 FROM board_groups WHERE id = ? AND board_id = ?').get(groupId, boardId);
     if (!g) throw badRequest('הקבוצה אינה שייכת ללוח', { groupId: 'קבוצה לא תקינה' });
@@ -223,7 +230,8 @@ export class ItemService {
     if (input.parentId) {
       const parent = this.getRow(input.parentId);
       if (parent.boardId !== boardId) throw badRequest('פריט האב אינו שייך ללוח', { parentId: 'פריט לא תקין' });
-      if (parent.parentId) throw badRequest('ניתן להוסיף תת-פריטים רק לפריט ראשי', { parentId: 'רמה אחת בלבד' });
+      // Two levels: item → sub-item → sub-sub-item.
+      if (parent.parentId && this.getRow(parent.parentId).parentId) throw badRequest('ניתן להוסיף תתי-משימות עד שתי רמות', { parentId: 'עד שתי רמות' });
       groupId = parent.groupId;
     } else {
       this.assertGroupInBoard(groupId, boardId);
@@ -291,7 +299,7 @@ export class ItemService {
           params.push(this.nextPosition(input.groupId, null));
         }
         // Sub-items always live in their parent's group.
-        this.db.prepare('UPDATE items SET group_id = ? WHERE parent_id = ?').run(input.groupId, itemId);
+        for (const d of this.descendants(itemId)) this.db.prepare('UPDATE items SET group_id = ? WHERE id = ?').run(input.groupId, d.id);
         this.record(actor, boardId, 'item_moved', { fromGroupId: item.groupId, toGroupId: input.groupId }, itemId);
       }
       if (input.position !== undefined) {
@@ -396,7 +404,7 @@ export class ItemService {
     const ts = nowIso();
     this.db.transaction(() => {
       for (const item of items) {
-        this.db.prepare('UPDATE items SET deleted_at = ? WHERE (id = ? OR parent_id = ?) AND deleted_at IS NULL').run(ts, item.id, item.id);
+        for (const id of [item.id, ...this.descendants(item.id).map((d) => d.id)]) this.db.prepare('UPDATE items SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL').run(ts, id);
         this.activity.record(boardId, actor.id, 'item_deleted', { name: item.name }, item.id);
       }
       this.boards.touch(boardId);
@@ -434,9 +442,13 @@ export class ItemService {
     const groupOk = this.db.prepare('SELECT 1 FROM board_groups WHERE id = ? AND board_id = ?').get(row.group_id, row.board_id);
     if (!groupOk) throw badRequest('הקבוצה של הפריט נמחקה');
     this.db.transaction(() => {
+      // The item, and every descendant that went to the trash in the same action.
       this.db
-        .prepare('UPDATE items SET deleted_at = NULL WHERE (id = ? OR (parent_id = ? AND deleted_at = ?))')
-        .run(itemId, itemId, row.deleted_at);
+        .prepare(
+          `UPDATE items SET deleted_at = NULL WHERE id = ? OR (deleted_at = ? AND (parent_id = ?
+             OR parent_id IN (SELECT id FROM items WHERE parent_id = ?)))`,
+        )
+        .run(itemId, row.deleted_at, itemId, itemId);
       this.activity.record(row.board_id, actor.id, 'item_restored', { name: row.name }, itemId);
       this.boards.touch(row.board_id);
     })();
@@ -449,16 +461,34 @@ export class ItemService {
     return this.db.prepare('DELETE FROM items WHERE deleted_at IS NOT NULL AND deleted_at < ?').run(cutoff).changes;
   }
 
+  /** Turns a sub-item into a top-level item of the same group (its own sub-items stay with it). */
+  promote(actor: Actor, itemId: string): Item {
+    const boardId = this.access.boardIdForItem(itemId);
+    this.access.requireBoard(actor, boardId, 'editor');
+    const item = this.getRow(itemId);
+    if (!item.parentId) throw badRequest('הפריט כבר פריט ראשי');
+    const parent = this.getRow(item.parentId);
+    this.db.transaction(() => {
+      this.db.prepare('UPDATE items SET parent_id = NULL, position = ?, updated_at = ? WHERE id = ?').run(this.nextPosition(item.groupId, null), nowIso(), itemId);
+      this.activity.record(boardId, actor.id, 'item_promoted', { name: item.name, fromParent: parent.name }, itemId);
+      this.boards.touch(boardId);
+    })();
+    return this.getRow(itemId);
+  }
+
   // ---------------------------------------------------------------- duplicate / move
   duplicate(actor: Actor, itemId: string): Item {
     const boardId = this.access.boardIdForItem(itemId);
     this.access.requireBoard(actor, boardId, 'editor');
     const item = this.getRow(itemId);
-    if (item.parentId) throw badRequest('לשכפול תת-פריט יש לשכפל את פריט האב');
     let newIdValue = '';
     this.db.transaction(() => {
-      newIdValue = this.insertItem(actor, boardId, item.groupId, null, `${item.name} (עותק)`.slice(0, LIMITS.itemName), item.values);
-      for (const child of this.children(itemId)) this.insertItem(actor, boardId, item.groupId, newIdValue, child.name, child.values);
+      // A copy stays next to the original (same parent), with its own sub-items.
+      newIdValue = this.insertItem(actor, boardId, item.groupId, item.parentId, `${item.name} (עותק)`.slice(0, LIMITS.itemName), item.values);
+      for (const child of this.children(itemId)) {
+        const childId = this.insertItem(actor, boardId, item.groupId, newIdValue, child.name, child.values);
+        if (!item.parentId) for (const g of this.children(child.id)) this.insertItem(actor, boardId, item.groupId, childId, g.name, g.values);
+      }
       this.activity.record(boardId, actor.id, 'item_duplicated', { fromItemId: itemId, name: item.name }, newIdValue);
       this.boards.touch(boardId);
     })();
@@ -520,7 +550,7 @@ export class ItemService {
       return out;
     };
 
-    const kids = this.children(itemId);
+    const kids = this.descendants(itemId);
     this.db.transaction(() => {
       for (const it of [item, ...kids]) {
         this.db

@@ -81,11 +81,15 @@ describe('A1 new column types', () => {
 });
 
 describe('A2 sub-items', () => {
-  it('creates one level of sub-items that follow their parent', async () => {
+  it('creates sub-items that follow their parent', async () => {
     const parent = await newItem('תחקיר');
     const child = await newItem('ראיון עדים', { parentId: parent.id }, e);
     expect(child.parentId).toBe(parent.id);
-    expect((await m.post(`/api/boards/${board.id}/items`, { groupId: board.groups[0]!.id, name: 'נכד', parentId: child.id })).statusCode).toBe(400);
+    // Wave J: two levels are allowed, a third is not.
+    const grand = await m.post(`/api/boards/${board.id}/items`, { groupId: board.groups[0]!.id, name: 'נכד', parentId: child.id });
+    expect(grand.statusCode).toBe(201);
+    expect((await m.post(`/api/boards/${board.id}/items`, { groupId: board.groups[0]!.id, name: 'נין', parentId: grand.json().item.id })).statusCode).toBe(400);
+    await m.del(`/api/items/${grand.json().item.id}`);
     expect((await v.post(`/api/boards/${board.id}/items`, { groupId: board.groups[0]!.id, name: 'x', parentId: parent.id })).statusCode).toBe(403);
 
     await m.patch(`/api/items/${parent.id}`, { groupId: board.groups[1]!.id });

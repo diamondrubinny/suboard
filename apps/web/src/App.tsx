@@ -26,6 +26,7 @@ const FormFillPage = lazy(() => import('./pages/field/FormPages').then((m) => ({
 const FormsAdminPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormsAdminPage })));
 const ForgotPasswordPage = lazy(() => import('./pages/PasswordResetPages').then((m) => ({ default: m.ForgotPasswordPage })));
 const ResetPasswordPage = lazy(() => import('./pages/PasswordResetPages').then((m) => ({ default: m.ResetPasswordPage })));
+const MyWorkPage = lazy(() => import('./pages/MyWorkPage').then((m) => ({ default: m.MyWorkPage })));
 const FilesPage = lazy(() => import('./pages/board/FilesPage').then((m) => ({ default: m.FilesPage })));
 const DashboardsPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.DashboardsPage })));
 const CustomDashboardPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.CustomDashboardPage })));
@@ -77,6 +78,7 @@ export function App() {
               <Route element={<RequireAuth />}>
                 <Route element={<Layout />}>
                   <Route index element={<DashboardPage />} />
+                  <Route path="my-work" element={lazyPage(<MyWorkPage />)} />
                   <Route path="boards" element={<BoardsPage />} />
                   <Route path="boards/:boardId" element={<BoardPage />} />
                   <Route path="boards/:boardId/settings" element={<BoardSettingsPage />} />

@@ -9,6 +9,7 @@ import {
   type DashboardBoardStat,
   type DashboardItemRef,
   type Item,
+  type MyWorkItem,
 } from '@suboard/shared';
 import type { DB } from '../db/index.js';
 import type { AccessService, Actor } from './access.js';
@@ -85,6 +86,30 @@ export class DashboardService {
       dueSoon: dueSoon.sort(byDue).slice(0, MAX_LIST),
       boards: stats.sort((a, b) => b.overdue - a.overdue || b.open - a.open),
     };
+  }
+
+  /** Every open item / sub-item assigned to the actor, across the boards they can see, by due date. */
+  myWork(actor: Actor): MyWorkItem[] {
+    const out: MyWorkItem[] = [];
+    for (const boardId of this.access.accessibleBoardIds(actor)) {
+      const columns = this.boards.columns(boardId);
+      const personCols = columns.filter((c) => c.type === 'person');
+      if (!personCols.length) continue;
+      const { name: boardName } = this.db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string };
+      const statusCol = findPrimaryStatusColumn(columns);
+      const dueCol = findDueColumn(columns);
+      const doneOption = statusCol?.settings.options?.find((o) => o.done);
+      const role = this.access.boardRole(actor, boardId);
+      const complete = statusCol && doneOption && role && role !== 'viewer' ? { columnId: statusCol.id, optionId: doneOption.id } : null;
+      const items = (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL').all(boardId) as ItemRow[]).map(toItem);
+      const names = new Map(items.map((i) => [i.id, i.name]));
+      for (const item of items) {
+        if (isItemDone(item, statusCol)) continue;
+        if (!personCols.some((c) => Array.isArray(item.values[c.id]) && (item.values[c.id] as string[]).includes(actor.id))) continue;
+        out.push({ ...this.ref(item, boardName, statusCol, dueCol), parentId: item.parentId, parentName: item.parentId ? (names.get(item.parentId) ?? null) : null, complete, statusId: statusCol && typeof item.values[statusCol.id] === 'string' ? (item.values[statusCol.id] as string) : null });
+      }
+    }
+    return out.sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999') || a.itemName.localeCompare(b.itemName, 'he')).slice(0, 500);
   }
 
   private ref(item: Item, boardName: string, statusCol: Column | undefined, dueCol: Column | undefined): DashboardItemRef {

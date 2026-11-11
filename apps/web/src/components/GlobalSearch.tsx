@@ -21,6 +21,7 @@ const GROUP_LABEL: Record<Entry['group'], string> = { recent: 'נפתחו לאח
 function pagesFor(role: string | undefined): { label: string; to: string; icon: IconName; keywords?: string }[] {
   const pages: { label: string; to: string; icon: IconName; keywords?: string; roles?: string[] }[] = [
     { label: 'לוח בקרה', to: '/', icon: 'home', keywords: 'בית ראשי' },
+    { label: 'המשימות שלי', to: '/my-work', icon: 'checks', keywords: 'משימות שלי action items תת-פריטים' },
     { label: 'כל הלוחות', to: '/boards', icon: 'boards' },
     { label: 'דשבורדים', to: '/dashboards', icon: 'chart', keywords: 'גרפים' },
     { label: 'עומס צוות', to: '/workload', icon: 'users' },

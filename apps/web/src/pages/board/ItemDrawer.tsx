@@ -1,4 +1,4 @@
-import { findPrimaryStatusColumn, LIMITS, REACTION_LABELS, REACTIONS, todayIso, isOverdue, type BoardDetail, type CellValue, type DirectoryUser, type ItemUpdate, type Reaction } from '@suboard/shared';
+import { addDaysIso, findDueColumn, formatDateHe, isItemDone, findPrimaryStatusColumn, LIMITS, REACTION_LABELS, REACTIONS, todayIso, isOverdue, type BoardDetail, type CellValue, type DirectoryUser, type ItemUpdate, type Reaction } from '@suboard/shared';
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import { errorMessage } from '../../api/client';
 import { useBoard, useBoards, useCreateItem, useDeleteItem, useItemActions, useItemActivity, useItemUpdates, useUpdateItem, useUpdateMutations, useFollow, useToggleFollow } from '../../api/hooks';
@@ -9,6 +9,8 @@ import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback
 import { Icon } from '../../components/Icon';
 import { Avatar, StatusPill } from '../../components/StatusPill';
 import { activityText, actorLabel, formatDateTime } from './activityText';
+import { childrenOf, depthOf, doneToggle, MAX_DEPTH, subtaskProgress, useUndoableUpdate } from './subtasks';
+import { appLink } from '../../api/base';
 import { AttachmentsPanel } from './AttachmentsPanel';
 import { LinksSection } from './LinksSection';
 import { DependenciesSection } from './DependenciesSection';
@@ -110,7 +112,8 @@ function DetailsPanel({
   const assignable = board.members.map((m) => ({ id: m.userId, name: m.name }));
   const update = useUpdateItem(board.id);
   const del = useDeleteItem(board.id);
-  const { restore, duplicate } = useItemActions(board.id);
+  const { restore, duplicate, promote } = useItemActions(board.id);
+  const undo = useUndoableUpdate(board);
   const [moving, setMoving] = useState(false);
   const [qrOpen, setQrOpen] = useState(false);
   const { toast, confirm } = useFeedback();
@@ -197,21 +200,47 @@ function DetailsPanel({
               createdBy={item.createdBy}
               updatedAt={item.updatedAt}
               overdue={overdue && c.settings.role === 'due'}
-              onChange={(v) => save({ values: { [c.id]: v } })}
+              onChange={(v) => undo.setValue(item, c.id, v)}
             />
+            {c.type === 'date' && canEdit && <DateShortcuts label={c.title} value={item.values[c.id]} onPick={(v) => undo.setValue(item, c.id, v)} />}
           </FieldRow>
         ))}
       </div>
       <p className="muted" style={{ fontSize: '0.85rem' }}>
         נוצר: {formatDateTime(item.createdAt)} · עודכן: {formatDateTime(item.updatedAt)}
       </p>
-      {!parent && <SubitemsSection board={board} parentId={item.id} onOpenItem={onOpenItem} />}
+      {depthOf(board, item) < MAX_DEPTH && <SubitemsSection board={board} parentId={item.id} users={users} onOpenItem={onOpenItem} />}
       <LinksSection itemId={item.id} />
       {!parent && <DependenciesSection board={board} itemId={item.id} onOpenItem={onOpenItem} />}
       <div className="toolbar" style={{ marginTop: 'var(--space-3)' }}>
         <button type="button" className="btn btn-sm" onClick={() => setQrOpen(true)}>
           <Icon name="grid" /> קוד QR
         </button>
+        <button
+          type="button"
+          className="btn btn-sm"
+          onClick={async () => {
+            const url = appLink(`/boards/${board.id}?item=${item.id}`);
+            try {
+              await navigator.clipboard.writeText(url);
+              toast('הקישור לפריט הועתק');
+            } catch {
+              toast(`לא ניתן להעתיק אוטומטית. הקישור: ${url}`, 'error');
+            }
+          }}
+        >
+          <Icon name="open" /> העתקת קישור
+        </button>
+        {parent && canEdit && (
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={promote.isPending}
+            onClick={() => promote.mutate(item.id, { onSuccess: () => toast(`"${item.name}" הפך לפריט ראשי`), onError: (e) => toast(errorMessage(e), 'error') })}
+          >
+            הפיכה לפריט ראשי
+          </button>
+        )}
       </div>
       {qrOpen && (
         <Suspense fallback={null}>
@@ -253,35 +282,80 @@ function DetailsPanel({
 /** Field types whose editor is a single labelable control (the others label themselves). */
 const SINGLE_INPUT = new Set(['text', 'long_text', 'number', 'status', 'date', 'checkbox']);
 
-function SubitemsSection({ board, parentId, onOpenItem }: { board: BoardDetail; parentId: string; onOpenItem: (id: string) => void }) {
+/** Sub-items ("action items") of an item: done checkbox, assignee, due date, quick add, progress. */
+function SubitemsSection({ board, parentId, users, onOpenItem }: { board: BoardDetail; parentId: string; users: DirectoryUser[]; onOpenItem: (id: string) => void }) {
   const create = useCreateItem(board.id);
   const { toast } = useFeedback();
+  const { setValue } = useUndoableUpdate(board);
   const [name, setName] = useState('');
-  const kids = board.items.filter((i) => i.parentId === parentId).sort((a, b) => a.position - b.position);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const kids = childrenOf(board, parentId);
   const parent = board.items.find((i) => i.id === parentId)!;
   const status = findPrimaryStatusColumn(board.columns);
+  const toggle = doneToggle(board);
+  const personCol = board.columns.find((c) => c.type === 'person');
+  const dueCol = findDueColumn(board.columns);
+  const today = todayIso();
   const canEdit = board.myRole !== 'viewer';
+  const prog = subtaskProgress(board, parentId);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const n = name.trim();
     if (!n) return;
-    create.mutate({ groupId: parent.groupId, parentId, name: n }, { onSuccess: () => setName(''), onError: (err) => toast(errorMessage(err), 'error') });
+    create.mutate(
+      { groupId: parent.groupId, parentId, name: n },
+      { onSuccess: () => (setName(''), requestAnimationFrame(() => inputRef.current?.focus())), onError: (err) => toast(errorMessage(err), 'error') },
+    );
   };
   return (
-    <section aria-labelledby="subitems-h" style={{ marginBottom: 'var(--space-4)' }}>
+    <section aria-labelledby="subitems-h" className="subtasks">
       <h3 id="subitems-h">
         תת-פריטים <span className="badge">{kids.length}</span>
       </h3>
-      {kids.length === 0 && <p className="muted">אין תת-פריטים.</p>}
-      <ul className="list-plain item-list">
+      {prog.total > 0 && toggle && (
+        <div className="subtasks-progress">
+          <span className="progress-bar" role="img" aria-label={`${prog.done} מתוך ${prog.total} תת-פריטים בוצעו`}>
+            <span style={{ inlineSize: `${Math.round((prog.done / prog.total) * 100)}%` }} />
+          </span>
+          <span className="muted num" aria-hidden="true">
+            {prog.done}/{prog.total} בוצעו
+          </span>
+        </div>
+      )}
+      {kids.length === 0 && <p className="muted">אין עדיין תת-פריטים. פרקו את הפריט למשימות קטנות — לכל אחת אחראי ותאריך משלה.</p>}
+      <ul className="list-plain subtask-list">
         {kids.map((k) => {
           const opt = status ? status.settings.options?.find((o) => o.id === k.values[status.id]) : undefined;
+          const done = isItemDone(k, status);
+          const people = personCol && Array.isArray(k.values[personCol.id]) ? (k.values[personCol.id] as string[]).map((id) => users.find((u) => u.id === id)?.name).filter(Boolean) : [];
+          const due = dueCol && typeof k.values[dueCol.id] === 'string' ? (k.values[dueCol.id] as string) : null;
+          const late = Boolean(due && due < today && !done);
+          const grand = childrenOf(board, k.id).length;
           return (
-            <li key={k.id}>
-              <button type="button" className="btn btn-ghost btn-sm grow" style={{ justifyContent: 'flex-start' }} onClick={() => onOpenItem(k.id)}>
+            <li key={k.id} className={`subtask${done ? ' done' : ''}`}>
+              {toggle && (
+                <DoneCheckbox
+                  done={done}
+                  disabled={!canEdit}
+                  label={`בוצע: ${k.name}`}
+                  onToggle={(on) => setValue(k, toggle.column.id, on ? toggle.doneId : toggle.openId, on ? `"${k.name}" סומן כבוצע` : `"${k.name}" נפתח מחדש`)}
+                />
+              )}
+              <button type="button" className="subtask-name" onClick={() => onOpenItem(k.id)}>
                 {k.name}
+                {grand > 0 && <span className="badge">{grand} תת-פריטים</span>}
               </button>
-              {status && <StatusPill label={opt?.label} color={opt?.color} />}
+              <span className="subtask-meta">
+                {people.length > 0 && <span className="muted">{people.join(', ')}</span>}
+                {due && (
+                  <span className={late ? 'badge danger' : 'muted'}>
+                    {late && <span className="sr-only">באיחור: </span>}
+                    {formatDateHe(due)}
+                  </span>
+                )}
+                {status && !toggle && <StatusPill label={opt?.label} color={opt?.color} />}
+                {status && toggle && !done && opt && <StatusPill label={opt.label} color={opt.color} />}
+              </span>
             </li>
           );
         })}
@@ -291,13 +365,60 @@ function SubitemsSection({ board, parentId, onOpenItem }: { board: BoardDetail; 
           <label htmlFor="new-subitem" className="sr-only">
             תת-פריט חדש
           </label>
-          <input id="new-subitem" className="input" placeholder="תת-פריט חדש" maxLength={LIMITS.itemName} value={name} onChange={(e) => setName(e.target.value)} />
+          <input id="new-subitem" ref={inputRef} className="input" placeholder="תת-פריט חדש (Enter להוספה)" maxLength={LIMITS.itemName} value={name} onChange={(e) => setName(e.target.value)} />
           <button type="submit" className="btn btn-sm" disabled={!name.trim() || create.isPending}>
             <Icon name="plus" size={16} /> הוספה
           </button>
         </form>
       )}
     </section>
+  );
+}
+
+/** Checkbox that reflects the click at once (no flicker while the change is being saved). */
+function DoneCheckbox({ done, disabled, label, onToggle }: { done: boolean; disabled: boolean; label: string; onToggle: (on: boolean) => void }) {
+  const [local, setLocal] = useState<boolean | null>(null);
+  useEffect(() => setLocal(null), [done]);
+  useEffect(() => {
+    if (local === null) return;
+    const t = window.setTimeout(() => setLocal(null), 4000); // a failed save falls back to the stored state
+    return () => window.clearTimeout(t);
+  }, [local]);
+  return (
+    <input
+      type="checkbox"
+      checked={local ?? done}
+      disabled={disabled}
+      aria-label={label}
+      onChange={(e) => {
+        setLocal(e.target.checked);
+        onToggle(e.target.checked);
+      }}
+    />
+  );
+}
+
+/** Quick picks next to a date field: today / tomorrow / in a week / clear. */
+function DateShortcuts({ label, value, onPick }: { label: string; value: unknown; onPick: (v: string | null) => void }) {
+  const today = todayIso();
+  const picks: [string, string | null][] = [
+    ['היום', today],
+    ['מחר', addDaysIso(today, 1)],
+    ['בעוד שבוע', addDaysIso(today, 7)],
+  ];
+  return (
+    <div className="date-shortcuts" role="group" aria-label={`קיצורים: ${label}`}>
+      {picks.map(([text, v]) => (
+        <button key={text} type="button" className="chip-btn" aria-pressed={value === v} onClick={() => onPick(v)}>
+          {text}
+        </button>
+      ))}
+      {typeof value === 'string' && value && (
+        <button type="button" className="chip-btn" onClick={() => onPick(null)}>
+          ניקוי
+        </button>
+      )}
+    </div>
   );
 }
 

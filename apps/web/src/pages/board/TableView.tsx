@@ -5,6 +5,7 @@ import { useCreateItem, useGroupMutations, useUpdateItem } from '../../api/hooks
 import { CellEditor } from '../../components/cells/CellEditor';
 import { useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
+import { depthOf, doneToggle, MAX_DEPTH, subtaskProgress, useUndoableUpdate } from './subtasks';
 import { sortItems } from './viewLogic';
 
 interface Props {
@@ -230,22 +231,31 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const today = todayIso();
+  const hasDone = doneToggle(board) !== null;
   const hidden = new Set(config.hidden ?? []);
   const columns = board.columns.filter((c) => !hidden.has(c.id));
   // Sub-items of every parent, from the full board (a parent shows its children even when only it matched a filter).
   const childrenOf = (id: string) => sortItems(board.items.filter((i) => i.parentId === id), board.columns, config.sort, users);
   const matchingIds = new Set(items.map((i) => i.id));
 
-  const setValue = (item: Item, columnId: string, value: CellValue) =>
-    updateItem.mutate({ itemId: item.id, patch: { values: { [columnId]: value } } }, { onError: (e) => toast(errorMessage(e), 'error') });
-  const rename = (item: Item, name: string) => updateItem.mutate({ itemId: item.id, patch: { name } }, { onError: (e) => toast(errorMessage(e), 'error') });
+  const { setValue, rename } = useUndoableUpdate(board);
+  const topOf = (i: Item): string => {
+    let cur = i;
+    for (let n = 0; n < MAX_DEPTH && cur.parentId; n++) cur = board.items.find((x) => x.id === cur.parentId) ?? cur;
+    return cur.id;
+  };
+  const withKids = board.items.filter((i) => depthOf(board, i) < MAX_DEPTH && board.items.some((c) => c.parentId === i.id)).map((i) => i.id);
+  const allOpen = withKids.length > 0 && withKids.every((id) => expanded[id]);
 
   const renderRow = (item: Item, color: string) => {
     const overdue = isOverdue(item, board.columns, today);
-    const kids = item.parentId ? [] : childrenOf(item.id);
+    const depth = depthOf(board, item);
+    const canNest = depth < MAX_DEPTH;
+    const kids = canNest ? childrenOf(item.id) : [];
     const isOpen = expanded[item.id] ?? false;
+    const prog = canNest ? subtaskProgress(board, item.id) : { done: 0, total: 0 };
     return (
-      <tr key={item.id} className={item.parentId ? 'sub-row' : undefined}>
+      <tr key={item.id} className={depth === 2 ? 'sub-row sub-row-2' : depth === 1 ? 'sub-row' : undefined}>
         <td className="col-select">
           {canEdit && (
             <input type="checkbox" checked={selected.has(item.id)} aria-label={`בחירת ${item.name}`} onChange={(e) => onSelect([item.id], e.target.checked)} />
@@ -253,8 +263,14 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
         </td>
         <th scope="row" className="col-name" style={{ fontWeight: 400, ['--group-color' as string]: color }}>
           <div className="name-cell">
-            {!item.parentId && (
-              <button type="button" className="icon-btn subitem-toggle" aria-expanded={isOpen} onClick={() => setExpanded((x) => ({ ...x, [item.id]: !isOpen }))}>
+            {canNest && (
+              <button
+                type="button"
+                className={`icon-btn subitem-toggle${prog.total > 0 && prog.done === prog.total ? ' all-done' : ''}`}
+                aria-expanded={isOpen}
+                title={prog.total ? `${prog.done} מתוך ${prog.total} תת-פריטים בוצעו` : 'הוספת תת-פריטים'}
+                onClick={() => setExpanded((x) => ({ ...x, [item.id]: !isOpen }))}
+              >
                 <span style={{ display: 'inline-flex', transform: isOpen ? undefined : 'rotate(90deg)' }} aria-hidden="true">
                   <Icon name="chevronDown" size={16} />
                 </span>
@@ -262,7 +278,19 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                 <span className="sr-only">
                   {isOpen ? 'הסתרת' : 'הצגת'} תת-פריטים של {item.name},{' '}
                 </span>
-                <span className="subitem-count num">{kids.length}</span>
+                {prog.total > 0 && hasDone ? (
+                  <>
+                    <span className="subitem-count num">
+                      {prog.done}/{prog.total}
+                    </span>
+                    <span className="sr-only"> בוצעו</span>
+                    <span className="subitem-bar" aria-hidden="true">
+                      <span style={{ inlineSize: `${Math.round((prog.done / prog.total) * 100)}%` }} />
+                    </span>
+                  </>
+                ) : (
+                  <span className="subitem-count num">{kids.length}</span>
+                )}
               </button>
             )}
             {canEdit ? <ItemNameInput item={item} onCommit={(n) => rename(item, n)} /> : <span className="cell-readonly">{item.name}</span>}
@@ -295,9 +323,16 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
 
   return (
     <>
+      {withKids.length > 0 && (
+        <div className="toolbar subitems-all">
+          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={allOpen} onClick={() => setExpanded(allOpen ? {} : Object.fromEntries(withKids.map((id) => [id, true])))}>
+            <Icon name="chevronDown" size={16} /> {allOpen ? 'כיווץ כל תת-הפריטים' : 'הרחבת כל תת-הפריטים'}
+          </button>
+        </div>
+      )}
       {board.groups.map((group) => {
         // Top-level rows: parents that match, plus parents of matching sub-items (to keep context).
-        const parentIds = new Set(items.filter((i) => i.parentId).map((i) => i.parentId!));
+        const parentIds = new Set(items.filter((i) => i.parentId).map((i) => topOf(i)));
         const tops = sortItems(
           board.items.filter((i) => !i.parentId && i.groupId === group.id && (matchingIds.has(i.id) || parentIds.has(i.id))),
           board.columns,
@@ -308,7 +343,10 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
         const color = PALETTE[group.color]?.bg ?? '#9AA0B4';
         const tableId = `group-table-${group.id}`;
         if (filtered && tops.length === 0) return null;
-        const groupIds = tops.flatMap((t) => [t.id, ...(expanded[t.id] ? childrenOf(t.id).map((c) => c.id) : [])]);
+        const groupIds = tops.flatMap((t) => [
+          t.id,
+          ...(expanded[t.id] ? childrenOf(t.id).flatMap((c) => [c.id, ...(expanded[c.id] ? childrenOf(c.id).map((g) => g.id) : [])]) : []),
+        ]);
         const allSelected = groupIds.length > 0 && groupIds.every((id) => selected.has(id));
         return (
           <section key={group.id} className="group-section" aria-label={`קבוצה: ${group.name}`}>
@@ -353,7 +391,15 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                       const open = expanded[item.id] ?? false;
                       return [
                         renderRow(item, color),
-                        ...(open ? childrenOf(item.id).map((child) => renderRow(child, color)) : []),
+                        ...(open
+                          ? childrenOf(item.id).flatMap((child) => [
+                              renderRow(child, color),
+                              ...(expanded[child.id] ? childrenOf(child.id).map((g) => renderRow(g, color)) : []),
+                              ...(expanded[child.id] && canEdit
+                                ? [<AddRow key={`add-${child.id}`} boardId={board.id} groupId={group.id} parentId={child.id} colSpan={columns.length} label={`תת-פריט חדש ל${child.name}`} sub />]
+                                : []),
+                            ])
+                          : []),
                         ...(open && canEdit
                           ? [<AddRow key={`add-${item.id}`} boardId={board.id} groupId={group.id} parentId={item.id} colSpan={columns.length} label={`תת-פריט חדש ל${item.name}`} sub />]
                           : []),

@@ -126,6 +126,11 @@ export function Layout() {
                 </NavLink>
               </li>
               <li>
+                <NavLink to="/my-work" className="nav-link">
+                  <Icon name="checks" /> המשימות שלי
+                </NavLink>
+              </li>
+              <li>
                 <NavLink to="/boards" end className="nav-link">
                   <Icon name="boards" /> כל הלוחות
                 </NavLink>

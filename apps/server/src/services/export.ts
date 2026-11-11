@@ -69,7 +69,11 @@ export class ExportService {
       .filter((i) => !i.parentId)
       .sort((a, b) => (groupOrder.get(a.groupId) ?? 0) - (groupOrder.get(b.groupId) ?? 0) || a.position - b.position);
     const ordered: Item[] = [];
-    for (const t of tops) ordered.push(t, ...board.items.filter((i) => i.parentId === t.id).sort((a, b) => a.position - b.position));
+    const kidsOf = (id: string) => board.items.filter((i) => i.parentId === id).sort((a, b) => a.position - b.position);
+    for (const t of tops) {
+      ordered.push(t);
+      for (const k of kidsOf(t.id)) ordered.push(k, ...kidsOf(k.id));
+    }
     const header = ['קבוצה', 'פריט', 'תת-פריט של', ...board.columns.map((c) => c.title), 'נוצר', 'עודכן'];
     const byId = new Map(board.items.map((i) => [i.id, i]));
     const rows = ordered.map((i) => [

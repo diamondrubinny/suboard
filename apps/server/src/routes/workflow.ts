@@ -10,6 +10,7 @@ const param = (req: FastifyRequest, name: string): string => idSchema.parse((req
 export async function workflowRoutes(app: FastifyInstance, { services }: { services: Services }) {
   const { items, views, search, exports } = services;
 
+  app.post('/items/:id/promote', async (req) => ({ item: items.promote(actorOf(req), param(req, 'id')) }));
   app.post('/items/:id/duplicate', async (req, reply) => reply.code(201).send({ item: items.duplicate(actorOf(req), param(req, 'id')) }));
 
   app.post('/items/:id/move', async (req) => items.moveToBoard(actorOf(req), param(req, 'id'), moveItemSchema.parse(req.body)));

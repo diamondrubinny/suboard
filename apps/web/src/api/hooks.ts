@@ -1,4 +1,5 @@
 import type {
+  MyWorkItem,
   CustomTemplate,
   ActiveSession,
   BoardFile,
@@ -122,6 +123,7 @@ export const qk = {
   recentBoards: ['recent-boards'] as const,
   follow: (itemId: string) => ['follow', itemId] as const,
   boardFiles: (boardId: string) => ['board-files', boardId] as const,
+  myWork: ['my-work'] as const,
 };
 
 // ------------------------------------------------------------------ phase 2
@@ -340,6 +342,7 @@ export function useItemActions(boardId: string) {
   return {
     restore: useMutation({ mutationFn: (itemId: string) => api<{ item: Item }>(`/items/${itemId}/restore`, 'POST'), onSuccess: all }),
     duplicate: useMutation({ mutationFn: (itemId: string) => api<{ item: Item }>(`/items/${itemId}/duplicate`, 'POST').then((r) => r.item), onSuccess: all }),
+    promote: useMutation({ mutationFn: (itemId: string) => api<{ item: Item }>(`/items/${itemId}/promote`, 'POST').then((r) => r.item), onSuccess: all }),
     move: useMutation({
       mutationFn: ({ itemId, target }: { itemId: string; target: { boardId: string; groupId: string } }) =>
         api<{ item: Item; dropped: string[] }>(`/items/${itemId}/move`, 'POST', target),
@@ -859,3 +862,19 @@ export function useToggleFollow(itemId: string) {
 
 export const useBoardFiles = (boardId: string) =>
   useQuery({ queryKey: qk.boardFiles(boardId), queryFn: () => api<{ files: BoardFile[] }>(`/boards/${boardId}/files`).then((r) => r.files) });
+
+// ------------------------------------------------------------------ wave J
+export const useMyWork = () => useQuery({ queryKey: qk.myWork, queryFn: () => api<{ items: MyWorkItem[] }>('/me/work').then((r) => r.items) });
+/** Mark an item done from "My work" (sets the board's primary status to its "done" option). */
+export function useCompleteWork() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, columnId, optionId }: { itemId: string; boardId: string; columnId: string; optionId: string | null }) =>
+      api<{ item: Item }>(`/items/${itemId}`, 'PATCH', { values: { [columnId]: optionId } }).then((r) => r.item),
+    onSuccess: (_i, v) => {
+      void qc.invalidateQueries({ queryKey: qk.myWork });
+      void qc.invalidateQueries({ queryKey: qk.board(v.boardId) });
+      void qc.invalidateQueries({ queryKey: qk.dashboard });
+    },
+  });
+}

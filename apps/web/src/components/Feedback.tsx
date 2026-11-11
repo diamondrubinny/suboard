@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Dialog } from './Dialog';
 
 // ------------------------------------------------------------------ toasts
@@ -12,11 +13,13 @@ interface Toast {
   message: string;
   kind: 'info' | 'error';
   action?: ToastAction;
+  key?: string;
 }
 
 interface FeedbackValue {
   /** `action` adds a button (e.g. "ביטול" after a delete); such toasts stay longer (10s). */
-  toast: (message: string, kind?: Toast['kind'], action?: ToastAction) => void;
+  /** `replaceKey`: a newer toast with the same key replaces the older one (e.g. only the last "undo" stays). */
+  toast: (message: string, kind?: Toast['kind'], action?: ToastAction, replaceKey?: string) => void;
   confirm: (opts: { title: string; message: string; confirmLabel?: string; danger?: boolean }) => Promise<boolean>;
 }
 
@@ -29,10 +32,22 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
     (Parameters<FeedbackValue['confirm']>[0] & { resolve: (v: boolean) => void }) | null
   >(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  // The top-most open modal dialog (or null): where toasts must live to stay interactive.
+  const [host, setHost] = useState<Element | null>(null);
+  useEffect(() => {
+    const pick = () => {
+      const open = document.querySelectorAll('dialog[open]');
+      setHost(open.length ? open[open.length - 1]! : null);
+    };
+    pick();
+    const mo = new MutationObserver(pick);
+    mo.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['open'] });
+    return () => mo.disconnect();
+  }, []);
 
-  const toast = useCallback((message: string, kind: Toast['kind'] = 'info', action?: ToastAction) => {
+  const toast = useCallback((message: string, kind: Toast['kind'] = 'info', action?: ToastAction, replaceKey?: string) => {
     const id = nextId.current++;
-    setToasts((t) => [...t, { id, message, kind, action }]);
+    setToasts((t) => [...(replaceKey ? t.filter((x) => x.key !== replaceKey) : t), { id, message, kind, action, key: replaceKey }]);
     window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), action ? 10000 : kind === 'error' ? 8000 : 4000);
   }, []);
 
@@ -49,7 +64,10 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
   return (
     <FeedbackContext.Provider value={{ toast, confirm }}>
       {children}
-      {/* Live regions: polite for info, assertive for errors. */}
+      {/* Live regions: polite for info, assertive for errors. Rendered inside the open modal dialog when
+          there is one: everything outside a modal <dialog> is inert, so a toast (and its "undo" button)
+          left in the page behind it could not be clicked or read. */}
+      {createPortal(
       <div className="toasts">
         <div role="status" aria-live="polite">
           {toasts
@@ -87,7 +105,9 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
               </div>
             ))}
         </div>
-      </div>
+      </div>,
+        host ?? document.body,
+      )}
       <Dialog
         open={confirmState !== null}
         title={confirmState?.title ?? ''}

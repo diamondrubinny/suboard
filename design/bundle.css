@@ -3607,3 +3607,128 @@ kbd {
   text-align: center;
   font-size: 0.9rem;
 }
+
+/* ---------- wave J: sub-items, my work, shortcuts ---------- */
+.subitem-toggle.all-done .subitem-count {
+  color: var(--success);
+}
+.subitem-bar {
+  display: inline-block;
+  inline-size: 1.6rem;
+  block-size: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+  margin-inline-start: 3px;
+}
+.subitem-bar > span {
+  display: block;
+  block-size: 100%;
+  background: var(--success);
+}
+.board-table tr.sub-row-2 .name-cell {
+  padding-inline-start: calc(var(--space-6) * 2);
+}
+.toolbar.subitems-all {
+  margin-block-end: var(--space-2);
+}
+.subtasks {
+  margin-block-end: var(--space-4);
+}
+.subtasks-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-end: var(--space-2);
+}
+.subtasks-progress .progress-bar {
+  flex: 1;
+}
+.subtask-list {
+  margin: 0 0 var(--space-2);
+}
+.subtask {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+.subtask > input[type='checkbox'] {
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
+  flex: none;
+}
+.subtask-name {
+  flex: 1 1 12rem;
+  min-inline-size: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: 0.2rem 0.3rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 500;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.subtask-name:hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+.subtask.done .subtask-name {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+}
+.subtask-meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: 0.85rem;
+}
+.mywork-group {
+  margin-block-end: var(--space-4);
+}
+.mywork-group h2 {
+  margin-block-start: 0;
+}
+.date-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-block-start: var(--space-1);
+}
+.chip-btn {
+  min-block-size: 1.9rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.chip-btn:hover {
+  background: var(--surface-sunken);
+}
+.chip-btn[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: var(--primary-tint);
+  color: var(--primary-ink);
+  font-weight: 600;
+}
+@media print {
+  .date-shortcuts,
+  .subitems-all {
+    display: none;
+  }
+}

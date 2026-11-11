@@ -56,6 +56,7 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
     services.favorites.setFavorite(actorOf(req), param(req, 'id'), false);
     return { favorite: false };
   });
+  app.get('/me/work', async (req) => ({ items: dashboard.myWork(actorOf(req)) }));
   app.get('/me/recent-boards', async (req) => ({ boards: services.favorites.recent(actorOf(req)) }));
   app.get('/boards/:id/files', async (req) => ({ files: services.attachments.listForBoard(actorOf(req), param(req, 'id')) }));
 
