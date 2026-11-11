@@ -24,6 +24,8 @@ const QrSheetPage = lazy(() => import('./pages/field/QrPages').then((m) => ({ de
 const FormsPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormsPage })));
 const FormFillPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormFillPage })));
 const FormsAdminPage = lazy(() => import('./pages/field/FormPages').then((m) => ({ default: m.FormsAdminPage })));
+const ForgotPasswordPage = lazy(() => import('./pages/PasswordResetPages').then((m) => ({ default: m.ForgotPasswordPage })));
+const ResetPasswordPage = lazy(() => import('./pages/PasswordResetPages').then((m) => ({ default: m.ResetPasswordPage })));
 const FilesPage = lazy(() => import('./pages/board/FilesPage').then((m) => ({ default: m.FilesPage })));
 const DashboardsPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.DashboardsPage })));
 const CustomDashboardPage = lazy(() => import('./pages/dashboards/DashboardPages').then((m) => ({ default: m.CustomDashboardPage })));
@@ -70,6 +72,8 @@ export function App() {
           <FeedbackProvider>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/forgot-password" element={lazyPage(<ForgotPasswordPage />)} />
+              <Route path="/reset-password" element={lazyPage(<ResetPasswordPage />)} />
               <Route element={<RequireAuth />}>
                 <Route element={<Layout />}>
                   <Route index element={<DashboardPage />} />

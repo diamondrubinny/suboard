@@ -30,6 +30,7 @@ import { SsoService } from './sso.js';
 import { FavoriteService } from './favorites.js';
 import { FollowService } from './follow.js';
 import { BoardTemplateService } from './boardTemplates.js';
+import { PasswordResetService } from './passwordReset.js';
 import { ScimService } from './scim.js';
 import { DashboardService as CustomDashboardService, DependencyService, MonthlyReportJob } from './planning.js';
 import { ClamdScanner, UnsafeNoopScanner, type Scanner } from '../lib/clamav.js';
@@ -71,6 +72,7 @@ export interface Services {
   favorites: FavoriteService;
   follow: FollowService;
   boardTemplates: BoardTemplateService;
+  passwordReset: PasswordResetService;
 }
 
 /** Infrastructure that tests (or alternative deployments) can substitute. */
@@ -123,8 +125,9 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const favorites = new FavoriteService(db, access);
   const follow = new FollowService(db, access, boards, items, notifications);
   const boardTemplates = new BoardTemplateService(db, access, boards, audit);
+  const passwordReset = new PasswordResetService(db, config, audit, auth, mailer);
   return {
     audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
-    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, permits, procedures, plans, sso, scim, favorites, follow, boardTemplates,
+    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, permits, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset,
   };
 }

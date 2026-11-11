@@ -543,4 +543,19 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       );
     `,
   },
+  {
+    version: 11,
+    name: 'password_resets',
+    sql: /* sql */ `
+      -- Self-service password reset links: only the SHA-256 of the token is stored; one use, 30 minutes.
+      CREATE TABLE password_resets (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used_at TEXT
+      );
+      CREATE INDEX idx_password_resets_user ON password_resets(user_id, created_at);
+    `,
+  },
 ];

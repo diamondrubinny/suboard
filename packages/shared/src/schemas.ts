@@ -34,6 +34,12 @@ export const passwordSchema = z
   .max(LIMITS.passwordMax, `עד ${LIMITS.passwordMax} תווים`);
 
 // ---------- Auth ----------
+export const forgotPasswordSchema = z.object({ email: z.string().trim().toLowerCase().max(254) });
+export const resetPasswordSchema = z.object({
+  /** 32 random bytes, base64url (from the e-mailed link). */
+  token: z.string().regex(/^[A-Za-z0-9_-]{43}$/, 'הקישור אינו תקין'),
+  newPassword: passwordSchema,
+});
 export const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1, 'שדה חובה').max(LIMITS.passwordMax),

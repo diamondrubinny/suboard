@@ -92,6 +92,12 @@ TIME_ZONE=Asia/Jerusalem
 LOCAL_LOGIN=enabled
 # Test / staging site: keep it out of search engines. Remove for production.
 NOINDEX=true
+# E-mail (notifications + "forgot password"). Fill in and restart: systemctl restart suboard
+# SMTP_HOST=smtp.example.com
+# SMTP_PORT=587
+# SMTP_USER=
+# SMTP_PASSWORD=
+# MAIL_FROM=SUBoard <noreply@dreadlist.com>
 EOF
   chown suboard:suboard "$ENV_FILE"; chmod 600 "$ENV_FILE"
   echo "wrote $ENV_FILE (secrets generated here; back up MFA_ENCRYPTION_KEY separately from the DB)"

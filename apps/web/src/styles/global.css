@@ -3588,3 +3588,23 @@ kbd {
     display: none;
   }
 }
+
+/* ---------- password reset ---------- */
+.form-success {
+  margin-block-end: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--success);
+  border-inline-start-width: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--success-tint);
+  color: var(--ink);
+}
+.form-success:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.auth-aside {
+  margin: var(--space-4) 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+}

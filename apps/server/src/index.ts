@@ -22,6 +22,7 @@ async function main() {
       const trash = app.services.items.purgeTrash();
       const orphans = app.services.attachments.sweepOrphans();
       const runs = app.services.automations.purgeRunsOlderThan();
+      app.services.passwordReset.purgeExpired();
       if (sessions || audit || notifications || trash || orphans || runs) app.log.info({ sessions, audit, notifications, trash, orphans, runs }, 'housekeeping purge');
     } catch (err) {
       app.log.error({ err }, 'housekeeping failed');

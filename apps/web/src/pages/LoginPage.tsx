@@ -1,7 +1,7 @@
 import { apiUrl } from '../api/base';
 import { loginSchema, mfaCodeSchema, type SessionUser } from '@suboard/shared';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError, errorMessage, safeNextPath } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import unitLogo from '../assets/safety-unit-logo.webp';
@@ -33,7 +33,7 @@ export function LoginPage() {
     const m = /(?:^#|&)mfa=([^&]+)/.exec(window.location.hash);
     return m ? decodeURIComponent(m[1]!) : null;
   });
-  const [sso, setSso] = useState<{ enabled: boolean; label: string; localLogin: 'enabled' | 'admins_only' | 'disabled' } | null>(null);
+  const [sso, setSso] = useState<{ enabled: boolean; label: string; localLogin: 'enabled' | 'admins_only' | 'disabled'; passwordReset?: boolean } | null>(null);
   const [code, setCode] = useState('');
   const [useRecovery, setUseRecovery] = useState(false);
   const [error, setError] = useState<string | null>(() => SSO_ERRORS[params.get('sso_error') ?? ''] ?? null);
@@ -48,7 +48,7 @@ export function LoginPage() {
   }, [challenge, useRecovery]);
   useEffect(() => {
     if (window.location.hash.includes('mfa=')) history.replaceState(null, '', window.location.pathname + window.location.search);
-    api<{ enabled: boolean; label: string; localLogin: 'enabled' | 'admins_only' | 'disabled' }>('/auth/sso/config')
+    api<{ enabled: boolean; label: string; localLogin: 'enabled' | 'admins_only' | 'disabled'; passwordReset?: boolean }>('/auth/sso/config')
       .then(setSso)
       .catch(() => setSso({ enabled: false, label: '', localLogin: 'enabled' }));
   }, []);
@@ -240,6 +240,11 @@ export function LoginPage() {
                 {submitting ? 'מתחבר…' : 'התחברות'}
               </button>
             </form>
+              )}
+              {sso && sso.localLogin !== 'disabled' && (
+                <p className="auth-aside">
+                  {sso.passwordReset ? <Link to="/forgot-password">שכחתי סיסמה</Link> : <>שכחת סיסמה? פנו למנהל המערכת לאיפוס.</>}
+                </p>
               )}
             </>
           ) : (

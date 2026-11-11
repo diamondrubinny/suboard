@@ -12,7 +12,8 @@ async function main() {
   const config = loadConfig();
   if (config.env === 'production') throw new Error('seed-demo is disabled in production');
   const db = openDatabase(config.databasePath);
-  const s = createServices(db, config);
+  // Demo data never sends e-mail (fictitious addresses), even when SMTP is configured.
+  const s = createServices(db, config, { mailer: null });
   if (s.users.countUsers() > 0) throw new Error('Database is not empty — seed-demo only runs on a fresh database');
 
   const pw = () => `Demo-${randomBytes(9).toString('base64url')}`;

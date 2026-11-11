@@ -1,4 +1,4 @@
-import { changePasswordSchema, loginSchema, mfaDisableSchema, mfaEnableSchema, mfaVerifySchema, preferencesSchema } from '@suboard/shared';
+import { changePasswordSchema, forgotPasswordSchema, resetPasswordSchema, loginSchema, mfaDisableSchema, mfaEnableSchema, mfaVerifySchema, preferencesSchema } from '@suboard/shared';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { AppConfig } from '../config.js';
 import { actorOf, clearSessionCookie, setSessionCookie } from '../plugins/auth.js';
@@ -33,7 +33,19 @@ export async function authRoutes(app: FastifyInstance, { services, config }: { s
       .header('Referrer-Policy', 'no-referrer')
       .send(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=${escapeAttr(to)}"><title>מעביר…</title></head><body><p><a href="${escapeAttr(to)}">המשך</a></p></body></html>`);
 
-  app.get('/auth/sso/config', { config: { public: true } }, async () => services.sso.publicConfig());
+  app.get('/auth/sso/config', { config: { public: true } }, async () => ({ ...services.sso.publicConfig(), passwordReset: services.passwordReset.available }));
+
+  // ---- self-service password reset (public; same answer whether or not the account exists)
+  app.post('/auth/password/forgot', { config: { public: true, rateLimit: { max: 5, timeWindow: 15 * 60_000 } } }, async (req) => {
+    const { email } = forgotPasswordSchema.parse(req.body);
+    await services.passwordReset.request(email, { ip: req.ip });
+    return { ok: true };
+  });
+  app.post('/auth/password/reset', { config: { public: true, rateLimit: { max: 10, timeWindow: 15 * 60_000 } } }, async (req) => {
+    const { token, newPassword } = resetPasswordSchema.parse(req.body);
+    await services.passwordReset.reset(token, newPassword, { ip: req.ip });
+    return { ok: true };
+  });
 
   app.get('/auth/sso/start', { config: { public: true, rateLimit: loginLimit } }, async (req, reply) => {
     if (!services.sso.enabled) return hop(reply, `${config.basePath}/login?sso_error=unavailable`);
