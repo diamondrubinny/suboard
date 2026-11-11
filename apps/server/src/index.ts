@@ -62,8 +62,17 @@ async function main() {
   if (!app.services.attachments.scannerName) app.log.warn('No malware scanner configured: uploaded files stay quarantined and cannot be downloaded');
   if (app.services.attachments.scannerName === 'disabled-unsafe') app.log.warn('UNSAFE: malware scanning is disabled (development only)');
 
+  let closing = false;
   const shutdown = async (signal: string) => {
+    if (closing) return;
+    closing = true;
     app.log.info({ signal }, 'shutting down');
+    // Never hang a restart on a slow or stuck connection: in-flight requests get 10 seconds.
+    const force = setTimeout(() => {
+      app.log.warn('shutdown timed out; exiting');
+      process.exit(0);
+    }, 10_000);
+    force.unref();
     await app.close();
     db.close();
     process.exit(0);
