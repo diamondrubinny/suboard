@@ -1,4 +1,4 @@
-import { addDaysIso, findDueColumn, formatDateHe, isItemDone, findPrimaryStatusColumn, LIMITS, REACTION_LABELS, REACTIONS, todayIso, isOverdue, type BoardDetail, type CellValue, type DirectoryUser, type ItemUpdate, type Reaction } from '@suboard/shared';
+import { addDaysIso, isReadonlyColumnType, findDueColumn, formatDateHe, isItemDone, findPrimaryStatusColumn, LIMITS, REACTION_LABELS, REACTIONS, todayIso, isOverdue, type BoardDetail, type CellValue, type DirectoryUser, type ItemUpdate, type Reaction } from '@suboard/shared';
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import { errorMessage } from '../../api/client';
 import { useBoard, useBoards, useCreateItem, useDeleteItem, useItemActions, useItemActivity, useItemUpdates, useUpdateItem, useUpdateMutations, useFollow, useToggleFollow } from '../../api/hooks';
@@ -9,7 +9,8 @@ import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback
 import { Icon } from '../../components/Icon';
 import { Avatar, StatusPill } from '../../components/StatusPill';
 import { activityText, actorLabel, formatDateTime } from './activityText';
-import { childrenOf, depthOf, doneToggle, MAX_DEPTH, subtaskProgress, useUndoableUpdate } from './subtasks';
+import { childrenOf, depthOf, descendantsOf, doneToggle, MAX_DEPTH, subtaskProgress, useUndoableUpdate } from './subtasks';
+import { PersonalSection, SaveItemTemplateButton } from './PersonalPanel';
 import { appLink } from '../../api/base';
 import { AttachmentsPanel } from './AttachmentsPanel';
 import { LinksSection } from './LinksSection';
@@ -210,6 +211,7 @@ function DetailsPanel({
         נוצר: {formatDateTime(item.createdAt)} · עודכן: {formatDateTime(item.updatedAt)}
       </p>
       {depthOf(board, item) < MAX_DEPTH && <SubitemsSection board={board} parentId={item.id} users={users} onOpenItem={onOpenItem} />}
+      <PersonalSection itemId={item.id} />
       <LinksSection itemId={item.id} />
       {!parent && <DependenciesSection board={board} itemId={item.id} onOpenItem={onOpenItem} />}
       <div className="toolbar" style={{ marginTop: 'var(--space-3)' }}>
@@ -231,6 +233,7 @@ function DetailsPanel({
         >
           <Icon name="open" /> העתקת קישור
         </button>
+        {canEdit && <SaveItemTemplateButton item={item} subCount={descendantsOf(board, item.id).length} />}
         {parent && canEdit && (
           <button
             type="button"
@@ -863,20 +866,40 @@ function ReplyForm({ itemId, parent }: { itemId: string; parent: ItemUpdate }) {
 
 function HistoryPanel({ board, itemId, users }: { board: BoardDetail; itemId: string; users: DirectoryUser[] }) {
   const q = useItemActivity(itemId);
+  const { setValue } = useUndoableUpdate(board);
+  const item = board.items.find((i) => i.id === itemId);
+  const canEdit = board.myRole !== 'viewer';
   if (q.isPending) return <LoadingState />;
   if (q.isError) return <ErrorState message={errorMessage(q.error)} onRetry={() => q.refetch()} />;
   if (!q.data.length) return <p className="muted">אין היסטוריה.</p>;
   return (
     <ul className="list-plain activity-list">
-      {q.data.map((a) => (
-        <li key={a.id}>
-          <strong>{actorLabel(a)}</strong> {activityText(a, board, users)}
-          <br />
-          <time className="muted" dateTime={a.createdAt} style={{ fontSize: '0.82rem' }}>
-            {formatDateTime(a.createdAt)}
-          </time>
-        </li>
-      ))}
+      {q.data.map((a) => {
+        // A recorded value change of a column that still exists can be put back (long text keeps no old value).
+        const column = a.action === 'item_value_changed' ? board.columns.find((c) => c.id === a.detail.columnId) : undefined;
+        const restorable = Boolean(canEdit && item && column && 'from' in a.detail && !isReadonlyColumnType(column.type) && column.type !== 'checklist' && JSON.stringify(item.values[column.id] ?? null) !== JSON.stringify(a.detail.from ?? null));
+        return (
+          <li key={a.id} className="activity-row">
+            <span>
+              <strong>{actorLabel(a)}</strong> {activityText(a, board, users)}
+              <br />
+              <time className="muted" dateTime={a.createdAt} style={{ fontSize: '0.82rem' }}>
+                {formatDateTime(a.createdAt)}
+              </time>
+            </span>
+            {restorable && column && item && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                aria-label={`שחזור הערך הקודם של ${column.title} (מ-${formatDateTime(a.createdAt)})`}
+                onClick={() => setValue(item, column.id, (a.detail.from ?? null) as CellValue, `"${column.title}" שוחזר לערך קודם`)}
+              >
+                <Icon name="history" size={16} /> שחזור
+              </button>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

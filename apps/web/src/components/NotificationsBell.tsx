@@ -22,6 +22,7 @@ const TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
       : n.detail === 'moved'
         ? `${n.actorName ?? 'מישהו'} העביר/ה את "${n.title}" לקבוצה אחרת (במעקב)`
         : `${n.actorName ?? 'מישהו'} הוסיף/ה עדכון ל"${n.title}" (במעקב)`,
+  reminder: (n) => `תזכורת: "${n.title}"${n.detail ? ` — ${n.detail}` : ''}`,
   reply: (n) => `${n.actorName ?? 'מישהו'} ענה/תה לעדכון שלך ב"${n.title}"`,
 };
 

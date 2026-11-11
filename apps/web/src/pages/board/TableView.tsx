@@ -246,6 +246,47 @@ function SortHeader({
   );
 }
 
+const fmt = (n: number) => new Intl.NumberFormat('he-IL', { maximumFractionDigits: 1 }).format(n);
+
+/** Totals row of a group (top-level items shown): sum / average for numbers, average for progress and rating, count for checkboxes. */
+function GroupSummary({ columns, items, groupName }: { columns: Column[]; items: Item[]; groupName: string }) {
+  const cell = (c: Column): string | null => {
+    const vals = items.map((i) => i.values[c.id]);
+    if (c.type === 'number' || c.type === 'progress' || c.type === 'rating') {
+      const nums = vals.filter((v): v is number => typeof v === 'number');
+      if (!nums.length) return null;
+      const sum = nums.reduce((a, b) => a + b, 0);
+      const avg = sum / nums.length;
+      return c.type === 'number' ? `סה"כ ${fmt(sum)} · ממוצע ${fmt(avg)}` : c.type === 'progress' ? `ממוצע ${fmt(avg)}%` : `ממוצע ${fmt(avg)}`;
+    }
+    if (c.type === 'checkbox') return `${vals.filter((v) => v === true).length} מתוך ${items.length}`;
+    return null;
+  };
+  const cells = columns.map(cell);
+  if (!items.length || cells.every((x) => x === null)) return null;
+  return (
+    <tfoot>
+      <tr className="summary-row">
+        <td className="col-select" />
+        <th scope="row" className="col-name">
+          סיכום <span className="sr-only">הקבוצה {groupName}</span>
+          <span className="muted"> ({items.length} פריטים)</span>
+        </th>
+        {columns.map((c, i) => (
+          <td key={c.id} className="cell summary-cell">
+            {cells[i] && (
+              <>
+                <span className="sr-only">{c.title}: </span>
+                {cells[i]}
+              </>
+            )}
+          </td>
+        ))}
+      </tr>
+    </tfoot>
+  );
+}
+
 const narrow = (c: Column) => ['checkbox', 'number', 'rating', 'auto_id', 'progress'].includes(c.type);
 
 export function TableView({ board, items, users, onOpenItem, filtered, config, onSort, onResize, selected, onSelect }: Props) {
@@ -461,6 +502,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                     )}
                     {canEdit && <AddRow boardId={board.id} groupId={group.id} colSpan={columns.length} label={`פריט חדש בקבוצה ${group.name}`} />}
                   </tbody>
+                  <GroupSummary columns={columns} items={tops} groupName={group.name} />
                 </table>
               </div>
             )}

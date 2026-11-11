@@ -15,6 +15,7 @@ import { RiskMatrixView } from './RiskMatrixView';
 import { GanttView } from './GanttView';
 import { CalendarView } from './CalendarView';
 import { ItemDrawer } from './ItemDrawer';
+import { NewFromTemplate } from './PersonalPanel';
 import { KanbanView } from './KanbanView';
 import { TableView } from './TableView';
 import { filterItems } from './viewLogic';
@@ -156,6 +157,7 @@ export function BoardPage() {
           <Link to={`/boards/${b.id}/qr`} className="btn btn-ghost">
             <Icon name="grid" /> מדבקות QR
           </Link>
+          <NewFromTemplate board={b} onCreated={openItem} />
           {b.myRole === 'owner' && (
             <Link to={`/boards/${b.id}/forms`} className="btn">
               <Icon name="clipboard" /> טפסים

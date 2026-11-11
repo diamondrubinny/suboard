@@ -203,7 +203,7 @@ export interface MfaSetup {
   qrSvg: string;
 }
 
-export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly' | 'training' | 'procedure' | 'followed' | 'reply';
+export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly' | 'training' | 'procedure' | 'followed' | 'reply' | 'reminder';
 
 export interface AppNotification {
   id: string;
@@ -654,4 +654,26 @@ export interface MyWorkItem extends DashboardItemRef {
   complete: { columnId: string; optionId: string } | null;
   /** Current option id of the primary status (to undo "mark done"). */
   statusId: string | null;
+}
+
+// ---------- Wave M ----------
+export interface ItemReminder {
+  id: string;
+  itemId: string;
+  remindAt: string;
+  note: string;
+}
+/** What only the current user keeps on an item. */
+export interface ItemPersonal {
+  reminders: ItemReminder[];
+  note: string;
+}
+export interface ItemTemplate {
+  id: string;
+  boardId: string;
+  name: string;
+  /** Number of items the template creates (the item and all its sub-items). */
+  size: number;
+  createdBy: string | null;
+  createdByName: string | null;
 }

@@ -569,4 +569,40 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       DELETE FROM notifications WHERE kind = 'permit';
     `,
   },
+  {
+    version: 13,
+    name: 'personal_and_item_templates',
+    sql: /* sql */ `
+      -- Personal reminders on items: only their owner sees them.
+      CREATE TABLE item_reminders (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        remind_at TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        sent_at TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_item_reminders_due ON item_reminders(sent_at, remind_at);
+      CREATE INDEX idx_item_reminders_user ON item_reminders(user_id, item_id);
+      -- Private note per user per item.
+      CREATE TABLE item_notes (
+        item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (item_id, user_id)
+      );
+      -- Item templates of a board: a name / values tree (no people, dates, files or updates).
+      CREATE TABLE item_templates (
+        id TEXT PRIMARY KEY,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        tree_json TEXT NOT NULL,
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_item_templates_board ON item_templates(board_id);
+    `,
+  },
 ];

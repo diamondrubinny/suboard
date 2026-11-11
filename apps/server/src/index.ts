@@ -23,6 +23,7 @@ async function main() {
       const orphans = app.services.attachments.sweepOrphans();
       const runs = app.services.automations.purgeRunsOlderThan();
       app.services.passwordReset.purgeExpired();
+      app.services.personal.purgeSentReminders();
       if (sessions || audit || notifications || trash || orphans || runs) app.log.info({ sessions, audit, notifications, trash, orphans, runs }, 'housekeeping purge');
     } catch (err) {
       app.log.error({ err }, 'housekeeping failed');
@@ -42,6 +43,7 @@ async function main() {
     ['effectiveness checks', () => app.services.investigations.runDue()],
     ['monthly management report', () => app.services.monthly.run()],
     ['training reminders', () => app.services.trainings.runReminders()],
+    ['personal reminders', () => app.services.personal.runDueReminders()],
     ['rescan uploads', () => app.services.attachments.rescanPending()],
   ];
   const frequent = async () => {

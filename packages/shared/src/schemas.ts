@@ -590,6 +590,14 @@ export const quickFormSchema = z.object({
 });
 export type QuickFormInput = z.input<typeof quickFormSchema>;
 
+export const reminderSchema = z.object({
+  remindAt: z.string().max(40).refine((s) => !Number.isNaN(Date.parse(s)), 'מועד לא תקין'),
+  note: z.string().trim().max(200).default(''),
+});
+export const personalNoteSchema = z.object({ body: z.string().max(2000) });
+export const saveItemTemplateSchema = z.object({ name: line(80) });
+export const useItemTemplateSchema = z.object({ groupId: idSchema });
+
 export const submitFormSchema = z.object({ name: line(LIMITS.itemName), values: z.record(idSchema, z.unknown()).default({}) });
 
 // ---------- Wave D ----------

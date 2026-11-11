@@ -25,6 +25,8 @@ export type ActivityAction =
   | 'item_restored'
   | 'item_duplicated'
   | 'item_promoted'
+  | 'item_template_saved'
+  | 'item_template_deleted'
   | 'item_moved_out'
   | 'item_moved_in'
   | 'items_imported'

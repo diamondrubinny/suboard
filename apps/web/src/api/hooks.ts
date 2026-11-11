@@ -1,4 +1,7 @@
 import type {
+  ItemPersonal,
+  ItemReminder,
+  ItemTemplate,
   QuickFormInput,
   MyWorkItem,
   CustomTemplate,
@@ -882,4 +885,24 @@ export function useQuickForm() {
       void qc.invalidateQueries({ queryKey: qk.boards });
     },
   });
+}
+
+// ------------------------------------------------------------------ wave M
+export const useItemPersonal = (itemId: string) => useQuery({ queryKey: ['item-personal', itemId], queryFn: () => api<{ personal: ItemPersonal }>(`/items/${itemId}/personal`).then((r) => r.personal) });
+export const useItemTemplates = (boardId: string) => useQuery({ queryKey: ['item-templates', boardId], queryFn: () => api<{ templates: ItemTemplate[] }>(`/boards/${boardId}/item-templates`).then((r) => r.templates) });
+export function usePersonalMutations(itemId: string, boardId = '') {
+  const qc = useQueryClient();
+  const mine = () => void qc.invalidateQueries({ queryKey: ['item-personal', itemId] });
+  const templates = () => void qc.invalidateQueries({ queryKey: ['item-templates', boardId] });
+  return {
+    addReminder: useMutation({ mutationFn: (input: { remindAt: string; note: string }) => api<{ reminder: ItemReminder }>(`/items/${itemId}/reminders`, 'POST', input).then((r) => r.reminder), onSuccess: mine }),
+    removeReminder: useMutation({ mutationFn: (id: string) => api(`/reminders/${id}`, 'DELETE'), onSuccess: mine }),
+    saveNote: useMutation({ mutationFn: (body: string) => api<{ note: string }>(`/items/${itemId}/note`, 'PUT', { body }), onSuccess: mine }),
+    saveTemplate: useMutation({ mutationFn: (name: string) => api<{ template: ItemTemplate }>(`/items/${itemId}/save-as-template`, 'POST', { name }).then((r) => r.template), onSuccess: templates }),
+    useTemplate: useMutation({
+      mutationFn: ({ templateId, groupId }: { templateId: string; groupId: string }) => api<{ item: Item }>(`/item-templates/${templateId}/use`, 'POST', { groupId }).then((r) => r.item),
+      onSuccess: () => void qc.invalidateQueries({ queryKey: qk.board(boardId) }),
+    }),
+    removeTemplate: useMutation({ mutationFn: (id: string) => api(`/item-templates/${id}`, 'DELETE'), onSuccess: templates }),
+  };
 }

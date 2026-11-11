@@ -41,6 +41,7 @@ const KIND_TEXT: Record<NotificationKind, string> = {
   training: 'הדרכה',
   procedure: 'נוהל',
   followed: 'פריט במעקב',
+  reminder: 'תזכורת',
   reply: 'תשובה לעדכון',
 };
 
@@ -184,6 +185,12 @@ export class NotificationService {
         lines: [{ text: `${actor.name} הזכיר/ה אותך בעדכון על "${itemName}" בלוח "${boardName}".`, boardId, itemId }],
       });
     }
+  }
+
+  /** A personal reminder came due (the caller has re-checked access). */
+  onReminder(userId: string, boardId: string, itemId: string, itemName: string, note: string): void {
+    const id = this.insert(userId, 'reminder', boardId, itemId, itemName, null, note || null);
+    void this.emailOne(userId, id, { subject: 'SUBoard: תזכורת', lines: [{ text: `תזכורת שקבעת לפריט "${itemName}" בלוח "${this.boardName(boardId)}".`, boardId, itemId }] });
   }
 
   /** Someone replied to the user's update. */
