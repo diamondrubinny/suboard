@@ -262,11 +262,11 @@ export function LoginPage() {
               {sso?.passkeys && sso.localLogin !== 'disabled' && passkeysSupported() && (
                 <>
                   <p className="sso-or" aria-hidden="true"><span>או</span></p>
-                  <button type="button" className="btn passkey-btn" style={{ inlineSize: '100%' }} disabled={submitting} onClick={onPasskey} aria-describedby="passkey-hint">
-                    <Icon name="lock" /> כניסה עם מפתח גישה (Passkey){sso.localLogin === 'admins_only' ? ' — מנהלי מערכת' : ''}
+                  <button type="button" className="btn passkey-btn" style={{ inlineSize: '100%', whiteSpace: 'normal', blockSize: 'auto' }} disabled={submitting} onClick={onPasskey} aria-describedby="passkey-hint">
+                    <Icon name="lock" /> כניסה עם מפתח גישה (Passkey)
                   </button>
                   <p id="passkey-hint" className="hint" style={{ textAlign: 'center' }}>
-                    בלי סיסמה: טביעת אצבע, זיהוי פנים או קוד הנעילה של המכשיר.
+                    בלי סיסמה: טביעת אצבע, זיהוי פנים או קוד הנעילה של המכשיר.{sso.localLogin === 'admins_only' ? ' למנהלי מערכת בלבד.' : ''}
                   </p>
                 </>
               )}
