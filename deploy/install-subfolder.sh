@@ -32,6 +32,11 @@ ORIGIN="$(echo "$PUBLIC_URL" | sed -E 's#^(https://[^/]+).*#\1#')"
 BASE_PATH="${PUBLIC_URL#"$ORIGIN"}"          # e.g. /test
 command -v apt-get >/dev/null || die "this script supports Ubuntu / Debian (apt)"
 
+port_owner() { ss -ltnpH "( sport = :$1 )" 2>/dev/null | sed -n 's/.*users:(("\([^"]*\)".*/\1/p' | head -1; }
+if [ -n "$(port_owner "$PORT")" ] && ! systemctl is-active --quiet suboard 2>/dev/null; then
+  die "port $PORT is already used by '$(port_owner "$PORT")' (another application). Re-run with a free port, e.g.:  sudo SUBOARD_PORT=3100 bash $0 $PUBLIC_URL $ADMIN_EMAIL"
+fi
+
 echo "==> Packages"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
@@ -91,7 +96,9 @@ EOF
   chown suboard:suboard "$ENV_FILE"; chmod 600 "$ENV_FILE"
   echo "wrote $ENV_FILE (secrets generated here; back up MFA_ENCRYPTION_KEY separately from the DB)"
 else
-  echo "keeping existing $ENV_FILE"
+  echo "keeping existing $ENV_FILE (secrets unchanged); updating address and port"
+  set_env() { if grep -q "^$1=" "$ENV_FILE"; then sed -i "s#^$1=.*#$1=$2#" "$ENV_FILE"; else echo "$1=$2" >> "$ENV_FILE"; fi; }
+  set_env PORT "$PORT"; set_env APP_ORIGIN "$ORIGIN"; set_env PUBLIC_URL "$PUBLIC_URL"; set_env STATIC_DIR "$APP_DIR/apps/web/dist"
 fi
 
 echo "==> Build (folder $BASE_PATH)"
@@ -122,7 +129,11 @@ systemctl daemon-reload
 systemctl enable suboard
 systemctl restart suboard
 for i in $(seq 1 30); do curl -fs "http://127.0.0.1:$PORT/api/health" >/dev/null && break; sleep 1; done
-curl -fs "http://127.0.0.1:$PORT/api/health" >/dev/null || die "service did not start: journalctl -u suboard -n 50"
+# Make sure it is SUBoard that answers, under the folder (not another app on the same port).
+curl -fs "http://127.0.0.1:$PORT$BASE_PATH/api/auth/sso/config" | grep -q '"localLogin"' \
+  || die "SUBoard is not answering on 127.0.0.1:$PORT$BASE_PATH — see: journalctl -u suboard -n 50 --no-pager"
+curl -fs "http://127.0.0.1:$PORT$BASE_PATH/" | grep -q "$BASE_PATH/assets/" \
+  || die "the web app was not built for $BASE_PATH — re-run this script"
 
 echo "==> Administrator"
 ADMIN_PW=""
