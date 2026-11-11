@@ -73,7 +73,7 @@ export function QrLandingPage() {
           <div key={col.id} className="qr-field">
             <dt>{col.title}</dt>
             <dd>
-              <CellEditor column={col} value={c.item.values[col.id]} users={c.members} readOnly label={col.title} mode="drawer" seq={c.item.seq} createdBy={c.item.createdBy} updatedAt={c.item.updatedAt} onChange={() => undefined} />
+              <CellEditor column={col} value={c.item.values[col.id]} users={c.members} readOnly label={col.title} mode="drawer" seq={c.item.seq} createdBy={c.item.createdBy} values={c.item.values} columns={c.columns} updatedAt={c.item.updatedAt} onChange={() => undefined} />
             </dd>
           </div>
         ))}

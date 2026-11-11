@@ -158,6 +158,8 @@ export const columnSettingsSchema = z
   .object({
     options: z.array(statusOptionSchema).max(LIMITS.statusOptions).optional(),
     role: z.enum(['due']).optional(),
+    /** formula: the expression, with columns referenced by id — `{<column id>}` (or `{#n}` inside a template). */
+    formula: z.string().trim().min(1, 'יש להזין נוסחה').max(500).optional(),
     /** auto_id: prefix shown before the running number, e.g. "INC". */
     prefix: z.string().regex(/^[A-Za-z0-9]{0,10}$/, 'אותיות לטיניות וספרות בלבד, עד 10').optional(),
     /** checklist: the inspection items and (optionally) where failed items open a corrective action. */
@@ -250,6 +252,7 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
     case 'auto_id':
     case 'created_by':
     case 'updated_at':
+    case 'formula':
       // Computed from the item; any client value is rejected.
       return z.never();
     case 'risk':
@@ -272,6 +275,12 @@ export const createBoardSchema = z.object({
   templateKey: z.string().regex(/^[a-z_]{1,40}$/).default('blank'),
   /** Create from an organisation template (structure saved from another board) instead. */
   customTemplateId: idSchema.optional(),
+});
+
+export const duplicateBoardSchema = z.object({
+  name: line(LIMITS.boardName),
+  /** Also copy the items (without people, updates and files). */
+  withItems: z.boolean().default(false),
 });
 
 export const saveTemplateSchema = z.object({

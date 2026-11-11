@@ -1,4 +1,4 @@
-import { checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser } from '@suboard/shared';
+import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { colorStyle, StatusPill } from '../StatusPill';
 import { ContactEditor, DateRangeEditor, ProgressEditor, RatingEditor, TagsPicker } from './ExtraCells';
@@ -26,6 +26,9 @@ export interface CellEditorProps {
   createdBy?: string | null;
   /** Last update time (`updated_at` columns). */
   updatedAt?: string;
+  /** For `formula` columns: the board's columns and the item's cells the formula reads. */
+  columns?: Column[];
+  values?: Record<string, CellValue>;
 }
 
 /** Text-like input that commits on blur / Enter and reverts on Escape. */
@@ -96,7 +99,7 @@ function checklistLabel(label: string, column: Column, value: unknown): string {
 }
 
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt } = props;
+  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, columns, values } = props;
   const options = column.settings.options ?? [];
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -108,6 +111,15 @@ export function CellEditor(props: CellEditorProps) {
           {seq ? formatAutoId(seq, column.settings.prefix) : '—'}
         </span>
       );
+
+    case 'formula': {
+      const result = columns && values ? evaluateFormula(column, { values, seq: seq ?? 0 }, columns, todayIso()) : null;
+      return (
+        <span className={`cell-readonly formula-cell${typeof result === 'number' ? ' num' : ''}`} id={inputId}>
+          {result === null || result === '' ? <span aria-label="אין תוצאה">—</span> : formatFormulaValue(result)}
+        </span>
+      );
+    }
 
     case 'created_by':
       return (

@@ -24,6 +24,7 @@ export type ActivityAction =
   | 'attachment_removed'
   | 'item_restored'
   | 'item_duplicated'
+  | 'group_duplicated'
   | 'item_promoted'
   | 'item_template_saved'
   | 'item_template_deleted'

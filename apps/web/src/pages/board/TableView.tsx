@@ -1,4 +1,4 @@
-import { COLUMN_WIDTH, PALETTE, todayIso, isOverdue, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Group, type Item, type ViewConfig } from '@suboard/shared';
+import { COLUMN_WIDTH, PALETTE, todayIso, isOverdue, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Group, type Item, type ViewConfig, evaluateFormula } from '@suboard/shared';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { errorMessage } from '../../api/client';
 import { useCreateItem, useGroupMutations, useUpdateItem } from '../../api/hooks';
@@ -249,8 +249,15 @@ function SortHeader({
 const fmt = (n: number) => new Intl.NumberFormat('he-IL', { maximumFractionDigits: 1 }).format(n);
 
 /** Totals row of a group (top-level items shown): sum / average for numbers, average for progress and rating, count for checkboxes. */
-function GroupSummary({ columns, items, groupName }: { columns: Column[]; items: Item[]; groupName: string }) {
+function GroupSummary({ columns, allColumns, items, groupName }: { columns: Column[]; allColumns: Column[]; items: Item[]; groupName: string }) {
+  const today = todayIso();
   const cell = (c: Column): string | null => {
+    if (c.type === 'formula') {
+      const nums = items.map((i) => evaluateFormula(c, i, allColumns, today)).filter((v): v is number => typeof v === 'number');
+      if (!nums.length) return null;
+      const sum = nums.reduce((a, b) => a + b, 0);
+      return `סה"כ ${fmt(sum)} · ממוצע ${fmt(sum / nums.length)}`;
+    }
     const vals = items.map((i) => i.values[c.id]);
     if (c.type === 'number' || c.type === 'progress' || c.type === 'rating') {
       const nums = vals.filter((v): v is number => typeof v === 'number');
@@ -394,6 +401,8 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
               seq={item.seq}
               createdBy={item.createdBy}
               updatedAt={item.updatedAt}
+              columns={board.columns}
+              values={item.values}
               onChange={(v) => setValue(item, c.id, v)}
               onOpenItem={() => onOpenItem(item.id)}
             />
@@ -502,7 +511,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                     )}
                     {canEdit && <AddRow boardId={board.id} groupId={group.id} colSpan={columns.length} label={`פריט חדש בקבוצה ${group.name}`} />}
                   </tbody>
-                  <GroupSummary columns={columns} items={tops} groupName={group.name} />
+                  <GroupSummary columns={columns} allColumns={board.columns} items={tops} groupName={group.name} />
                 </table>
               </div>
             )}

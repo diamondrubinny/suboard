@@ -1,4 +1,4 @@
-import { MAX_SUBITEM_DEPTH, isReadonlyColumnType, cellValueSchema, LIMITS, REACTIONS, type CellValue, type Reaction, type UpdateReaction, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
+import { MAX_SUBITEM_DEPTH, isReadonlyColumnType, cellValueSchema, LIMITS, REACTIONS, type CellValue, type Group, type Reaction, type UpdateReaction, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
 import { nowIso, type DB } from '../db/index.js';
 import { newId } from '../lib/crypto.js';
 import { AppError, badRequest, forbidden, notFound } from '../lib/errors.js';
@@ -40,6 +40,9 @@ export interface CommentEvent {
   /** Already notified as mentioned / replied-to: followers' notice skips them. */
   notified: string[];
 }
+
+/** Largest group / board that can be copied in one action. */
+export const MAX_BULK_COPY = 2000;
 
 export class ItemService {
   constructor(
@@ -503,6 +506,68 @@ export class ItemService {
     const copy = this.getRow(newIdValue);
     this.emit({ kind: 'created', boardId, actorId: actor.id, before: null, after: copy });
     return copy;
+  }
+
+  /** Live items of a board, parents before their children. */
+  private liveTree(boardId: string): Item[] {
+    return (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL ORDER BY position').all(boardId) as ItemRow[]).map(toItem);
+  }
+
+  /**
+   * Copies a group with all its items and sub-items into a new group right in the same board.
+   * A bulk copy: no notifications and no automations run for the copies.
+   */
+  duplicateGroup(actor: Actor, groupId: string): { group: Group; items: number } {
+    const boardId = this.access.boardIdForGroup(groupId);
+    this.access.requireBoard(actor, boardId, 'editor');
+    const source = this.boards.groups(boardId).find((g) => g.id === groupId)!;
+    const all = this.liveTree(boardId).filter((i) => i.groupId === groupId);
+    if (all.length > MAX_BULK_COPY) throw badRequest(`אפשר לשכפל קבוצה של עד ${MAX_BULK_COPY} פריטים`);
+    const group = this.boards.createGroup(actor, boardId, { name: `${source.name} (עותק)`.slice(0, LIMITS.groupName), color: source.color });
+    this.db.transaction(() => {
+      const copy = (parentFrom: string | null, parentTo: string | null) => {
+        for (const it of all.filter((i) => i.parentId === parentFrom)) copy(it.id, this.insertItem(actor, boardId, group.id, parentTo, it.name, it.values));
+      };
+      copy(null, null);
+      this.activity.record(boardId, actor.id, 'group_duplicated', { name: source.name, items: all.length });
+      this.boards.touch(boardId);
+    })();
+    return { group, items: all.length };
+  }
+
+  countLive(boardId: string): number {
+    return (this.db.prepare('SELECT COUNT(*) AS n FROM items WHERE board_id = ? AND deleted_at IS NULL').get(boardId) as { n: number }).n;
+  }
+
+  /**
+   * Fills a freshly duplicated board with copies of the source board's items (groups and columns
+   * are matched by position). People, checklist results, updates and files are not copied: the new
+   * board starts with its creator as the only member. Callers check access to both boards.
+   */
+  copyBoardItems(actor: Actor, fromBoardId: string, toBoardId: string): number {
+    const fromGroups = this.boards.groups(fromBoardId);
+    const toGroups = this.boards.groups(toBoardId);
+    const fromCols = this.boards.columns(fromBoardId);
+    const toCols = this.boards.columns(toBoardId);
+    const colMap = new Map<string, string>();
+    fromCols.forEach((c, i) => {
+      const dst = toCols[i];
+      if (dst && dst.type === c.type && !isReadonlyColumnType(c.type) && c.type !== 'person' && c.type !== 'checklist') colMap.set(c.id, dst.id);
+    });
+    const all = this.liveTree(fromBoardId);
+    this.db.transaction(() => {
+      const copy = (parentFrom: string | null, parentTo: string | null) => {
+        for (const it of all.filter((i) => i.parentId === parentFrom)) {
+          const group = toGroups[fromGroups.findIndex((g) => g.id === it.groupId)] ?? toGroups[0];
+          if (!group) continue;
+          const values = Object.fromEntries(Object.entries(it.values).flatMap(([k, v]) => (colMap.has(k) ? [[colMap.get(k)!, v]] : [])));
+          copy(it.id, this.insertItem(actor, toBoardId, group.id, parentTo, it.name, values));
+        }
+      };
+      copy(null, null);
+      this.boards.touch(toBoardId);
+    })();
+    return all.length;
   }
 
   /**

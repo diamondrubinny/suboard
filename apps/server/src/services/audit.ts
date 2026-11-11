@@ -18,6 +18,7 @@ export type AuditEvent =
   | 'user_created'
   | 'user_updated'
   | 'board_created'
+  | 'board_duplicated'
   | 'template_created'
   | 'template_deleted'
   | 'board_archived'

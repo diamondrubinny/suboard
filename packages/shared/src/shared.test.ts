@@ -197,3 +197,82 @@ describe('risk matrix and checklist (wave C)', () => {
     expect(cellValueSchema('checklist').safeParse({ a: { r: 'maybe' } }).success).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------- formula columns
+import { evaluateFormula, formatFormulaValue, formulaToDisplay, formulaToStored, mapFormulaRefs, validateFormula, FORMULA_MAX_LENGTH } from './formula.js';
+import type { Column as FCol } from './types.js';
+
+describe('formula columns', () => {
+  const col = (id: string, title: string, type: FCol['type'], settings: FCol['settings'] = {}): FCol => ({ id, boardId: 'b', title, type, settings, position: 0 });
+  const cols: FCol[] = [
+    col('cost', 'עלות', 'number'),
+    col('qty', 'כמות', 'number'),
+    col('due', 'תאריך יעד', 'date'),
+    col('st', 'סטטוס', 'status', { options: [{ id: 'd', label: 'בוצע', color: 'green' }, { id: 'o', label: 'פתוח', color: 'gray' }] }),
+    col('ok', 'אושר', 'checkbox'),
+    col('risk', 'סיכון', 'risk'),
+    col('txt', 'מיקום', 'text'),
+    col('ppl', 'אחראי', 'person'),
+    col('f2', 'אחר', 'formula', { formula: '1' }),
+  ];
+  const item = { seq: 7, values: { cost: 100, qty: 3, due: '2026-11-21', st: 'd', ok: true, risk: { l: 3, s: 4 }, txt: 'מעבדה 214' } };
+  const run = (formula: string, values: Record<string, unknown> = item.values) =>
+    evaluateFormula(col('f', 'נוסחה', 'formula', { formula }), { seq: 7, values: values as never }, cols, '2026-11-11');
+
+  it('does arithmetic with precedence, parentheses and unary minus', () => {
+    expect(run('{cost} * {qty}')).toBe(300);
+    expect(run('1 + 2 * 3')).toBe(7);
+    expect(run('(1 + 2) * 3')).toBe(9);
+    expect(run('-{cost} + 10')).toBe(-90);
+    expect(run('ROUND({cost} * 1.18 / 7, 2)')).toBe(16.86);
+    expect(run('MAX({cost}, {qty}, 250) - MIN({cost}, {qty})')).toBe(247);
+    expect(run('AVG({cost}, {qty})')).toBe(51.5);
+    expect(run('{risk}')).toBe(12);
+    expect(run('{cost} + {ok}')).toBe(101);
+  });
+
+  it('treats dates as day numbers and blanks as blanks', () => {
+    expect(run('DAYS({due}, TODAY())')).toBe(10);
+    expect(run('{due} - TODAY()')).toBe(10);
+    expect(run('{cost} * {qty}', { cost: 5 })).toBeNull();
+    expect(run('{cost} / {qty}', { cost: 5, qty: 0 })).toBeNull();
+    expect(run('SUM({cost}, {qty})', { cost: 5 })).toBe(5);
+    expect(run('IF(EMPTY({qty}), 0, {qty})', {})).toBe(0);
+    expect(run('{cost} > 3', {})).toBe(false);
+  });
+
+  it('compares, branches and joins text', () => {
+    expect(run('IF({st} = "בוצע", "סגור", "פתוח")')).toBe('סגור');
+    expect(run('IF(AND({cost} >= 100, NOT({qty} > 5)), 1, 2)')).toBe(1);
+    expect(run('IF(OR({cost} < 1, {st} != "בוצע"), "כן", "לא")')).toBe('לא');
+    expect(run('{txt} & " / " & {cost}')).toBe('מעבדה 214 / 100');
+    expect(run('CONCAT("#", {qty})')).toBe('#3');
+    expect(formatFormulaValue(run('{cost} * 12.345'))).toBe('1,234.5');
+    expect(formatFormulaValue(run('{cost} > 1'))).toBe('כן');
+    expect(formatFormulaValue(null)).toBe('');
+  });
+
+  it('rejects anything that is not the formula language', () => {
+    const bad = (f: string) => expect(validateFormula(f, cols), f).toBeTruthy();
+    for (const f of ['', '1 +', '(1', 'FOO(1)', 'IF(1,2)', '{nope} + 1', '{f2} + 1', '{ppl}', 'alert(1)', 'constructor', '1; 2', '"open', '{cost', '__proto__', 'this.x', '1 ** 2', 'a.b()', '`x`'])
+      bad(f);
+    expect(validateFormula('x'.repeat(FORMULA_MAX_LENGTH + 1), cols)).toBeTruthy();
+    expect(validateFormula('('.repeat(60) + '1' + ')'.repeat(60), cols)).toBeTruthy();
+    expect(validateFormula(Array(300).fill('1').join('+'), cols)).toBeTruthy();
+    expect(validateFormula('IF({st} = "בוצע", 0, DAYS({due}, TODAY()))', cols)).toBeNull();
+    // a broken or dangling formula never throws at evaluation time
+    expect(run('1 +')).toBeNull();
+    expect(run('{gone} * 2')).toBeNull();
+  });
+
+  it('converts between titles, ids and template positions without touching text in quotes', () => {
+    const stored = formulaToStored('IF({סטטוס} = "{עלות}", {עלות} * { כמות }, 0)', cols);
+    expect(stored).toEqual({ formula: 'IF({st} = "{עלות}", {cost} * {qty}, 0)', unknown: [] });
+    expect(formulaToStored('{אין כזו} + 1', cols).unknown).toEqual(['אין כזו']);
+    expect(formulaToDisplay('{cost} * {deleted}', cols)).toBe('{עלות} * {?}');
+    const ids = cols.map((c) => c.id);
+    const portable = mapFormulaRefs('{cost} * {qty}', (id) => `#${ids.indexOf(id)}`).formula;
+    expect(portable).toBe('{#0} * {#1}');
+    expect(mapFormulaRefs(portable, (r) => ['new-a', 'new-b'][Number(r.slice(1))] ?? null).formula).toBe('{new-a} * {new-b}');
+  });
+});

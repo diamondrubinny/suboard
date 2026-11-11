@@ -4,6 +4,7 @@ import {
   createGroupSchema,
   createItemSchema,
   createUpdateSchema,
+  duplicateBoardSchema,
   idSchema,
   reactionSchema,
   saveTemplateSchema,
@@ -17,6 +18,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { actorOf } from '../plugins/auth.js';
 import type { Services } from '../services/index.js';
 import { listTemplates } from '../services/templates.js';
+import { MAX_BULK_COPY } from '../services/items.js';
+import { badRequest } from '../lib/errors.js';
 
 const param = (req: FastifyRequest, name: string): string => idSchema.parse((req.params as Record<string, string>)[name]);
 
@@ -40,6 +43,20 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
   app.post('/boards', async (req, reply) => {
     const board = boards.create(actorOf(req), createBoardSchema.parse(req.body), (id) => services.boardTemplates.structure(id));
     return reply.code(201).send({ board });
+  });
+
+  /** A new board with the same groups and columns (and optionally the items). Members, automations, forms, updates and files stay behind. */
+  app.post('/boards/:id/duplicate', { config: { rateLimit: { max: 20, timeWindow: 15 * 60_000 } } }, async (req, reply) => {
+    const actor = actorOf(req);
+    const sourceId = param(req, 'id');
+    const input = duplicateBoardSchema.parse(req.body);
+    services.access.requireBoard(actor, sourceId, 'owner');
+    if (input.withItems && services.items.countLive(sourceId) > MAX_BULK_COPY) throw badRequest(`אפשר לשכפל עם פריטים לוח של עד ${MAX_BULK_COPY} פריטים`);
+    const structure = services.boardTemplates.structureOfBoard(sourceId);
+    const board = boards.create(actor, { name: input.name, templateKey: structure.baseKey, customTemplateId: sourceId }, () => structure);
+    const items = input.withItems ? services.items.copyBoardItems(actor, sourceId, board.id) : 0;
+    services.audit.log('board_duplicated', { userId: actor.id, ip: req.ip, meta: { fromBoardId: sourceId, boardId: board.id, items } });
+    return reply.code(201).send({ board: boards.get(actor, board.id), items });
   });
 
   app.get('/boards/:id', async (req) => {
@@ -90,6 +107,9 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
     const group = boards.createGroup(actorOf(req), param(req, 'id'), createGroupSchema.parse(req.body));
     return reply.code(201).send({ group });
   });
+  app.post('/groups/:id/duplicate', { config: { rateLimit: { max: 30, timeWindow: 15 * 60_000 } } }, async (req, reply) =>
+    reply.code(201).send(services.items.duplicateGroup(actorOf(req), param(req, 'id'))),
+  );
   app.patch('/groups/:id', async (req) => ({
     group: boards.updateGroup(actorOf(req), param(req, 'id'), updateGroupSchema.parse(req.body)),
   }));

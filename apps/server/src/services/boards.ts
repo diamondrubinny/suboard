@@ -1,4 +1,4 @@
-import {
+import { mapFormulaRefs, validateFormula,
   COLOR_KEYS,
   LIMITS,
   type BoardDetail,
@@ -101,10 +101,16 @@ export class BoardService {
       template.groups.forEach((g, i) => {
         this.db.prepare('INSERT INTO board_groups (id, board_id, name, color, position) VALUES (?, ?, ?, ?, ?)').run(newId(), id, g.name, g.color, i);
       });
+      // Formulas in a template point at columns by position ({#n}); here they get the new column ids.
+      const columnIds = template.columns.map(() => newId());
       template.columns.forEach((c, i) => {
+        const settings: ColumnSettings = { ...(c.settings ?? {}) };
+        if (c.type === 'formula' && settings.formula) {
+          settings.formula = mapFormulaRefs(settings.formula, (ref) => (/^#\d+$/.test(ref) ? (columnIds[Number(ref.slice(1))] ?? null) : null)).formula;
+        }
         this.db
           .prepare('INSERT INTO board_columns (id, board_id, title, type, settings, position) VALUES (?, ?, ?, ?, ?, ?)')
-          .run(newId(), id, c.title, c.type, JSON.stringify(c.settings ?? {}), i);
+          .run(columnIds[i], id, c.title, c.type, JSON.stringify(settings), i);
       });
       this.activity.record(id, actor.id, 'board_created', { name: input.name, template: template.key, ...(custom ? { customTemplate: true } : {}) });
     })();
@@ -285,6 +291,15 @@ export class BoardService {
     if (settings?.prefix !== undefined) {
       if (type !== 'auto_id') throw badRequest('תחילית מותרת רק בעמודת מזהה רץ');
       if (settings.prefix) s.prefix = settings.prefix;
+    }
+    if (type === 'formula') {
+      const formula = settings?.formula?.trim();
+      if (!formula) throw badRequest('יש להזין נוסחה', { formula: 'יש להזין נוסחה' });
+      const problem = boardId ? validateFormula(formula, this.columns(boardId)) : null;
+      if (problem) throw badRequest(problem, { formula: problem });
+      s.formula = formula;
+    } else if (settings?.formula !== undefined) {
+      throw badRequest('נוסחה מותרת רק בעמודת נוסחה');
     }
     if (settings?.role === 'due') {
       if (type !== 'date') throw badRequest('רק עמודת תאריך יכולה לשמש כתאריך יעד');

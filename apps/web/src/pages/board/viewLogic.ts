@@ -1,4 +1,4 @@
-import { isDateRange, findPrimaryStatusColumn, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Item, type ViewConfig } from '@suboard/shared';
+import { evaluateFormula, todayIso, isDateRange, findPrimaryStatusColumn, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Item, type ViewConfig } from '@suboard/shared';
 
 /** Items matching the view's search / status / "mine" filters (parents and sub-items alike). */
 export function filterItems(board: BoardDetail, config: ViewConfig, userId: string | undefined): Item[] {
@@ -15,8 +15,12 @@ export function filterItems(board: BoardDetail, config: ViewConfig, userId: stri
 }
 
 /** A comparable key for a cell: labels by option order, people by name, ranges by start date. */
-function sortKey(c: Column | undefined, v: CellValue | undefined, item: Item, users: DirectoryUser[]): string | number | null {
+function sortKey(c: Column | undefined, v: CellValue | undefined, item: Item, users: DirectoryUser[], columns: Column[]): string | number | null {
   if (!c) return null;
+  if (c.type === 'formula') {
+    const r = evaluateFormula(c, item, columns, todayIso());
+    return typeof r === 'boolean' ? (r ? 1 : 0) : r;
+  }
   if (c.type === 'auto_id') return item.seq;
   if (c.type === 'created_by') return item.createdBy ? (users.find((u) => u.id === item.createdBy)?.name ?? null) : 'אוטומציה';
   if (c.type === 'updated_at') return item.updatedAt;
@@ -46,7 +50,7 @@ export function sortItems(items: Item[], columns: Column[], sort: ViewConfig['so
   const byPos = [...items].sort((a, b) => a.position - b.position);
   if (!sort) return byPos;
   const col = columns.find((c) => c.id === sort.by);
-  const key = (i: Item) => (sort.by === 'name' ? i.name : sort.by === 'seq' ? i.seq : sortKey(col, i.values[sort.by], i, users));
+  const key = (i: Item) => (sort.by === 'name' ? i.name : sort.by === 'seq' ? i.seq : sortKey(col, i.values[sort.by], i, users, columns));
   const dir = sort.dir === 'asc' ? 1 : -1;
   return byPos.sort((a, b) => {
     const ka = key(a);

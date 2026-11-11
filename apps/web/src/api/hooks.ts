@@ -246,6 +246,14 @@ export function useUpdateBoard(boardId: string) {
   });
 }
 
+export function useDuplicateBoard(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; withItems: boolean }) => api<{ board: BoardDetail; items: number }>(`/boards/${boardId}/duplicate`, 'POST', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.boards }),
+  });
+}
+
 export function useArchiveBoard(boardId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -412,6 +420,10 @@ export function useGroupMutations(boardId: string) {
       mutationFn: ({ groupId, patch }: { groupId: string; patch: { name?: string; color?: string } }) =>
         api<{ group: Group }>(`/groups/${groupId}`, 'PATCH', patch).then((r) => r.group),
       onSuccess: (group) => update((b) => ({ ...b, groups: b.groups.map((g) => (g.id === group.id ? group : g)) })),
+    }),
+    duplicate: useMutation({
+      mutationFn: (groupId: string) => api<{ group: Group; items: number }>(`/groups/${groupId}/duplicate`, 'POST', {}),
+      onSuccess: refresh,
     }),
     remove: useMutation({
       mutationFn: (groupId: string) => api(`/groups/${groupId}`, 'DELETE'),

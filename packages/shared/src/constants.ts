@@ -29,12 +29,13 @@ export const COLUMN_TYPES = [
   'checklist',
   'created_by',
   'updated_at',
+  'formula',
 ] as const;
 
 /** Column types that hold a list of label options in their settings. */
 export const OPTION_COLUMN_TYPES = ['status', 'tags'] as const;
 /** Column types computed by the server (not editable by users). */
-export const READONLY_COLUMN_TYPES = ['auto_id', 'created_by', 'updated_at'] as const;
+export const READONLY_COLUMN_TYPES = ['auto_id', 'created_by', 'updated_at', 'formula'] as const;
 export type ColumnType = (typeof COLUMN_TYPES)[number];
 /** Computed from the item itself (running number, creator, last update): no stored value, never edited. */
 export function isReadonlyColumnType(type: ColumnType): boolean {
@@ -92,6 +93,7 @@ export const COLUMN_TYPE_LABELS: Record<ColumnType, string> = {
   checklist: 'צ\'קליסט בדיקה',
   created_by: 'נוצר ע"י',
   updated_at: 'עודכן לאחרונה',
+  formula: 'נוסחה (חישוב אוטומטי)',
 };
 
 export const LIMITS = {

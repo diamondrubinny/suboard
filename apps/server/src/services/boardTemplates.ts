@@ -1,4 +1,4 @@
-import { columnSettingsSchema, COLOR_KEYS, COLUMN_TYPES, MAX_CUSTOM_TEMPLATES, type ColorKey, type ColumnSettings, type ColumnType, type CustomTemplate } from '@suboard/shared';
+import { mapFormulaRefs, columnSettingsSchema, COLOR_KEYS, COLUMN_TYPES, MAX_CUSTOM_TEMPLATES, type ColorKey, type ColumnSettings, type ColumnType, type CustomTemplate } from '@suboard/shared';
 import { z } from 'zod';
 import { nowIso, type DB } from '../db/index.js';
 import { newId } from '../lib/crypto.js';
@@ -84,11 +84,8 @@ export class BoardTemplateService {
     return s;
   }
 
-  saveFromBoard(actor: Actor, boardId: string, input: { name: string; description?: string }): CustomTemplate {
-    if (!BoardTemplateService.canCreateBoards(actor)) throw forbidden('רק מנהלים יכולים לשמור תבניות');
-    this.access.requireBoard(actor, boardId, 'owner');
-    const count = (this.db.prepare('SELECT COUNT(*) AS n FROM board_templates').get() as { n: number }).n;
-    if (count >= MAX_CUSTOM_TEMPLATES) throw badRequest(`ניתן לשמור עד ${MAX_CUSTOM_TEMPLATES} תבניות; מחקו תבנית ישנה`);
+  /** The portable structure of a live board (callers check access). */
+  structureOfBoard(boardId: string): TemplateStructure {
     const board = this.db.prepare('SELECT template_key FROM boards WHERE id = ?').get(boardId) as { template_key: string };
     const groups = this.boards.groups(boardId).map((g) => ({ name: g.name, color: g.color }));
     const columns = this.boards.columns(boardId).map((c) => {
@@ -96,11 +93,33 @@ export class BoardTemplateService {
       if (settings.checklist) settings.checklist = { items: settings.checklist.items }; // drop links to other boards
       return { title: c.title, type: c.type, settings };
     });
+    return BoardTemplateService.portable(columns, this.boards.columns(boardId).map((c) => c.id), groups, board.template_key);
+  }
+
+  /** Column ids mean nothing outside their board: formulas are stored by column position ({#n}). */
+  private static portable(columns: TemplateStructure['columns'], ids: string[], groups: TemplateStructure['groups'], baseKey: string): TemplateStructure {
+    return {
+      baseKey,
+      groups,
+      columns: columns.map((c) =>
+        c.type === 'formula' && c.settings.formula
+          ? { ...c, settings: { ...c.settings, formula: mapFormulaRefs(c.settings.formula, (id) => (ids.includes(id) ? `#${ids.indexOf(id)}` : null)).formula } }
+          : c,
+      ),
+    };
+  }
+
+  saveFromBoard(actor: Actor, boardId: string, input: { name: string; description?: string }): CustomTemplate {
+    if (!BoardTemplateService.canCreateBoards(actor)) throw forbidden('רק מנהלים יכולים לשמור תבניות');
+    this.access.requireBoard(actor, boardId, 'owner');
+    const count = (this.db.prepare('SELECT COUNT(*) AS n FROM board_templates').get() as { n: number }).n;
+    if (count >= MAX_CUSTOM_TEMPLATES) throw badRequest(`ניתן לשמור עד ${MAX_CUSTOM_TEMPLATES} תבניות; מחקו תבנית ישנה`);
+    const { groups, columns, baseKey } = this.structureOfBoard(boardId);
     const id = newId();
     const ts = nowIso();
     this.db
       .prepare('INSERT INTO board_templates (id, name, description, base_key, groups_json, columns_json, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(id, input.name, input.description ?? '', board.template_key, JSON.stringify(groups), JSON.stringify(columns), actor.id, ts);
+      .run(id, input.name, input.description ?? '', baseKey, JSON.stringify(groups), JSON.stringify(columns), actor.id, ts);
     this.audit.log('template_created', { userId: actor.id, meta: { templateId: id, fromBoardId: boardId } });
     return this.list(actor).find((t) => t.id === id)!;
   }

@@ -15,13 +15,14 @@ import {
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../api/client';
-import { useArchiveBoard, useBoard, useColumnMutations, useDirectory, useGroupMutations, useMemberMutations, useTemplateMutations, useTemplates, useUpdateBoard } from '../../api/hooks';
+import { useArchiveBoard, useDuplicateBoard, useBoard, useColumnMutations, useDirectory, useGroupMutations, useMemberMutations, useTemplateMutations, useTemplates, useUpdateBoard } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
 import { usePageTitle } from '../../components/Layout';
 import { colorStyle } from '../../components/StatusPill';
 import { ChecklistSettingsEditor, ComplianceSection } from './FieldSettings';
+import { FormulaEditor } from './FormulaEditor';
 
 export function BoardSettingsPage() {
   const { boardId = '' } = useParams();
@@ -55,6 +56,7 @@ export function BoardSettingsPage() {
         <GroupsSection board={b} />
         <MembersSection board={b} />
         <TemplateSection board={b} />
+        <DuplicateSection board={b} />
         <DangerSection board={b} />
       </div>
     </>
@@ -167,6 +169,7 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
   const add = (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return toast('יש להזין כותרת לעמודה', 'error');
+    if (type === 'formula') return toast('יש לכתוב את הנוסחה למטה וללחוץ "הוספת עמודת נוסחה"', 'error');
     create.mutate({ title: title.trim(), type }, { onSuccess: () => (setTitle(''), toast('העמודה נוספה')), onError: onErr });
   };
 
@@ -204,6 +207,11 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
                     עריכת סעיפים
                   </button>
                 )}
+                {c.type === 'formula' && (
+                  <button type="button" className="btn btn-sm" aria-expanded={editing === c.id} onClick={() => setEditing(editing === c.id ? null : c.id)}>
+                    עריכת הנוסחה
+                  </button>
+                )}
                 {c.type === 'auto_id' && <PrefixInput column={c} onSave={(prefix) => update.mutate({ columnId: c.id, patch: { settings: { prefix } } }, { onError: onErr })} />}
                 <button
                   type="button"
@@ -229,7 +237,15 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
                 }
               />
             )}
-            {editing === c.id && c.type !== 'checklist' && (
+            {editing === c.id && c.type === 'formula' && (
+              <FormulaEditor
+                column={c}
+                columns={board.columns}
+                saving={update.isPending}
+                onSave={(formula) => update.mutate({ columnId: c.id, patch: { settings: { formula } } }, { onSuccess: () => (setEditing(null), toast('הנוסחה נשמרה')), onError: onErr })}
+              />
+            )}
+            {editing === c.id && c.type !== 'checklist' && c.type !== 'formula' && (
               <StatusOptionsEditor
                 column={c}
                 saving={update.isPending}
@@ -259,10 +275,22 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
             </option>
           ))}
         </select>
-        <button type="submit" className="btn" disabled={create.isPending}>
-          <Icon name="plus" /> הוספת עמודה
-        </button>
+        {type !== 'formula' && (
+          <button type="submit" className="btn" disabled={create.isPending}>
+            <Icon name="plus" /> הוספת עמודה
+          </button>
+        )}
       </form>
+      {type === 'formula' && (
+        <FormulaEditor
+          columns={board.columns}
+          saving={create.isPending}
+          onSave={(formula) => {
+            if (!title.trim()) return toast('יש להזין כותרת לעמודה', 'error');
+            create.mutate({ title: title.trim(), type: 'formula', settings: { formula } }, { onSuccess: () => (setTitle(''), setType('text'), toast('עמודת הנוסחה נוספה')), onError: onErr });
+          }}
+        />
+      )}
     </section>
   );
 }
@@ -306,7 +334,7 @@ function ColumnTitleInput({ column, onSave }: { column: Column; onSave: (t: stri
 }
 
 function GroupsSection({ board }: { board: BoardDetail }) {
-  const { remove, update } = useGroupMutations(board.id);
+  const { remove, update, duplicate } = useGroupMutations(board.id);
   const { toast, confirm } = useFeedback();
   return (
     <section className="card" aria-labelledby="groups-h">
@@ -332,6 +360,15 @@ function GroupsSection({ board }: { board: BoardDetail }) {
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                className="btn btn-sm"
+                aria-label={`שכפול הקבוצה ${g.name}`}
+                disabled={duplicate.isPending}
+                onClick={() => duplicate.mutate(g.id, { onSuccess: (r) => toast(`הקבוצה שוכפלה (${r.items} פריטים)`), onError: (err) => toast(errorMessage(err), 'error') })}
+              >
+                שכפול
+              </button>
               <button
                 type="button"
                 className="icon-btn"
@@ -463,6 +500,57 @@ function MembersSection({ board }: { board: BoardDetail }) {
 }
 
 /** Save this board's structure as an organisation template; manage the templates you may delete. */
+function DuplicateSection({ board }: { board: BoardDetail }) {
+  const { user } = useAuth();
+  const dup = useDuplicateBoard(board.id);
+  const navigate = useNavigate();
+  const { toast } = useFeedback();
+  const [name, setName] = useState(`${board.name} (עותק)`.slice(0, LIMITS.boardName));
+  const [withItems, setWithItems] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (user?.role === 'member') return null;
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return setError('יש להזין שם ללוח החדש');
+    setError(null);
+    dup.mutate(
+      { name: name.trim(), withItems },
+      {
+        onSuccess: (r) => {
+          toast(withItems ? `הלוח שוכפל עם ${r.items} פריטים` : 'הלוח שוכפל');
+          navigate(`/boards/${r.board.id}`);
+        },
+        onError: (err) => setError(errorMessage(err)),
+      },
+    );
+  };
+  return (
+    <section className="card" aria-labelledby="dup-h">
+      <h2 id="dup-h">שכפול הלוח</h2>
+      <p className="muted">לוח חדש עם אותן קבוצות ועמודות (כולל נוסחאות). חברים, אוטומציות, טפסים, עדכונים וקבצים אינם מועתקים; בלוח החדש רק את/ה חבר/ה.</p>
+      <form onSubmit={submit} noValidate>
+        {error && (
+          <div className="form-error" role="alert">
+            {error}
+          </div>
+        )}
+        <div className="field">
+          <label htmlFor="dup-name">שם הלוח החדש</label>
+          <input id="dup-name" className="input" value={name} maxLength={LIMITS.boardName} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <label className="check">
+          <input type="checkbox" checked={withItems} onChange={(e) => setWithItems(e.target.checked)} /> להעתיק גם את הפריטים ({board.items.length}) — בלי שיוך לאנשים ובלי תוצאות צ׳קליסט
+        </label>
+        <p>
+          <button type="submit" className="btn" disabled={dup.isPending} aria-busy={dup.isPending}>
+            {dup.isPending ? 'משכפל…' : 'שכפול הלוח'}
+          </button>
+        </p>
+      </form>
+    </section>
+  );
+}
+
 function TemplateSection({ board }: { board: BoardDetail }) {
   const { user } = useAuth();
   const templates = useTemplates();

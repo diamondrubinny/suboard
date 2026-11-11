@@ -200,6 +200,8 @@ function DetailsPanel({
               seq={item.seq}
               createdBy={item.createdBy}
               updatedAt={item.updatedAt}
+              columns={board.columns}
+              values={item.values}
               overdue={overdue && c.settings.role === 'due'}
               onChange={(v) => undo.setValue(item, c.id, v)}
             />
