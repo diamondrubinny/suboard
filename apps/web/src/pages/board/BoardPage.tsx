@@ -1,3 +1,4 @@
+import { apiUrl } from '../../api/base';
 import { BOARD_ROLE_LABELS, findPrimaryStatusColumn, viewConfigSchema, type SavedView, type ViewConfig } from '@suboard/shared';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
@@ -127,14 +128,14 @@ export function BoardPage() {
           <span className="badge" title="ההרשאה שלך בלוח">
             {BOARD_ROLE_LABELS[b.myRole]}
           </span>
-          <a href={`/api/boards/${b.id}/export.xlsx`} className="btn" download>
+          <a href={apiUrl(`/boards/${b.id}/export.xlsx`)} className="btn" download>
             <Icon name="download" /> Excel
           </a>
-          <a href={`/api/boards/${b.id}/export.csv`} className="btn btn-ghost" download>
+          <a href={apiUrl(`/boards/${b.id}/export.csv`)} className="btn btn-ghost" download>
             CSV
           </a>
           {b.columns.some((c) => c.type === 'date' || c.type === 'date_range') && (
-            <a href={`/api/boards/${b.id}/calendar.ics${config.calendarColumnId ? `?columnId=${config.calendarColumnId}` : ''}`} className="btn btn-ghost" download>
+            <a href={apiUrl(`/boards/${b.id}/calendar.ics${config.calendarColumnId ? `?columnId=${config.calendarColumnId}` : ''}`)} className="btn btn-ghost" download>
               <Icon name="calendar" /> ליומן (ICS)
             </a>
           )}

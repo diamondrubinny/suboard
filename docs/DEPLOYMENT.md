@@ -91,6 +91,29 @@ sudo systemctl enable --now clamav-freshclam clamav-daemon
 
 **נבדק** מול ספק OIDC מדומה (HTTPS, חתימת RS256, PKCE) ומול צורת הבקשות של Entra ל-SCIM (PATCH עם `Replace` ו-`"False"`). **לא נבדק מול Entra ID אמיתי** — יש לבצע בדיקת קבלה בסביבת הארגון.
 
+## 1ו. התקנה בתיקייה של אתר קיים (למשל `https://dreadlist.com/test`)
+
+המערכת יכולה לרוץ תחת תיקייה של דומיין קיים, לצד האתר שכבר רץ בו. הכתובת נקבעת ב-`PUBLIC_URL` (כולל התיקייה), והממשק נבנה עם `VITE_BASE_PATH` זהה. עוגיית החיבור מוגבלת לתיקייה, כך שהאתר הקיים לא מקבל אותה.
+
+**שרת Linux (Ubuntu 22.04/24.04, Debian 12) עם nginx או Apache — סקריפט אחד:**
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/diamondrubinny/suboard/claude/nifty-ptolemy-dn445c/deploy/install-subfolder.sh
+```
+
+```bash
+sudo bash install-subfolder.sh https://dreadlist.com/test admin@dreadlist.com
+```
+
+(אם המאגר פרטי — העתיקו את הקובץ `deploy/install-subfolder.sh` לשרת בדרך אחרת, והגדירו גישת קריאה ל-git, למשל deploy key.)
+
+הסקריפט: מתקין Node.js 22, ClamAV ו-git; יוצר משתמש מערכת `suboard`; מוריד ובונה את הקוד ל-`/opt/suboard` עבור התיקייה; כותב `.env` עם סודות שנוצרים בשרת (פעם אחת, לא נדרס); יוצר שירות systemd שמאזין ל-`127.0.0.1:3000` בלבד; יוצר מנהל מערכת עם סיסמה חד-פעמית שמודפסת פעם אחת. **הוא לא משנה את הגדרות שרת האינטרנט הקיים** — הוא כותב קטע מוכן ל-nginx (`/etc/suboard/nginx-location.conf`) ול-Apache (`/etc/suboard/apache-location.conf`), ואתם מוסיפים שורת `include` אחת בבלוק ה-HTTPS של האתר וטוענים מחדש. עדכון גרסה: הרצה חוזרת של אותו סקריפט.
+
+- **אתר בדיקות:** `NOINDEX=true` (ברירת המחדל בסקריפט) מוסיף `X-Robots-Tag: noindex` לכל תשובה. **רק נתונים בדויים** באתר בדיקות שחשוף לאינטרנט.
+- `APP_ORIGIN` הוא המקור בלבד (`https://dreadlist.com`, בלי תיקייה) — הוא נבדק מול כותרת `Origin` של הדפדפן.
+- **אחסון משותף (cPanel / Plesk):** אפשרי רק אם יש "Setup Node.js App"; יש לבנות עם `VITE_BASE_PATH=/test/` ולהגדיר את אותם משתנים. ללא תמיכה ב-Node.js — לא ניתן להריץ את המערכת שם.
+- **IIS (Windows):** URL Rewrite + ARR, כלל reverse proxy מ-`test/(.*)` ל-`http://127.0.0.1:3000/test/{R:1}`, ושירות Windows ל-Node (למשל NSSM).
+
 ## 2. systemd (`/etc/systemd/system/suboard.service`)
 
 ```ini

@@ -1,3 +1,4 @@
+import { apiUrl } from '../../api/base';
 import { findPrimaryStatusColumn, isRiskValue, RISK_LEVEL_LABELS, riskLevel, riskScore, type PlanPin } from '@suboard/shared';
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -166,7 +167,7 @@ export function FloorPlanPage() {
       )}
       <div className="plan-layout">
         <div className={`plan-canvas${placing ? ' placing' : ''}`} ref={imgRef} onClick={place}>
-          <img src={`/api/attachments/${attachmentId}/download`} alt={`תוכנית קומה: ${plan?.itemName ?? ''}. הנעיצות מפורטות ברשימה.`} draggable={false} />
+          <img src={apiUrl(`/attachments/${attachmentId}/download`)} alt={`תוכנית קומה: ${plan?.itemName ?? ''}. הנעיצות מפורטות ברשימה.`} draggable={false} />
           {pins.map((p, i) => {
             const d = describe(p.itemId);
             return (

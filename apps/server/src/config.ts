@@ -32,6 +32,8 @@ const envSchema = z
     MFA_REQUIRED_ROLES: z.string().default('admin'),
     MFA_ISSUER: z.string().min(1).max(40).default('SUBoard'),
     PUBLIC_URL: z.string().url().optional(),
+    /** true on test / staging sites: X-Robots-Tag noindex on every response. */
+    NOINDEX: bool.optional(),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
     SMTP_SECURE: bool.optional(),
@@ -114,6 +116,9 @@ export interface AppConfig {
   mfaRequiredRoles: string[];
   mfaIssuer: string;
   publicUrl: string;
+  /** Path prefix when served under a folder ("/test" for https://example.org/test); "" at the root. From PUBLIC_URL. */
+  basePath: string;
+  noIndex: boolean;
   smtp: { host: string; port: number; secure: boolean; user?: string; password?: string } | null;
   mailFrom: string;
   digestHour: number;
@@ -169,6 +174,8 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     mfaRequiredRoles: e.MFA_REQUIRED_ROLES.split(',').map((r) => r.trim()).filter(Boolean),
     mfaIssuer: e.MFA_ISSUER,
     publicUrl: (e.PUBLIC_URL ?? e.APP_ORIGIN.split(',')[0] ?? '').replace(/\/$/, ''),
+    noIndex: e.NOINDEX ?? false,
+    basePath: basePathOf(e.PUBLIC_URL ?? e.APP_ORIGIN.split(',')[0] ?? ''),
     smtp: e.SMTP_HOST
       ? { host: e.SMTP_HOST, port: e.SMTP_PORT, secure: e.SMTP_SECURE ?? e.SMTP_PORT === 465, user: e.SMTP_USER, password: e.SMTP_PASSWORD }
       : null,
@@ -196,4 +203,14 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     localLogin: e.LOCAL_LOGIN,
     scimToken: e.SCIM_TOKEN ?? null,
   };
+}
+
+/** "/test" for "https://example.org/test/", "" for an origin or an unparsable value. */
+export function basePathOf(url: string): string {
+  try {
+    const p = new URL(url).pathname.replace(/\/+$/, '');
+    return /^(\/[A-Za-z0-9._~-]+)*$/.test(p) ? p : '';
+  } catch {
+    return '';
+  }
 }

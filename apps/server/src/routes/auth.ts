@@ -24,7 +24,7 @@ export async function authRoutes(app: FastifyInstance, { services, config }: { s
 
   // ---- SSO (OpenID Connect)
   const SSO_COOKIE = 'sb_sso';
-  const ssoCookieOpts = { httpOnly: true, secure: config.cookieSecure, sameSite: 'lax' as const, path: '/api/auth/sso' };
+  const ssoCookieOpts = { httpOnly: true, secure: config.cookieSecure, sameSite: 'lax' as const, path: `${config.basePath}/api/auth/sso` };
   /** Same-origin hop page: the next navigation starts on our site, so the SameSite=Strict session cookie is sent. */
   const hop = (reply: FastifyReply, to: string) =>
     reply
@@ -36,13 +36,13 @@ export async function authRoutes(app: FastifyInstance, { services, config }: { s
   app.get('/auth/sso/config', { config: { public: true } }, async () => services.sso.publicConfig());
 
   app.get('/auth/sso/start', { config: { public: true, rateLimit: loginLimit } }, async (req, reply) => {
-    if (!services.sso.enabled) return hop(reply, '/login?sso_error=unavailable');
+    if (!services.sso.enabled) return hop(reply, `${config.basePath}/login?sso_error=unavailable`);
     try {
       const { url, cookie } = await services.sso.start((req.query as { next?: string }).next);
       reply.setCookie(SSO_COOKIE, cookie, { ...ssoCookieOpts, maxAge: 600 });
       return reply.redirect(url, 302);
     } catch (err) {
-      return hop(reply, `/login?sso_error=${err instanceof SsoError ? err.code : 'unavailable'}`);
+      return hop(reply, `${config.basePath}/login?sso_error=${err instanceof SsoError ? err.code : 'unavailable'}`);
     }
   });
 
@@ -52,18 +52,18 @@ export async function authRoutes(app: FastifyInstance, { services, config }: { s
     const q = req.query as { error?: string };
     if (q.error) {
       services.audit.log('sso_login_failed', { ip: req.ip, meta: { reason: 'idp_error', detail: String(q.error).slice(0, 60) } });
-      return hop(reply, '/login?sso_error=exchange');
+      return hop(reply, `${config.basePath}/login?sso_error=exchange`);
     }
     try {
       // The redirect URI is built from PUBLIC_URL, never from the request's Host header.
-      const callbackUrl = new URL(req.url, config.publicUrl);
+      const callbackUrl = new URL(config.publicUrl + req.url); // req.url is relative to the app's folder
       const { result, next } = await services.sso.callback(cookie, callbackUrl, { ip: req.ip, userAgent: req.headers['user-agent'] });
-      if (result.kind === 'mfa') return hop(reply, `/login?next=${encodeURIComponent(next)}#mfa=${encodeURIComponent(result.challengeToken)}`);
+      if (result.kind === 'mfa') return hop(reply, `${config.basePath}/login?next=${encodeURIComponent(next)}#mfa=${encodeURIComponent(result.challengeToken)}`);
       setSessionCookie(reply, result.token, config);
-      return hop(reply, safeNext(next));
+      return hop(reply, config.basePath + safeNext(next));
     } catch (err) {
       if (!(err instanceof SsoError)) req.log.error({ err }, 'SSO callback failed');
-      return hop(reply, `/login?sso_error=${err instanceof SsoError ? err.code : 'exchange'}`);
+      return hop(reply, `${config.basePath}/login?sso_error=${err instanceof SsoError ? err.code : 'exchange'}`);
     }
   });
 

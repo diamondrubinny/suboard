@@ -52,6 +52,14 @@ export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOver
     // Trust exactly N reverse-proxy hops for req.ip (rate limiting / audit); never trust by default.
     trustProxy: config.trustProxyHops > 0 ? (_addr: string, hop: number) => hop < config.trustProxyHops : false,
     bodyLimit: 100 * 1024,
+    // Under a folder (PUBLIC_URL https://example.org/test), accept both "/test/…" and proxies that
+    // already stripped the prefix; routes are always registered at the root.
+    rewriteUrl: config.basePath
+      ? (req) => {
+          const url = req.url ?? '/';
+          return url === config.basePath ? '/' : url.startsWith(`${config.basePath}/`) ? url.slice(config.basePath.length) : url;
+        }
+      : undefined,
     disableRequestLogging: config.env === 'production' ? false : undefined,
   });
 
@@ -108,6 +116,8 @@ export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOver
   app.addHook('onSend', async (req, reply) => {
     reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
     if (req.url.startsWith('/api/')) reply.header('Cache-Control', 'no-store');
+    // Test / staging sites: keep every response out of search engines.
+    if (config.noIndex) reply.header('X-Robots-Tag', 'noindex, nofollow');
   });
 
   app.setErrorHandler((err: FastifyError | AppError | ZodError, req, reply) => {

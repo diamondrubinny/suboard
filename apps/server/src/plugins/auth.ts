@@ -57,13 +57,14 @@ export function setSessionCookie(reply: FastifyReply, token: string, config: App
     httpOnly: true,
     secure: config.cookieSecure,
     sameSite: 'strict',
-    path: '/',
+    // Scoped to the app's folder, so other sites on the same domain never receive it.
+    path: config.basePath || '/',
     maxAge: Math.floor(config.sessionTtlMs / 1000),
   });
 }
 
 export function clearSessionCookie(reply: FastifyReply, config: AppConfig): void {
-  reply.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: config.cookieSecure, sameSite: 'strict', path: '/' });
+  reply.clearCookie(SESSION_COOKIE, { httpOnly: true, secure: config.cookieSecure, sameSite: 'strict', path: config.basePath || '/' });
 }
 
 /** The authenticated actor for a request (routes are already guarded by the preHandler). */

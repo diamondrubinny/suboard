@@ -1,3 +1,4 @@
+import { apiUrl } from '../api/base';
 import { loginSchema, mfaCodeSchema, type SessionUser } from '@suboard/shared';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -138,7 +139,7 @@ export function LoginPage() {
             <>
               {sso?.enabled && (
                 <div className="sso-block">
-                  <a className="btn btn-primary sso-btn" href={`/api/auth/sso/start?next=${encodeURIComponent(next)}`}>
+                  <a className="btn btn-primary sso-btn" href={apiUrl(`/auth/sso/start?next=${encodeURIComponent(next)}`)}>
                     <Icon name="shield" /> {sso.label}
                   </a>
                   {sso.localLogin !== 'disabled' && <p className="sso-or" aria-hidden="true"><span>או</span></p>}

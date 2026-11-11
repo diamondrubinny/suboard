@@ -1,3 +1,4 @@
+import { BASE } from './api/base';
 import { Component, lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
@@ -52,7 +53,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
         <div className="state" role="alert">
           <h1>אירעה שגיאה בלתי צפויה</h1>
           <p>נסו לרענן את הדף. אם הבעיה חוזרת, פנו למנהל המערכת.</p>
-          <button type="button" className="btn btn-primary" onClick={() => window.location.assign('/')}>
+          <button type="button" className="btn btn-primary" onClick={() => window.location.assign(`${BASE}/`)}>
             חזרה לדף הבית
           </button>
         </div>
@@ -64,7 +65,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
 export function App() {
   return (
     <ErrorBoundary>
-      <BrowserRouter>
+      <BrowserRouter basename={BASE || undefined}>
         <AuthProvider>
           <FeedbackProvider>
             <Routes>

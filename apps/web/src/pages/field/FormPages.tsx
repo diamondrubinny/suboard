@@ -1,3 +1,4 @@
+import { appLink } from '../../api/base';
 import {
   createFormSchema,
   FORM_FIELD_TYPES,
@@ -41,7 +42,7 @@ export function FormsAdminPage() {
         <p>רק בעלי הלוח מנהלים טפסים.</p>
       </div>
     );
-  const link = (f: BoardForm) => `${window.location.origin}/forms/${f.id}`;
+  const link = (f: BoardForm) => appLink(`/forms/${f.id}`);
 
   return (
     <>

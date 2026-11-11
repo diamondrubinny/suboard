@@ -1,3 +1,4 @@
+import { apiUrl } from '../../api/base';
 import { formatDateHe, todayIso, type Training, type TrainingCell, type TrainingState } from '@suboard/shared';
 import { useId, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -46,7 +47,7 @@ export function TrainingsPage() {
           </p>
         </div>
         <div className="actions no-print">
-          <a className="btn" href="/api/trainings/matrix.csv" download>
+          <a className="btn" href={apiUrl('/trainings/matrix.csv')} download>
             <Icon name="download" /> CSV
           </a>
           <button type="button" className="btn" onClick={() => window.print()}>

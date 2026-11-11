@@ -1,3 +1,4 @@
+import { apiUrl } from '../../api/base';
 import type { Attachment, BoardDetail } from '@suboard/shared';
 import { useRef, useState } from 'react';
 import { errorMessage } from '../../api/client';
@@ -122,7 +123,7 @@ export function AttachmentsPanel({ board, itemId }: { board: BoardDetail; itemId
             <Icon name="paperclip" />
             <span className="name">
               {a.status === 'clean' ? (
-                <a href={`/api/attachments/${a.id}/download`} download={a.originalName}>
+                <a href={apiUrl(`/attachments/${a.id}/download`)} download={a.originalName}>
                   <bdi>{a.originalName}</bdi>
                   <span className="sr-only"> — הורדה</span>
                 </a>

@@ -1,3 +1,4 @@
+import { BASE } from './api/base';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -13,7 +14,7 @@ initTheme();
 // Installable app (PWA). Production only, so development never serves stale bundles.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
+    navigator.serviceWorker.register(`${BASE}/sw.js`, { scope: `${BASE}/` }).catch(() => {
       /* Not critical: the app works without it. */
     });
   });

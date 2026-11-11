@@ -1,3 +1,4 @@
+import { apiUrl } from '../../api/base';
 import type { BoardFile } from '@suboard/shared';
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -74,7 +75,7 @@ export function FilesPage() {
               <li key={f.id}>
                 <figure className="gallery-card">
                   <button type="button" className="gallery-thumb" onClick={() => setPreview(f)} aria-label={`הגדלת התמונה ${f.name} (פריט: ${f.itemName})`}>
-                    <img src={`/api/attachments/${f.id}/download`} alt="" loading="lazy" decoding="async" />
+                    <img src={apiUrl(`/attachments/${f.id}/download`)} alt="" loading="lazy" decoding="async" />
                   </button>
                   <figcaption>
                     <Link to={itemLink(f)}>{f.itemName}</Link>
@@ -105,7 +106,7 @@ export function FilesPage() {
                 {docs.map((f) => (
                   <tr key={f.id}>
                     <td>
-                      <a href={`/api/attachments/${f.id}/download`} download>
+                      <a href={apiUrl(`/attachments/${f.id}/download`)} download>
                         <Icon name="download" size={16} /> <bdi>{f.name}</bdi>
                       </a>
                     </td>
@@ -124,12 +125,12 @@ export function FilesPage() {
       <Dialog open={Boolean(preview)} onClose={() => setPreview(null)} title={preview ? `${preview.itemName} — ${preview.name}` : ''}>
         {preview && (
           <>
-            <img className="gallery-preview" src={`/api/attachments/${preview.id}/download`} alt={`${preview.name}, מצורף לפריט ${preview.itemName}`} />
+            <img className="gallery-preview" src={apiUrl(`/attachments/${preview.id}/download`)} alt={`${preview.name}, מצורף לפריט ${preview.itemName}`} />
             <p className="toolbar">
               <Link to={itemLink(preview)} className="btn" onClick={() => setPreview(null)}>
                 פתיחת הפריט
               </Link>
-              <a href={`/api/attachments/${preview.id}/download`} download className="btn btn-ghost">
+              <a href={apiUrl(`/attachments/${preview.id}/download`)} download className="btn btn-ghost">
                 <Icon name="download" /> הורדה
               </a>
             </p>

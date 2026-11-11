@@ -1,4 +1,5 @@
 import type { ApiErrorBody } from '@suboard/shared';
+import { apiUrl } from './base';
 
 export class ApiError extends Error {
   constructor(
@@ -20,7 +21,7 @@ type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 export async function api<T>(path: string, method: Method = 'GET', body?: unknown): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(apiUrl(path), {
       method,
       credentials: 'same-origin',
       headers: {
@@ -58,7 +59,7 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
   form.append('file', file, file.name);
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(apiUrl(path), {
       method: 'POST',
       credentials: 'same-origin',
       headers: { Accept: 'application/json', 'X-Requested-With': 'suboard' },

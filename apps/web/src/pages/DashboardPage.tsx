@@ -1,3 +1,4 @@
+import { apiUrl } from '../api/base';
 import { formatDateHe, PALETTE, type DashboardItemRef } from '@suboard/shared';
 import { Link } from 'react-router-dom';
 import { errorMessage } from '../api/client';
@@ -48,7 +49,7 @@ export function DashboardPage() {
       <div className="page-header">
         <h1>שלום, {user?.name}</h1>
         <div className="actions">
-          <a href="/api/me/calendar.ics" className="btn" download aria-describedby="ics-hint">
+          <a href={apiUrl('/me/calendar.ics')} className="btn" download aria-describedby="ics-hint">
             <Icon name="calendar" /> הפריטים שלי ליומן (ICS)
           </a>
           <span id="ics-hint" className="sr-only">
