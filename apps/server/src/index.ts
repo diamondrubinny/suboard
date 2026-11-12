@@ -17,6 +17,7 @@ async function main() {
   const housekeeping = () => {
     try {
       const sessions = app.services.auth.purgeExpiredSessions();
+      app.services.apiTokens.purgeExpired();
       const audit = app.services.audit.purgeOlderThan(AUDIT_RETENTION_DAYS);
       const notifications = app.services.notifications.purgeOlderThan(config.notificationRetentionDays);
       const trash = app.services.items.purgeTrash();

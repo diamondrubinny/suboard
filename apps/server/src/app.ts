@@ -111,7 +111,7 @@ export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOver
     },
   });
   await app.register(csrfPlugin, { allowedOrigins: config.allowedOrigins });
-  await app.register(authPlugin, { auth: services.auth, config });
+  await app.register(authPlugin, { auth: services.auth, config, tokens: services.apiTokens });
 
   // Optional modules switched off by an administrator: their whole API answers 404 (after sign-in checks).
   app.addHook('preHandler', async (req) => {

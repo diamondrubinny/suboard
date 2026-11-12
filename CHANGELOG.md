@@ -2,6 +2,11 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.9.0 — 2026-11-12
+
+### Added
+- Personal API tokens (module off by default): a user creates a token that lets a script call the API with the user's own permissions. Read-only by default, always expiring, stored as a hash, shown once; closed to account security and administration routes.
+
 ## 1.8.0 — 2026-11-12
 
 ### Added

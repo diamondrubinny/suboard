@@ -39,6 +39,17 @@ export interface AdminUser {
   authSource: 'local' | 'sso' | 'scim';
 }
 
+export interface ApiTokenInfo {
+  id: string;
+  name: string;
+  /** Last four characters, to tell tokens apart. */
+  hint: string;
+  scope: 'read' | 'write';
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string;
+}
+
 export const WEBHOOK_EVENTS = ['item_created', 'item_updated'] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 export const WEBHOOK_EVENT_LABELS: Record<WebhookEvent, string> = { item_created: 'פריט נוצר', item_updated: 'פריט השתנה' };

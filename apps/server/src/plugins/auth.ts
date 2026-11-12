@@ -5,6 +5,7 @@ import type { AppConfig } from '../config.js';
 import { AppError, unauthorized } from '../lib/errors.js';
 import type { Actor } from '../services/access.js';
 import type { AuthService } from '../services/auth.js';
+import type { ApiTokenService } from '../services/apiTokens.js';
 
 export const SESSION_COOKIE = 'sb_session';
 
@@ -12,6 +13,8 @@ declare module 'fastify' {
   interface FastifyRequest {
     user: SessionUser | null;
     sessionId: string | null;
+    /** Set when the request is authenticated by a personal API token (no browser session). */
+    tokenScope: 'read' | 'write' | null;
   }
   interface FastifyContextConfig {
     /** Route is reachable without a session. */
@@ -25,9 +28,10 @@ declare module 'fastify' {
  * Resolves the session cookie on every /api request and enforces authentication
  * for every route that is not explicitly marked `config.public`.
  */
-export const authPlugin = fp(async (app: FastifyInstance, opts: { auth: AuthService; config: AppConfig }) => {
+export const authPlugin = fp(async (app: FastifyInstance, opts: { auth: AuthService; config: AppConfig; tokens: ApiTokenService }) => {
   app.decorateRequest('user', null);
   app.decorateRequest('sessionId', null);
+  app.decorateRequest('tokenScope', null);
 
   app.addHook('onRequest', async (req) => {
     if (!req.url.startsWith('/api/')) return;
@@ -35,6 +39,13 @@ export const authPlugin = fp(async (app: FastifyInstance, opts: { auth: AuthServ
     if (resolved) {
       req.user = resolved.user;
       req.sessionId = resolved.sessionId;
+      return;
+    }
+    // No browser session: a personal API token may stand for its owner.
+    const viaToken = opts.tokens.resolve(req.headers.authorization);
+    if (viaToken) {
+      req.user = viaToken.user;
+      req.tokenScope = viaToken.scope;
     }
   });
 
@@ -43,6 +54,14 @@ export const authPlugin = fp(async (app: FastifyInstance, opts: { auth: AuthServ
     const cfg = req.routeOptions.config;
     if (cfg?.public) return;
     if (!req.user) throw unauthorized();
+    if (req.tokenScope) {
+      // A token is for the data API only: never account security, user administration or other tokens.
+      const path = req.url.slice(4).split('?')[0]!;
+      if (/^\/(auth|admin|users|scim)(\/|$)/.test(path) && path !== '/auth/me' && path !== '/users/directory') {
+        throw new AppError(403, 'TOKEN_NOT_ALLOWED', 'הפעולה אינה זמינה עם אסימון API');
+      }
+      if (req.tokenScope === 'read' && !['GET', 'HEAD'].includes(req.method)) throw new AppError(403, 'TOKEN_READ_ONLY', 'האסימון מאפשר קריאה בלבד');
+    }
     if (req.user.mustChangePassword && !cfg?.allowPendingPasswordChange) {
       throw new AppError(403, 'PASSWORD_CHANGE_REQUIRED', 'יש להחליף את הסיסמה הזמנית לפני המשך עבודה');
     }

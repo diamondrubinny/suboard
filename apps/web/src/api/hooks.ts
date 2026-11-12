@@ -10,6 +10,7 @@ import type {
   ModuleState,
   Workspace,
   Webhook,
+  ApiTokenInfo,
   WebhookDelivery,
   WebhookEvent,
   BoardFile,
@@ -881,6 +882,15 @@ export function useSessionMutations() {
   return {
     revoke: useMutation({ mutationFn: (handle: string) => api<{ ok: true; signedOut: boolean }>(`/auth/sessions/${handle}`, 'DELETE'), onSuccess: refresh }),
     revokeOthers: useMutation({ mutationFn: () => api<{ sessions: ActiveSession[] }>('/auth/sessions/revoke-others', 'POST', {}), onSuccess: refresh }),
+  };
+}
+export const useApiTokens = () => useQuery({ queryKey: ['api-tokens'] as const, queryFn: () => api<{ tokens: ApiTokenInfo[] }>('/auth/tokens').then((r) => r.tokens) });
+export function useApiTokenMutations() {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: ['api-tokens'] });
+  return {
+    create: useMutation({ mutationFn: (input: { name: string; scope: 'read' | 'write'; days: 30 | 90 | 365 }) => api<{ token: string; info: ApiTokenInfo }>('/auth/tokens', 'POST', input), onSuccess: refresh }),
+    revoke: useMutation({ mutationFn: (id: string) => api(`/auth/tokens/${id}`, 'DELETE'), onSuccess: refresh }),
   };
 }
 export const useWebhooks = (boardId: string) => useQuery({ queryKey: ['webhooks', boardId] as const, queryFn: () => api<{ webhooks: Webhook[] }>(`/boards/${boardId}/webhooks`).then((r) => r.webhooks) });

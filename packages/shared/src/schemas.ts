@@ -301,6 +301,13 @@ const webhookEvents = z.array(z.enum(['item_created', 'item_updated'])).min(1, '
 export const createWebhookSchema = z.object({ url: z.string().trim().min(1, 'יש להזין כתובת').max(500), events: webhookEvents });
 export const updateWebhookSchema = z.object({ active: z.boolean().optional(), events: webhookEvents.optional() }).refine((v) => Object.keys(v).length > 0, 'אין שינויים');
 
+export const createApiTokenSchema = z.object({
+  name: line(60),
+  scope: z.enum(['read', 'write']),
+  /** Every token expires: 30, 90 or 365 days. */
+  days: z.union([z.literal(30), z.literal(90), z.literal(365)]),
+});
+
 export const workspaceSchema = z.object({ name: line(60) });
 export const moveBoardSchema = z.object({ workspaceId: idSchema.nullable() });
 

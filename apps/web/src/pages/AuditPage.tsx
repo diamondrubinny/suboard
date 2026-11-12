@@ -40,6 +40,7 @@ const EVENTS: Record<string, string> = {
   modules_changed: 'הפעלה / כיבוי של מודולים',
   workspace_changed: 'שינוי בסביבות העבודה',
   webhook_changed: 'הגדרת / מחיקת Webhook',
+  api_token_changed: 'יצירת / ביטול אסימון API',
   board_duplicated: 'שכפול לוח',
   passkey_added: 'מפתח גישה נוסף',
   passkey_add_failed: 'הוספת מפתח גישה נכשלה',

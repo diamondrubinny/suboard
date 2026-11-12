@@ -41,8 +41,9 @@ export async function userRoutes(app: FastifyInstance, { services }: { services:
     else services.auth.revokeAllSessions(id);
     // A lost or stolen device may hold a passkey: for another user, those go too (they can add new ones).
     const passkeysRemoved = id === actor.id ? 0 : services.passkeys.removeAllOf(id);
-    services.audit.log('sessions_revoked_by_admin', { userId: actor.id, ip: req.ip, meta: { targetUserId: id, passkeysRemoved } });
-    return { ok: true, passkeysRemoved };
+    const tokensRevoked = id === actor.id ? 0 : services.apiTokens.revokeAllOf(id);
+    services.audit.log('sessions_revoked_by_admin', { userId: actor.id, ip: req.ip, meta: { targetUserId: id, passkeysRemoved, tokensRevoked } });
+    return { ok: true, passkeysRemoved, tokensRevoked };
   });
 
   // ---- optional modules: every signed-in user reads the state (to build the menu); admins change it

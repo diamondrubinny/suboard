@@ -17,6 +17,9 @@ export const csrfPlugin = fp(async (app: FastifyInstance, opts: { allowedOrigins
   const allowed = new Set(opts.allowedOrigins);
   app.addHook('onRequest', async (req) => {
     if (SAFE.has(req.method) || !req.url.startsWith('/api/')) return;
+    // A request that carries a bearer token and no session cookie has no ambient credentials a
+    // foreign page could ride on, so the browser-oriented checks do not apply to it.
+    if (/^Bearer sbp_/.test(req.headers.authorization ?? '') && !req.cookies?.sb_session) return;
     if (req.headers[CSRF_HEADER] !== CSRF_HEADER_VALUE) {
       throw new AppError(403, 'CSRF', 'הבקשה נחסמה (בדיקת אבטחה)');
     }

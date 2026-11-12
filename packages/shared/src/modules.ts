@@ -7,7 +7,7 @@
  * One registry for both sides: the server guards `api` prefixes, the web app builds its navigation
  * and route guards from the same keys.
  */
-export const MODULE_KEYS = ['forms', 'dashboards', 'workload', 'monthly_report', 'trainings', 'procedures', 'compliance', 'webhooks'] as const;
+export const MODULE_KEYS = ['forms', 'dashboards', 'workload', 'monthly_report', 'trainings', 'procedures', 'compliance', 'webhooks', 'api_tokens'] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
 export interface ModuleDefinition {
@@ -42,6 +42,13 @@ export const MODULES: readonly ModuleDefinition[] = [
     description: 'בעלי לוח יכולים להגדיר כתובת HTTPS שתקבל הודעה חתומה על יצירה ושינוי של פריטים. מידע מהלוח יוצא מהמערכת — כבוי כברירת מחדל.',
     api: ['/webhooks'],
     apiPatterns: [/^\/boards\/[^/]+\/webhooks(\/|$)/],
+    defaultOff: true,
+  },
+  {
+    key: 'api_tokens',
+    label: 'אסימוני API אישיים',
+    description: 'משתמש יכול ליצור אסימון שמאפשר לסקריפט לפעול בשמו דרך ה-API, בהרשאות שלו בלבד. גישה מחוץ לדפדפן — כבוי כברירת מחדל.',
+    api: ['/auth/tokens'],
     defaultOff: true,
   },
 ];

@@ -6,12 +6,15 @@ import { useFeedback } from '../components/Feedback';
 import { usePageTitle } from '../components/Layout';
 import { MfaSection, NotificationPrefsSection } from './MfaSection';
 import { PasskeysSection } from './PasskeysSection';
+import { ApiTokensSection } from './ApiTokensSection';
+import { useModules } from '../api/hooks';
 import { SessionsSection } from './SessionsSection';
 
 export function ProfilePage() {
   usePageTitle('פרופיל');
   const { user, refresh } = useAuth();
   const { toast } = useFeedback();
+  const modules = useModules(Boolean(user) && !user?.mustChangePassword && !user?.mfaSetupRequired);
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -115,6 +118,7 @@ export function ProfilePage() {
         </section>
         {!user.mustChangePassword && <MfaSection />}
         {!user.mustChangePassword && !user.mfaSetupRequired && <PasskeysSection />}
+        {!user.mustChangePassword && !user.mfaSetupRequired && modules.data?.api_tokens === true && <ApiTokensSection />}
         {!user.mustChangePassword && !user.mfaSetupRequired && <NotificationPrefsSection />}
         {!user.mustChangePassword && !user.mfaSetupRequired && <SessionsSection />}
       </div>

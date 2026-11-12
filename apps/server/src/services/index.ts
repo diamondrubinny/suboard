@@ -35,6 +35,7 @@ import { PasskeyService } from './passkeys.js';
 import { ModuleService } from './modules.js';
 import { WorkspaceService } from './workspaces.js';
 import { WebhookService } from './webhooks.js';
+import { ApiTokenService } from './apiTokens.js';
 import { ScimService } from './scim.js';
 import { DashboardService as CustomDashboardService, DependencyService, MonthlyReportJob } from './planning.js';
 import { ClamdScanner, UnsafeNoopScanner, type Scanner } from '../lib/clamav.js';
@@ -81,6 +82,7 @@ export interface Services {
   modules: ModuleService;
   workspaces: WorkspaceService;
   webhooks: WebhookService;
+  apiTokens: ApiTokenService;
 }
 
 /** Infrastructure that tests (or alternative deployments) can substitute. */
@@ -137,9 +139,10 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const modules = new ModuleService(db, audit);
   const workspaces = new WorkspaceService(db, access, audit);
   const webhooks = new WebhookService(db, config, access, boards, modules, audit, items);
+  const apiTokens = new ApiTokenService(db, auth, modules, audit);
   const personal = new PersonalService(db, access, boards, items, activity, notifications);
   return {
     audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
-    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset, personal, passkeys, modules, workspaces, webhooks,
+    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset, personal, passkeys, modules, workspaces, webhooks, apiTokens,
   };
 }

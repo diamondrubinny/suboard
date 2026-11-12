@@ -1,4 +1,4 @@
-import { changePasswordSchema, forgotPasswordSchema, resetPasswordSchema, loginSchema, mfaDisableSchema, mfaEnableSchema, mfaVerifySchema, passkeyLoginSchema, passkeyRegisterOptionsSchema, passkeyRegisterSchema, preferencesSchema } from '@suboard/shared';
+import { createApiTokenSchema, changePasswordSchema, forgotPasswordSchema, resetPasswordSchema, loginSchema, mfaDisableSchema, mfaEnableSchema, mfaVerifySchema, passkeyLoginSchema, passkeyRegisterOptionsSchema, passkeyRegisterSchema, preferencesSchema } from '@suboard/shared';
 import type { AuthenticationResponseJSON, RegistrationResponseJSON } from '@simplewebauthn/server';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { AppConfig } from '../config.js';
@@ -155,6 +155,21 @@ export async function authRoutes(app: FastifyInstance, { services, config }: { s
     const id = String((req.params as { id: string }).id);
     if (!/^[0-9a-f-]{36}$/.test(id)) throw notFound('מפתח הגישה לא נמצא');
     services.passkeys.remove(actorOf(req).id, id, req.ip);
+    return { ok: true };
+  });
+
+  // ---- personal API tokens (module off by default; never reachable with a token itself)
+  const tokenLimit = { max: 20, timeWindow: 15 * 60_000 };
+  app.get('/auth/tokens', async (req) => ({ tokens: services.apiTokens.list(actorOf(req).id) }));
+  app.post('/auth/tokens', { config: { rateLimit: tokenLimit } }, async (req, reply) => {
+    const input = createApiTokenSchema.parse(req.body);
+    reply.header('Cache-Control', 'no-store');
+    return reply.code(201).send(services.apiTokens.create(actorOf(req).id, input, req.ip));
+  });
+  app.delete('/auth/tokens/:id', { config: { rateLimit: tokenLimit } }, async (req) => {
+    const id = String((req.params as { id: string }).id);
+    if (!/^[0-9a-f-]{36}$/.test(id)) throw notFound('האסימון לא נמצא');
+    services.apiTokens.revoke(actorOf(req).id, id, req.ip);
     return { ok: true };
   });
 

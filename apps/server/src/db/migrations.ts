@@ -734,4 +734,23 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE INDEX idx_webhook_deliveries ON webhook_deliveries(webhook_id, created_at);
     `,
   },
+  {
+    version: 21,
+    name: 'api_tokens',
+    sql: /* sql */ `
+      -- Personal API tokens: only a hash of the token is stored.
+      CREATE TABLE api_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        hint TEXT NOT NULL,
+        scope TEXT NOT NULL CHECK (scope IN ('read', 'write')),
+        created_at TEXT NOT NULL,
+        last_used_at TEXT,
+        expires_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_api_tokens_user ON api_tokens(user_id);
+    `,
+  },
 ];
