@@ -161,6 +161,8 @@ export const columnSettingsSchema = z
   .object({
     options: z.array(statusOptionSchema).max(LIMITS.statusOptions).optional(),
     role: z.enum(['due']).optional(),
+    /** Who may change this column's cells: every editor (default), or the board's owners only. */
+    editBy: z.enum(['editors', 'owners']).optional(),
     /** formula: the expression, with columns referenced by id — `{<column id>}` (or `{#n}` inside a template). */
     formula: z.string().trim().min(1, 'יש להזין נוסחה').max(500).optional(),
     /** relation: the board whose items this column connects to. */

@@ -210,9 +210,21 @@ export class ItemService {
     return id;
   }
 
+  /**
+   * Columns locked to the board's owners: an editor may not write their cells, through any path a
+   * person drives (edit, create, bulk edit, import, connect-boards). Automations and forms, which the
+   * owner configured, are not people and keep working.
+   */
+  assertMayEditColumns(actor: Actor, boardId: string, columnIds: string[]): void {
+    if (!columnIds.length || this.access.boardRole(actor, boardId) === 'owner') return;
+    const locked = this.boards.columns(boardId).find((c) => columnIds.includes(c.id) && c.settings.editBy === 'owners');
+    if (locked) throw forbidden(`רק בעלי הלוח יכולים לערוך את העמודה "${locked.title}"`);
+  }
+
   // ---------------------------------------------------------------- CRUD
   create(actor: Actor, boardId: string, input: { groupId: string; parentId?: string; name: string; values?: Record<string, unknown> }): Item {
     this.access.requireBoard(actor, boardId, 'editor');
+    this.assertMayEditColumns(actor, boardId, Object.keys(input.values ?? {}));
     const item = this.createAs(actor, boardId, input);
     this.emit({ kind: 'created', boardId, actorId: actor.id, before: null, after: item });
     return item;
@@ -260,6 +272,7 @@ export class ItemService {
   update(actor: Actor, itemId: string, input: { name?: string; groupId?: string; position?: number; values?: Record<string, unknown> }): Item {
     const boardId = this.access.boardIdForItem(itemId);
     this.access.requireBoard(actor, boardId, 'editor');
+    this.assertMayEditColumns(actor, boardId, Object.keys(input.values ?? {}));
     const before = this.getRow(itemId);
     const after = this.updateAs(actor, boardId, before, input);
     const changed = before.name !== after.name || before.groupId !== after.groupId || JSON.stringify(before.values) !== JSON.stringify(after.values);
@@ -576,6 +589,8 @@ export class ItemService {
    * target board. Everything else is dropped and reported back.
    */
   moveToBoard(actor: Actor, itemId: string, target: { boardId: string; groupId: string }): { item: Item; dropped: string[] } {
+    // Values never land in a column of the target board that is locked to its owners, unless the mover is one.
+    const targetOwner = this.access.boardRole(actor, target.boardId) === 'owner';
     const fromBoard = this.access.boardIdForItem(itemId);
     this.access.requireBoard(actor, fromBoard, 'editor');
     this.access.requireBoard(actor, target.boardId, 'editor');
@@ -592,7 +607,7 @@ export class ItemService {
       for (const [cid, v] of Object.entries(values)) {
         const src = fromCols.find((c) => c.id === cid);
         if (!src) continue;
-        const dst = toCols.find((c) => c.title === src.title && c.type === src.type && !isReadonlyColumnType(c.type));
+        const dst = toCols.find((c) => c.title === src.title && c.type === src.type && !isReadonlyColumnType(c.type) && (targetOwner || c.settings.editBy !== 'owners'));
         if (!dst) {
           dropped.add(src.title);
           continue;
@@ -681,6 +696,7 @@ export class ItemService {
   importRows(actor: Actor, boardId: string, input: { groupId: string; rows: { name: string; values?: Record<string, unknown> }[] }): ImportResult {
     this.access.requireBoard(actor, boardId, 'editor');
     this.assertGroupInBoard(input.groupId, boardId);
+    this.assertMayEditColumns(actor, boardId, [...new Set(input.rows.flatMap((r) => Object.keys(r.values ?? {})))]);
     const errors: ImportResult['errors'] = [];
     let created = 0;
     input.rows.forEach((row, idx) => {

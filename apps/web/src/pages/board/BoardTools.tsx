@@ -1,4 +1,4 @@
-import { isReadonlyColumnType, findPrimaryStatusColumn, type BoardDetail, type DirectoryUser, type ImportResult, type SavedView, type ViewConfig } from '@suboard/shared';
+import { isReadonlyColumnType, findPrimaryStatusColumn, type BoardDetail, type DirectoryUser, type ImportResult, type SavedView, type ViewConfig, canEditColumn } from '@suboard/shared';
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { errorMessage } from '../../api/client';
 import { useItemActions, useTrash, useViewMutations, useViews } from '../../api/hooks';
@@ -282,7 +282,7 @@ export function ImportDialog({ board, members, open, onClose }: { board: BoardDe
   const [groupId, setGroupId] = useState(board.groups[0]?.id ?? '');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
-  const columns = board.columns.filter((c) => !isReadonlyColumnType(c.type));
+  const columns = board.columns.filter((c) => !isReadonlyColumnType(c.type) && canEditColumn(c, board.myRole));
 
   const reset = () => (setRows(null), setMapping([]), setError(null), setResult(null));
   const close = () => (reset(), onClose());

@@ -432,6 +432,7 @@ export class BoardService {
       if (type !== 'date') throw badRequest('רק עמודת תאריך יכולה לשמש כתאריך יעד');
       s.role = 'due';
     }
+    if (settings?.editBy === 'owners') s.editBy = 'owners';
     return s;
   }
 
@@ -472,7 +473,8 @@ export class BoardService {
       if (input.title !== undefined) this.db.prepare('UPDATE board_columns SET title = ? WHERE id = ?').run(input.title, columnId);
       if (input.position !== undefined) this.db.prepare('UPDATE board_columns SET position = ? WHERE id = ?').run(input.position, columnId);
       if (input.settings !== undefined) {
-        const settings = this.normalizeSettings(col.type, input.settings, actor, boardId);
+        // The lock is a setting of its own: saving labels or a formula must not silently unlock the column.
+        const settings = this.normalizeSettings(col.type, { ...input.settings, editBy: input.settings.editBy ?? col.settings.editBy }, actor, boardId);
         this.db.prepare('UPDATE board_columns SET settings = ? WHERE id = ?').run(JSON.stringify(settings), columnId);
         if (settings.role === 'due') this.clearOtherDueColumns(boardId, columnId);
         // Clear cell values that point to status options which no longer exist.

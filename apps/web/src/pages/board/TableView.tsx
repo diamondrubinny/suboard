@@ -1,4 +1,4 @@
-import { COLUMN_WIDTH, PALETTE, todayIso, isOverdue, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Group, type Item, type ViewConfig, evaluateFormula, COLOR_KEYS } from '@suboard/shared';
+import { COLUMN_WIDTH, PALETTE, todayIso, isOverdue, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Group, type Item, type ViewConfig, evaluateFormula, COLOR_KEYS, canEditColumn } from '@suboard/shared';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { errorMessage } from '../../api/client';
 import { useCreateItem, useGroupMutations, useUpdateItem } from '../../api/hooks';
@@ -416,7 +416,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
               value={item.values[c.id]}
               users={users}
               assignable={assignable}
-              readOnly={!canEdit}
+              readOnly={!canEditColumn(c, board.myRole)}
               label={`${c.title} — ${item.name}`}
               overdue={overdue && c.settings.role === 'due'}
               seq={item.seq}

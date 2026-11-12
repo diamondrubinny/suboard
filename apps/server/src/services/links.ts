@@ -88,6 +88,7 @@ export class LinkService {
     this.items.getLive(itemId);
     const col = this.boards.columns(boardId).find((c) => c.id === columnId);
     if (!col || col.type !== 'relation' || !col.settings.relation) throw notFound('העמודה לא נמצאה');
+    this.items.assertMayEditColumns(actor, boardId, [columnId]);
     const targetBoard = col.settings.relation.boardId;
     if (!this.access.boardRole(actor, targetBoard)) throw forbidden('אין לך גישה ללוח המחובר');
     const ids = [...new Set(targetIds)].filter((id) => id !== itemId);

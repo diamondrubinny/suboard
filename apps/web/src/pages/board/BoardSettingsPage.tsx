@@ -11,6 +11,7 @@ import {
   type Column,
   type ColumnType,
   type StatusOption,
+  isReadonlyColumnType,
 } from '@suboard/shared';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -251,6 +252,7 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
               <ColumnTitleInput column={c} onSave={(t) => update.mutate({ columnId: c.id, patch: { title: t } }, { onError: onErr })} />
               <span className="badge">{COLUMN_TYPE_LABELS[c.type]}</span>
               {c.settings.role === 'due' && <span className="badge success">תאריך יעד</span>}
+              {c.settings.editBy === 'owners' && <span className="badge">נעולה: בעלים בלבד</span>}
               <span style={{ marginInlineStart: 'auto', display: 'flex', gap: '0.25rem' }}>
                 <button type="button" className="icon-btn" aria-label={`הזזת ${c.title} למעלה`} disabled={idx === 0}
                   onClick={() => update.mutate({ columnId: c.id, patch: { position: (board.columns[idx - 1]!.position ?? 0) - 0.5 } }, { onError: onErr })}>
@@ -275,6 +277,22 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
                     עריכת סעיפים
                   </button>
                 )}
+                {!isReadonlyColumnType(c.type) || c.type === 'relation' ? (
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    aria-pressed={c.settings.editBy === 'owners'}
+                    aria-label={`נעילה: רק בעלי הלוח יערכו את העמודה ${c.title}`}
+                    onClick={() =>
+                      update.mutate(
+                        { columnId: c.id, patch: { settings: { ...c.settings, editBy: c.settings.editBy === 'owners' ? 'editors' : 'owners' } } },
+                        { onSuccess: () => toast(c.settings.editBy === 'owners' ? 'העמודה פתוחה לעריכה לכל העורכים' : 'העמודה ננעלה: רק בעלי הלוח יערכו אותה'), onError: onErr },
+                      )
+                    }
+                  >
+                    נעילה
+                  </button>
+                ) : null}
                 {c.type === 'formula' && (
                   <button type="button" className="btn btn-sm" aria-expanded={editing === c.id} onClick={() => setEditing(editing === c.id ? null : c.id)}>
                     עריכת הנוסחה

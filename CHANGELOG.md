@@ -2,6 +2,11 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.7.0 — 2026-11-12
+
+### Added
+- Column lock: a board owner can make a column editable by owners only. Editors see it read-only and the server refuses the write on every path (edit, create, bulk edit, import, connect-boards, move between boards). Automations and forms keep working.
+
 ## 1.6.0 — 2026-11-12
 
 ### Added

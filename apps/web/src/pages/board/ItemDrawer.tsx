@@ -1,4 +1,4 @@
-import { addDaysIso, isReadonlyColumnType, findDueColumn, formatDateHe, isItemDone, findPrimaryStatusColumn, LIMITS, REACTION_LABELS, REACTIONS, todayIso, isOverdue, type BoardDetail, type CellValue, type DirectoryUser, type ItemUpdate, type Reaction } from '@suboard/shared';
+import { addDaysIso, isReadonlyColumnType, findDueColumn, formatDateHe, isItemDone, findPrimaryStatusColumn, LIMITS, REACTION_LABELS, REACTIONS, todayIso, isOverdue, type BoardDetail, type CellValue, type DirectoryUser, type ItemUpdate, type Reaction, canEditColumn } from '@suboard/shared';
 import { lazy, Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import { errorMessage } from '../../api/client';
 import { useBoard, useBoards, useCreateItem, useDeleteItem, useItemActions, useItemActivity, useItemUpdates, useUpdateItem, useUpdateMutations, useFollow, useToggleFollow } from '../../api/hooks';
@@ -195,7 +195,7 @@ function DetailsPanel({
               value={item.values[c.id]}
               users={users}
               assignable={assignable}
-              readOnly={!canEdit}
+              readOnly={!canEditColumn(c, board.myRole)}
               label={c.title}
               mode="drawer"
               seq={item.seq}

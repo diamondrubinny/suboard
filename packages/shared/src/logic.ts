@@ -10,6 +10,12 @@ export function findPrimaryStatusColumn(columns: Column[]): Column | undefined {
   return columns.find((c) => c.type === 'status');
 }
 
+/** May someone with this board role change the cells of the column? (Viewers never; locked columns: owners only.) */
+export function canEditColumn(column: Column, role: 'owner' | 'editor' | 'viewer' | null | undefined): boolean {
+  if (role === 'owner') return true;
+  return role === 'editor' && column.settings.editBy !== 'owners';
+}
+
 /** An item is "closed" when its primary status value is an option flagged `done`. */
 export function isItemDone(item: Item, statusColumn: Column | undefined): boolean {
   if (!statusColumn) return false;
