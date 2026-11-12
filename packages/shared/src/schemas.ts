@@ -160,6 +160,10 @@ export const columnSettingsSchema = z
     role: z.enum(['due']).optional(),
     /** formula: the expression, with columns referenced by id — `{<column id>}` (or `{#n}` inside a template). */
     formula: z.string().trim().min(1, 'יש להזין נוסחה').max(500).optional(),
+    /** relation: the board whose items this column connects to. */
+    relation: z.object({ boardId: idSchema }).optional(),
+    /** mirror: shows `targetColumnId` of the items connected through `relationColumnId` (a relation column of this board; `#n` inside a template). */
+    mirror: z.object({ relationColumnId: z.string().min(1).max(40), targetColumnId: z.string().max(40) }).optional(),
     /** auto_id: prefix shown before the running number, e.g. "INC". */
     prefix: z.string().regex(/^[A-Za-z0-9]{0,10}$/, 'אותיות לטיניות וספרות בלבד, עד 10').optional(),
     /** checklist: the inspection items and (optionally) where failed items open a corrective action. */
@@ -254,6 +258,8 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
     case 'updated_at':
     case 'formula':
     case 'linked':
+    case 'relation':
+    case 'mirror':
       // Computed from the item; any client value is rejected.
       return z.never();
     case 'risk':
@@ -279,6 +285,8 @@ export const createBoardSchema = z.object({
 });
 
 export const setModulesSchema = z.object({ modules: z.record(z.string().max(40), z.boolean()) });
+
+export const setRelationSchema = z.object({ itemIds: z.array(idSchema).max(20) });
 
 export const addLinkSchema = z.object({ toItemId: idSchema });
 

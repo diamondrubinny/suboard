@@ -1,5 +1,6 @@
 import {
   addLinkSchema,
+  setRelationSchema,
   complianceSettingsSchema,
   createFormSchema,
   quickFormSchema,
@@ -38,6 +39,12 @@ export async function fieldRoutes(app: FastifyInstance, { services }: { services
   app.post('/items/:id/links', { config: { rateLimit: { max: 120, timeWindow: 15 * 60_000 } } }, async (req, reply) =>
     reply.code(201).send({ links: links.add(actorOf(req), param(req, 'id'), addLinkSchema.parse(req.body).toItemId) }),
   );
+  app.put('/items/:id/relations/:columnId', { config: { rateLimit: { max: 300, timeWindow: 15 * 60_000 } } }, async (req) => ({
+    related: links.setRelation(actorOf(req), param(req, 'id'), param(req, 'columnId'), setRelationSchema.parse(req.body).itemIds),
+  }));
+  app.get('/boards/:id/item-names', async (req) => ({
+    items: links.itemNames(actorOf(req), param(req, 'id'), String((req.query as { q?: string }).q ?? '')),
+  }));
   app.delete('/links/:id', async (req) => {
     links.remove(actorOf(req), param(req, 'id'));
     return { ok: true };

@@ -116,6 +116,10 @@ export interface BoardDetail {
   updatedAt: string;
   /** Present when the board has a `linked` column: per item, linked items the viewer may see and how many are done. */
   linkStats?: Record<string, LinkStat>;
+  /** Relation columns: item id → column id → connected items the viewer may see. */
+  relations?: Record<string, Record<string, RelatedItem[]>>;
+  /** Mirror columns: item id → column id → the mirrored values as text (one per connected item). */
+  mirrors?: Record<string, Record<string, string[]>>;
   favorite: boolean;
 }
 
@@ -354,6 +358,12 @@ export interface LinkStat {
   done: number;
 }
 export const MAX_MANUAL_LINKS = 50;
+export const MAX_RELATION_ITEMS = 20;
+export interface RelatedItem {
+  id: string;
+  name: string;
+  boardId: string;
+}
 
 export interface ItemLink {
   id: string;

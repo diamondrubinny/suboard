@@ -23,6 +23,7 @@ import { usePageTitle } from '../../components/Layout';
 import { colorStyle } from '../../components/StatusPill';
 import { ChecklistSettingsEditor, ComplianceSection } from './FieldSettings';
 import { FormulaEditor } from './FormulaEditor';
+import { RelationSetup } from './RelationSetup';
 
 export function BoardSettingsPage() {
   const { boardId = '' } = useParams();
@@ -173,6 +174,7 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
     e.preventDefault();
     if (!title.trim()) return toast('יש להזין כותרת לעמודה', 'error');
     if (type === 'formula') return toast('יש לכתוב את הנוסחה למטה וללחוץ "הוספת עמודת נוסחה"', 'error');
+    if (type === 'relation' || type === 'mirror') return toast('יש להשלים את הבחירה למטה', 'error');
     create.mutate({ title: title.trim(), type }, { onSuccess: () => (setTitle(''), toast('העמודה נוספה')), onError: onErr });
   };
 
@@ -278,12 +280,23 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
             </option>
           ))}
         </select>
-        {type !== 'formula' && (
+        {type !== 'formula' && type !== 'relation' && type !== 'mirror' && (
           <button type="submit" className="btn" disabled={create.isPending}>
             <Icon name="plus" /> הוספת עמודה
           </button>
         )}
       </form>
+      {(type === 'relation' || type === 'mirror') && (
+        <RelationSetup
+          kind={type}
+          board={board}
+          saving={create.isPending}
+          onSave={(settings) => {
+            if (!title.trim()) return toast('יש להזין כותרת לעמודה', 'error');
+            create.mutate({ title: title.trim(), type, settings }, { onSuccess: () => (setTitle(''), setType('text'), toast('העמודה נוספה')), onError: onErr });
+          }}
+        />
+      )}
       {type === 'formula' && (
         <FormulaEditor
           columns={board.columns}

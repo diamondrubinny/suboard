@@ -2,6 +2,13 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.2.0 — 2026-11-12
+
+### Added
+- "Connect boards" column: pick items of another board in a cell (a fault → its equipment), with a searchable picker.
+- Mirror column: shows a column of the connected items (e.g. the maintenance contact's e-mail), always up to date.
+- People without access to the connected board see neither the connected items nor the mirrored values.
+
 ## 1.1.0 — 2026-11-12
 
 ### Added

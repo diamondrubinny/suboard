@@ -4060,3 +4060,17 @@ kbd {
 .module-row p {
   margin: var(--space-1) 0 0;
 }
+
+/* ---- connect-boards (relation) cells */
+.relation-drawer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.relation-options {
+  max-block-size: 45vh;
+  overflow-y: auto;
+  display: grid;
+  gap: var(--space-1);
+}

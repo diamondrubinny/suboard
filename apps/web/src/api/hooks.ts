@@ -619,6 +619,25 @@ export function useLinkMutations(itemId: string, boardId: string) {
   };
 }
 
+/** Item names of a board, for the relation picker. */
+export const useBoardItemNames = (boardId: string, q: string) =>
+  useQuery({
+    queryKey: ['item-names', boardId, q] as const,
+    queryFn: () => api<{ items: { id: string; name: string }[] }>(`/boards/${boardId}/item-names?q=${encodeURIComponent(q)}`).then((r) => r.items),
+    enabled: Boolean(boardId),
+    staleTime: 15_000,
+  });
+export function useSetRelation(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, columnId, itemIds }: { itemId: string; columnId: string; itemIds: string[] }) => api(`/items/${itemId}/relations/${columnId}`, 'PUT', { itemIds }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: qk.board(boardId) });
+      void qc.invalidateQueries({ queryKey: ['links'] });
+    },
+  });
+}
+
 export const useInvestigation = (itemId: string) =>
   useQuery({ queryKey: qk.investigation(itemId), queryFn: () => api<{ investigation: Investigation }>(`/items/${itemId}/investigation`).then((r) => r.investigation) });
 

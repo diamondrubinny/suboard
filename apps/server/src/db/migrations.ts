@@ -669,4 +669,15 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       );
     `,
   },
+  {
+    version: 17,
+    name: 'relation_columns',
+    sql: /* sql */ `
+      -- Links made through a "connect boards" column carry the column; manual links keep NULL.
+      ALTER TABLE item_links ADD COLUMN column_id TEXT REFERENCES board_columns(id) ON DELETE CASCADE;
+      DROP INDEX idx_links_related;
+      CREATE UNIQUE INDEX idx_links_related ON item_links(from_item, to_item, COALESCE(column_id, '')) WHERE kind = 'related';
+      CREATE INDEX idx_links_column ON item_links(column_id);
+    `,
+  },
 ];

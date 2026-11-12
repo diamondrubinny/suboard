@@ -1,4 +1,4 @@
-import { MAX_MANUAL_LINKS, findPrimaryStatusColumn, isItemDone, type ItemCard, type ItemLink } from '@suboard/shared';
+import { MAX_MANUAL_LINKS, MAX_RELATION_ITEMS, type RelatedItem, findPrimaryStatusColumn, isItemDone, type ItemCard, type ItemLink } from '@suboard/shared';
 import { nowIso, type DB } from '../db/index.js';
 import { newId } from '../lib/crypto.js';
 import { badRequest, forbidden, notFound } from '../lib/errors.js';
@@ -63,10 +63,10 @@ export class LinkService {
     if (!target || !this.access.boardRole(actor, target.board_id)) throw notFound('הפריט לקישור לא נמצא');
     this.items.getLive(itemId);
     const pair = [itemId, toItemId, toItemId, itemId];
-    if (this.db.prepare("SELECT 1 FROM item_links WHERE kind = 'related' AND ((from_item = ? AND to_item = ?) OR (from_item = ? AND to_item = ?))").get(...pair)) {
+    if (this.db.prepare("SELECT 1 FROM item_links WHERE kind = 'related' AND column_id IS NULL AND ((from_item = ? AND to_item = ?) OR (from_item = ? AND to_item = ?))").get(...pair)) {
       throw badRequest('הפריטים כבר מקושרים');
     }
-    const count = (this.db.prepare("SELECT COUNT(*) AS n FROM item_links WHERE kind = 'related' AND (from_item = ? OR to_item = ?)").get(itemId, itemId) as { n: number }).n;
+    const count = (this.db.prepare("SELECT COUNT(*) AS n FROM item_links WHERE kind = 'related' AND column_id IS NULL AND (from_item = ? OR to_item = ?)").get(itemId, itemId) as { n: number }).n;
     if (count >= MAX_MANUAL_LINKS) throw badRequest(`אפשר לקשר עד ${MAX_MANUAL_LINKS} פריטים לפריט אחד`);
     this.db.transaction(() => {
       this.db.prepare("INSERT INTO item_links (id, from_item, to_item, kind, created_by, created_at) VALUES (?, ?, ?, 'related', ?, ?)").run(newId(), itemId, toItemId, actor.id, nowIso());
@@ -78,17 +78,56 @@ export class LinkService {
     return this.list(actor, itemId);
   }
 
+  /**
+   * Replaces what one item is connected to through a relation column. Targets must be live items of
+   * the column's board, and the actor must be able to see that board.
+   */
+  setRelation(actor: Actor, itemId: string, columnId: string, targetIds: string[]): RelatedItem[] {
+    const boardId = this.access.boardIdForItem(itemId);
+    this.access.requireBoard(actor, boardId, 'editor');
+    this.items.getLive(itemId);
+    const col = this.boards.columns(boardId).find((c) => c.id === columnId);
+    if (!col || col.type !== 'relation' || !col.settings.relation) throw notFound('העמודה לא נמצאה');
+    const targetBoard = col.settings.relation.boardId;
+    if (!this.access.boardRole(actor, targetBoard)) throw forbidden('אין לך גישה ללוח המחובר');
+    const ids = [...new Set(targetIds)].filter((id) => id !== itemId);
+    if (ids.length > MAX_RELATION_ITEMS) throw badRequest(`אפשר לחבר עד ${MAX_RELATION_ITEMS} פריטים בתא`);
+    const found = ids.length
+      ? (this.db.prepare(`SELECT id, name FROM items WHERE board_id = ? AND deleted_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`).all(targetBoard, ...ids) as { id: string; name: string }[])
+      : [];
+    if (found.length !== ids.length) throw badRequest('אחד הפריטים אינו שייך ללוח המחובר');
+    this.db.transaction(() => {
+      // Connected items on the target board that the actor could see are replaced as a set.
+      this.db.prepare("DELETE FROM item_links WHERE kind = 'related' AND from_item = ? AND column_id = ?").run(itemId, columnId);
+      const ins = this.db.prepare("INSERT INTO item_links (id, from_item, to_item, kind, created_by, created_at, column_id) VALUES (?, ?, ?, 'related', ?, ?, ?)");
+      for (const id of ids) ins.run(newId(), itemId, id, actor.id, nowIso(), columnId);
+      this.activity.record(boardId, actor.id, 'item_linked', { column: col.title, count: ids.length }, itemId);
+      this.boards.touch(boardId);
+    })();
+    return ids.map((id) => ({ id, name: found.find((f) => f.id === id)!.name, boardId: targetBoard }));
+  }
+
+  /** Names of a board's items for the relation picker (viewer access to that board). */
+  itemNames(actor: Actor, boardId: string, q: string): { id: string; name: string }[] {
+    this.access.requireBoard(actor, boardId, 'viewer');
+    const like = `%${q.trim().slice(0, 100).replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    return this.db
+      .prepare("SELECT id, name FROM items WHERE board_id = ? AND deleted_at IS NULL AND name LIKE ? ESCAPE '\\' ORDER BY name LIMIT 50")
+      .all(boardId, like) as { id: string; name: string }[];
+  }
+
   /** Removes a manual link. An editor of either item's board may do it. */
   remove(actor: Actor, linkId: string): void {
     const l = this.db
       .prepare(
-        `SELECT l.kind, l.from_item, l.to_item, a.board_id AS from_board, b.board_id AS to_board, a.name AS from_name, b.name AS to_name
+        `SELECT l.kind, l.column_id, l.from_item, l.to_item, a.board_id AS from_board, b.board_id AS to_board, a.name AS from_name, b.name AS to_name
          FROM item_links l JOIN items a ON a.id = l.from_item JOIN items b ON b.id = l.to_item WHERE l.id = ?`,
       )
-      .get(linkId) as { kind: string; from_item: string; to_item: string; from_board: string; to_board: string; from_name: string; to_name: string } | undefined;
+      .get(linkId) as { kind: string; column_id: string | null; from_item: string; to_item: string; from_board: string; to_board: string; from_name: string; to_name: string } | undefined;
     const roles = l ? [this.access.boardRole(actor, l.from_board), this.access.boardRole(actor, l.to_board)] : [];
     if (!l || !roles.some(Boolean)) throw notFound('הקישור לא נמצא');
     if (l.kind !== 'related') throw badRequest('קישור שנוצר אוטומטית אינו ניתן להסרה');
+    if (l.column_id) throw badRequest('החיבור הזה מנוהל בעמודת החיבור של הפריט');
     if (!roles.some((r) => r === 'editor' || r === 'owner')) throw forbidden('נדרשת הרשאת עריכה באחד הלוחות');
     this.db.transaction(() => {
       this.db.prepare('DELETE FROM item_links WHERE id = ?').run(linkId);

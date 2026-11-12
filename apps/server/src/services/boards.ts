@@ -1,4 +1,4 @@
-import { mapFormulaRefs, validateFormula, findPrimaryStatusColumn, isItemDone, type LinkStat,
+import { mapFormulaRefs, validateFormula, type Item, findPrimaryStatusColumn, isItemDone, type LinkStat,
   COLOR_KEYS,
   LIMITS,
   type BoardDetail,
@@ -19,6 +19,7 @@ import { badRequest, forbidden, notFound } from '../lib/errors.js';
 import type { AccessService, Actor } from './access.js';
 import type { ActivityService } from './activity.js';
 import type { AuditService } from './audit.js';
+import { formatCell } from './export.js';
 import { toColumn, toGroup, toItem, type ColumnRow, type GroupRow, type ItemRow } from './mappers.js';
 import { getTemplate } from './templates.js';
 import type { TemplateStructure } from './boardTemplates.js';
@@ -108,6 +109,9 @@ export class BoardService {
         if (c.type === 'formula' && settings.formula) {
           settings.formula = mapFormulaRefs(settings.formula, (ref) => (/^#\d+$/.test(ref) ? (columnIds[Number(ref.slice(1))] ?? null) : null)).formula;
         }
+        if (c.type === 'mirror' && settings.mirror && /^#\d+$/.test(settings.mirror.relationColumnId)) {
+          settings.mirror = { ...settings.mirror, relationColumnId: columnIds[Number(settings.mirror.relationColumnId.slice(1))] ?? settings.mirror.relationColumnId };
+        }
         this.db
           .prepare('INSERT INTO board_columns (id, board_id, title, type, settings, position) VALUES (?, ?, ?, ?, ?, ?)')
           .run(columnIds[i], id, c.title, c.type, JSON.stringify(settings), i);
@@ -134,8 +138,57 @@ export class BoardService {
       createdAt: b.created_at,
       updatedAt: b.updated_at,
       ...(this.columns(boardId).some((c) => c.type === 'linked') ? { linkStats: this.linkStats(actor, boardId) } : {}),
+      ...this.relationData(actor, boardId),
       favorite: this.db.prepare('SELECT 1 FROM board_favorites WHERE user_id = ? AND board_id = ?').get(actor.id, boardId) !== undefined,
     };
+  }
+
+  /**
+   * Relation and mirror columns of a board. Connected items on boards the actor cannot see are left
+   * out entirely (no name, no mirrored value).
+   */
+  relationData(actor: Actor, boardId: string): Pick<BoardDetail, 'relations' | 'mirrors'> {
+    const columns = this.columns(boardId);
+    const relCols = columns.filter((c) => c.type === 'relation' && c.settings.relation);
+    if (!relCols.length) return {};
+    const visible = new Map(relCols.map((c) => [c.id, this.access.boardRole(actor, c.settings.relation!.boardId) !== null]));
+    const rows = this.db
+      .prepare(
+        `SELECT l.from_item, l.column_id, o.*
+         FROM item_links l
+         JOIN items me ON me.id = l.from_item AND me.board_id = ? AND me.deleted_at IS NULL
+         JOIN items o ON o.id = l.to_item AND o.deleted_at IS NULL
+         JOIN boards b ON b.id = o.board_id AND b.archived_at IS NULL
+         WHERE l.kind = 'related' AND l.column_id IS NOT NULL
+         ORDER BY l.created_at`,
+      )
+      .all(boardId) as (ItemRow & { from_item: string; column_id: string })[];
+    const relations: NonNullable<BoardDetail['relations']> = {};
+    const targets = new Map<string, Map<string, Item[]>>(); // column → item → connected items
+    for (const r of rows) {
+      const col = relCols.find((c) => c.id === r.column_id);
+      if (!col || !visible.get(col.id) || r.board_id !== col.settings.relation!.boardId) continue;
+      const other = toItem(r);
+      ((relations[r.from_item] ??= {})[col.id] ??= []).push({ id: other.id, name: other.name, boardId: r.board_id });
+      const byItem = targets.get(col.id) ?? targets.set(col.id, new Map()).get(col.id)!;
+      (byItem.get(r.from_item) ?? byItem.set(r.from_item, []).get(r.from_item)!).push(other);
+    }
+    const mirrorCols = columns.filter((c) => c.type === 'mirror' && c.settings.mirror);
+    if (!mirrorCols.length) return { relations };
+    const users = new Map((this.db.prepare('SELECT id, name FROM users').all() as { id: string; name: string }[]).map((u) => [u.id, u.name]));
+    const mirrors: NonNullable<BoardDetail['mirrors']> = {};
+    for (const mc of mirrorCols) {
+      const rel = relCols.find((c) => c.id === mc.settings.mirror!.relationColumnId);
+      if (!rel || !visible.get(rel.id)) continue;
+      const targetCols = this.columns(rel.settings.relation!.boardId);
+      const tc = targetCols.find((c) => c.id === mc.settings.mirror!.targetColumnId);
+      if (!tc) continue;
+      for (const [itemId, list] of targets.get(rel.id) ?? []) {
+        const texts = list.map((o) => formatCell(tc, o.values[tc.id], o, users, targetCols)).filter(Boolean);
+        if (texts.length) (mirrors[itemId] ??= {})[mc.id] = texts;
+      }
+    }
+    return { relations, mirrors };
   }
 
   /**
@@ -321,6 +374,30 @@ export class BoardService {
     if (settings?.prefix !== undefined) {
       if (type !== 'auto_id') throw badRequest('תחילית מותרת רק בעמודת מזהה רץ');
       if (settings.prefix) s.prefix = settings.prefix;
+    }
+    if (type === 'relation') {
+      const target = settings?.relation?.boardId;
+      if (!target) throw badRequest('יש לבחור לוח לחיבור', { relation: 'יש לבחור לוח' });
+      // Like wiring a checklist to another board: the owner must be able to see the board they connect.
+      if (actor && !this.access.boardRole(actor, target)) throw badRequest('יש לבחור לוח שיש לך גישה אליו', { relation: 'אין גישה ללוח' });
+      s.relation = { boardId: target };
+    } else if (settings?.relation) {
+      throw badRequest('לוח מחובר מותר רק בעמודת חיבור');
+    }
+    if (type === 'mirror') {
+      const m = settings?.mirror;
+      if (!m) throw badRequest('יש לבחור עמודת חיבור ועמודה להצגה', { mirror: 'חסרות הגדרות' });
+      if (boardId && !/^#\d+$/.test(m.relationColumnId)) {
+        const rel = this.columns(boardId).find((c) => c.id === m.relationColumnId);
+        if (!rel || rel.type !== 'relation' || !rel.settings.relation) throw badRequest('יש לבחור עמודת חיבור של הלוח הזה', { mirror: 'עמודת חיבור לא תקינה' });
+        const target = this.columns(rel.settings.relation.boardId).find((c) => c.id === m.targetColumnId);
+        if (m.targetColumnId !== '' && (!target || ['relation', 'mirror', 'linked', 'checklist'].includes(target.type))) {
+          throw badRequest('אי אפשר להציג את העמודה הזו כמראה', { mirror: 'עמודה לא תקינה' });
+        }
+      }
+      s.mirror = { relationColumnId: m.relationColumnId, targetColumnId: m.targetColumnId };
+    } else if (settings?.mirror) {
+      throw badRequest('הגדרות מראה מותרות רק בעמודת מראה');
     }
     if (type === 'formula') {
       const formula = settings?.formula?.trim();

@@ -104,7 +104,9 @@ export class BoardTemplateService {
       columns: columns.map((c) =>
         c.type === 'formula' && c.settings.formula
           ? { ...c, settings: { ...c.settings, formula: mapFormulaRefs(c.settings.formula, (id) => (ids.includes(id) ? `#${ids.indexOf(id)}` : null)).formula } }
-          : c,
+          : c.type === 'mirror' && c.settings.mirror && ids.includes(c.settings.mirror.relationColumnId)
+            ? { ...c, settings: { ...c.settings, mirror: { ...c.settings.mirror, relationColumnId: `#${ids.indexOf(c.settings.mirror.relationColumnId)}` } } }
+            : c,
       ),
     };
   }

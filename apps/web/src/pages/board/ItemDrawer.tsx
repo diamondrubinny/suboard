@@ -203,6 +203,10 @@ function DetailsPanel({
               columns={board.columns}
               values={item.values}
               linkStat={board.linkStats?.[item.id]}
+              itemId={item.id}
+              boardId={board.id}
+              related={board.relations?.[item.id]?.[c.id]}
+              mirrored={board.mirrors?.[item.id]?.[c.id]}
               overdue={overdue && c.settings.role === 'due'}
               onChange={(v) => undo.setValue(item, c.id, v)}
             />

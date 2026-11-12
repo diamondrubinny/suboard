@@ -1,5 +1,6 @@
 import { DateField } from '../DateField';
-import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser, type LinkStat } from '@suboard/shared';
+import { RelationCell } from './RelationCell';
+import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser, type LinkStat, type RelatedItem } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { colorStyle, StatusPill } from '../StatusPill';
 import { ContactEditor, DateRangeEditor, ProgressEditor, RatingEditor, TagsPicker } from './ExtraCells';
@@ -32,6 +33,11 @@ export interface CellEditorProps {
   values?: Record<string, CellValue>;
   /** For `linked` columns: linked items the viewer may see, and how many are done. */
   linkStat?: LinkStat;
+  /** For `relation` columns: the item, its board and the connected items; for `mirror`: the mirrored texts. */
+  itemId?: string;
+  boardId?: string;
+  related?: RelatedItem[];
+  mirrored?: string[];
 }
 
 /** Text-like input that commits on blur / Enter and reverts on Escape. */
@@ -102,7 +108,7 @@ function checklistLabel(label: string, column: Column, value: unknown): string {
 }
 
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, columns, values, linkStat } = props;
+  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, columns, values, linkStat, itemId, boardId, related, mirrored } = props;
   const options = column.settings.options ?? [];
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -112,6 +118,17 @@ export function CellEditor(props: CellEditorProps) {
       return (
         <span className="cell-readonly auto-id num" id={inputId}>
           {seq ? formatAutoId(seq, column.settings.prefix) : '—'}
+        </span>
+      );
+
+    case 'relation':
+      if (!itemId || !boardId) return <span className="cell-readonly" id={inputId}>—</span>;
+      return <RelationCell column={column} boardId={boardId} itemId={itemId} related={related ?? []} readOnly={readOnly} label={label} mode={mode} id={inputId} />;
+
+    case 'mirror':
+      return (
+        <span className="cell-readonly" id={inputId} title={mirrored?.join(', ') || undefined}>
+          {mirrored?.length ? mirrored.join(', ') : <span aria-label="אין ערך">—</span>}
         </span>
       );
 
