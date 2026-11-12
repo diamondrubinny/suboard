@@ -2,6 +2,12 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.8.0 — 2026-11-12
+
+### Added
+- Outgoing webhooks (module off by default): a board owner registers an HTTPS address that receives a signed JSON message when items are created or changed. Targets are restricted against server-side request forgery, redirects are not followed, deliveries are logged, and a failing webhook switches itself off.
+- Modules can be "off until enabled"; enabling one that sends data out asks for confirmation.
+
 ## 1.7.0 — 2026-11-12
 
 ### Added

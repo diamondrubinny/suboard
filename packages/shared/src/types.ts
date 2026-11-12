@@ -39,6 +39,29 @@ export interface AdminUser {
   authSource: 'local' | 'sso' | 'scim';
 }
 
+export const WEBHOOK_EVENTS = ['item_created', 'item_updated'] as const;
+export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
+export const WEBHOOK_EVENT_LABELS: Record<WebhookEvent, string> = { item_created: 'פריט נוצר', item_updated: 'פריט השתנה' };
+export interface WebhookDelivery {
+  id: string;
+  event: string;
+  ok: boolean;
+  status: number | null;
+  error: string | null;
+  at: string;
+}
+export interface Webhook {
+  id: string;
+  boardId: string;
+  url: string;
+  events: WebhookEvent[];
+  active: boolean;
+  /** Consecutive failed deliveries; the webhook switches itself off after 10. */
+  failures: number;
+  createdAt: string;
+  last: { ok: boolean; status: number | null; error: string | null; at: string } | null;
+}
+
 export interface Workspace {
   id: string;
   name: string;

@@ -297,6 +297,10 @@ export const createBoardSchema = z.object({
   workspaceId: idSchema.optional(),
 });
 
+const webhookEvents = z.array(z.enum(['item_created', 'item_updated'])).min(1, 'יש לבחור לפחות אירוע אחד').max(2);
+export const createWebhookSchema = z.object({ url: z.string().trim().min(1, 'יש להזין כתובת').max(500), events: webhookEvents });
+export const updateWebhookSchema = z.object({ active: z.boolean().optional(), events: webhookEvents.optional() }).refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+
 export const workspaceSchema = z.object({ name: line(60) });
 export const moveBoardSchema = z.object({ workspaceId: idSchema.nullable() });
 

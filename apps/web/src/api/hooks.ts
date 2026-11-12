@@ -9,6 +9,9 @@ import type {
   PasskeyInfo,
   ModuleState,
   Workspace,
+  Webhook,
+  WebhookDelivery,
+  WebhookEvent,
   BoardFile,
   FollowState,
   Reaction,
@@ -878,6 +881,21 @@ export function useSessionMutations() {
   return {
     revoke: useMutation({ mutationFn: (handle: string) => api<{ ok: true; signedOut: boolean }>(`/auth/sessions/${handle}`, 'DELETE'), onSuccess: refresh }),
     revokeOthers: useMutation({ mutationFn: () => api<{ sessions: ActiveSession[] }>('/auth/sessions/revoke-others', 'POST', {}), onSuccess: refresh }),
+  };
+}
+export const useWebhooks = (boardId: string) => useQuery({ queryKey: ['webhooks', boardId] as const, queryFn: () => api<{ webhooks: Webhook[] }>(`/boards/${boardId}/webhooks`).then((r) => r.webhooks) });
+export const useWebhookDeliveries = (id: string) => useQuery({ queryKey: ['webhook-deliveries', id] as const, queryFn: () => api<{ deliveries: WebhookDelivery[] }>(`/webhooks/${id}/deliveries`).then((r) => r.deliveries) });
+export function useWebhookMutations(boardId: string) {
+  const qc = useQueryClient();
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ['webhooks', boardId] });
+    void qc.invalidateQueries({ queryKey: ['webhook-deliveries'] });
+  };
+  return {
+    create: useMutation({ mutationFn: (input: { url: string; events: WebhookEvent[] }) => api<{ webhook: Webhook; secret: string }>(`/boards/${boardId}/webhooks`, 'POST', input), onSuccess: refresh }),
+    update: useMutation({ mutationFn: ({ id, patch }: { id: string; patch: { active?: boolean; events?: WebhookEvent[] } }) => api(`/webhooks/${id}`, 'PATCH', patch), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/webhooks/${id}`, 'DELETE'), onSuccess: refresh }),
+    test: useMutation({ mutationFn: (id: string) => api<{ delivery: WebhookDelivery }>(`/webhooks/${id}/test`, 'POST', {}).then((r) => r.delivery), onSettled: refresh }),
   };
 }
 export const useWorkspaces = () => useQuery({ queryKey: qk.workspaces, queryFn: () => api<{ workspaces: Workspace[] }>('/workspaces').then((r) => r.workspaces), staleTime: 60_000 });

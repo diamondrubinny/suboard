@@ -34,6 +34,8 @@ const envSchema = z
     PUBLIC_URL: z.string().url().optional(),
     /** true on test / staging sites: X-Robots-Tag noindex on every response. */
     NOINDEX: bool.optional(),
+    /** Tests / development only: let webhooks reach http and private addresses. Ignored in production. */
+    WEBHOOK_ALLOW_INSECURE_TARGETS: bool.optional(),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
     SMTP_SECURE: bool.optional(),
@@ -119,6 +121,7 @@ export interface AppConfig {
   /** Path prefix when served under a folder ("/test" for https://example.org/test); "" at the root. From PUBLIC_URL. */
   basePath: string;
   noIndex: boolean;
+  webhookAllowInsecureTargets: boolean;
   smtp: { host: string; port: number; secure: boolean; user?: string; password?: string } | null;
   mailFrom: string;
   digestHour: number;
@@ -175,6 +178,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
     mfaIssuer: e.MFA_ISSUER,
     publicUrl: (e.PUBLIC_URL ?? e.APP_ORIGIN.split(',')[0] ?? '').replace(/\/$/, ''),
     noIndex: e.NOINDEX ?? false,
+    webhookAllowInsecureTargets: e.WEBHOOK_ALLOW_INSECURE_TARGETS ?? false,
     basePath: basePathOf(e.PUBLIC_URL ?? e.APP_ORIGIN.split(',')[0] ?? ''),
     smtp: e.SMTP_HOST
       ? { host: e.SMTP_HOST, port: e.SMTP_PORT, secure: e.SMTP_SECURE ?? e.SMTP_PORT === 465, user: e.SMTP_USER, password: e.SMTP_PASSWORD }

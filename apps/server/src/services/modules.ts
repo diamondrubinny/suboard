@@ -1,4 +1,4 @@
-import { allModulesOn, MODULE_KEYS, type ModuleKey, type ModuleState } from '@suboard/shared';
+import { defaultModuleState, MODULE_KEYS, type ModuleKey, type ModuleState } from '@suboard/shared';
 import { nowIso, type DB } from '../db/index.js';
 import { forbidden } from '../lib/errors.js';
 import type { Actor } from './access.js';
@@ -17,13 +17,13 @@ export class ModuleService {
 
   state(): ModuleState {
     if (this.cache) return this.cache;
-    const state = allModulesOn();
+    const state = defaultModuleState();
     const row = this.db.prepare('SELECT value FROM app_settings WHERE key = ?').get(SETTING) as { value: string } | undefined;
     if (row) {
       try {
         const saved = JSON.parse(row.value) as Record<string, unknown>;
         // Unknown keys are ignored and missing ones stay on, so adding a module later needs no migration.
-        for (const k of MODULE_KEYS) if (saved[k] === false) state[k] = false;
+        for (const k of MODULE_KEYS) if (typeof saved[k] === 'boolean') state[k] = saved[k] as boolean;
       } catch {
         /* unreadable setting: everything stays on */
       }

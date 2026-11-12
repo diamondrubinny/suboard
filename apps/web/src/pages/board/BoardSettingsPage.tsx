@@ -25,6 +25,7 @@ import { colorStyle } from '../../components/StatusPill';
 import { ChecklistSettingsEditor, ComplianceSection } from './FieldSettings';
 import { FormulaEditor } from './FormulaEditor';
 import { RelationSetup } from './RelationSetup';
+import { WebhooksSection } from './WebhooksSection';
 
 export function BoardSettingsPage() {
   const { boardId = '' } = useParams();
@@ -62,6 +63,7 @@ export function BoardSettingsPage() {
         <MembersSection board={b} />
         <TemplateSection board={b} />
         <DuplicateSection board={b} />
+        {modules.data?.webhooks === true && <WebhooksSection board={b} />}
         <DangerSection board={b} />
       </div>
     </>

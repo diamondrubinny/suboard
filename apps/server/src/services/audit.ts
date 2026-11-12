@@ -21,6 +21,7 @@ export type AuditEvent =
   | 'board_duplicated'
   | 'modules_changed'
   | 'workspace_changed'
+  | 'webhook_changed'
   | 'template_created'
   | 'template_deleted'
   | 'board_archived'

@@ -5,6 +5,8 @@ import {
   createItemSchema,
   createUpdateSchema,
   duplicateBoardSchema,
+  createWebhookSchema,
+  updateWebhookSchema,
   moveBoardSchema,
   workspaceSchema,
   idSchema,
@@ -46,6 +48,19 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
     const board = boards.create(actorOf(req), createBoardSchema.parse(req.body), (id) => services.boardTemplates.structure(id));
     return reply.code(201).send({ board });
   });
+
+  // ---- outgoing webhooks (board owners; the whole module is off until an administrator enables it)
+  app.get('/boards/:id/webhooks', async (req) => ({ webhooks: services.webhooks.list(actorOf(req), param(req, 'id')) }));
+  app.post('/boards/:id/webhooks', { config: { rateLimit: { max: 20, timeWindow: 15 * 60_000 } } }, async (req, reply) =>
+    reply.code(201).send(services.webhooks.create(actorOf(req), param(req, 'id'), createWebhookSchema.parse(req.body), req.ip)),
+  );
+  app.patch('/webhooks/:id', async (req) => ({ webhook: services.webhooks.update(actorOf(req), param(req, 'id'), updateWebhookSchema.parse(req.body)) }));
+  app.delete('/webhooks/:id', async (req) => {
+    services.webhooks.remove(actorOf(req), param(req, 'id'), req.ip);
+    return { ok: true };
+  });
+  app.get('/webhooks/:id/deliveries', async (req) => ({ deliveries: services.webhooks.deliveries(actorOf(req), param(req, 'id')) }));
+  app.post('/webhooks/:id/test', { config: { rateLimit: { max: 20, timeWindow: 15 * 60_000 } } }, async (req) => ({ delivery: await services.webhooks.test(actorOf(req), param(req, 'id')) }));
 
   // ---- workspaces (organisation of the board list only; access stays per board)
   app.get('/workspaces', async (req) => ({ workspaces: services.workspaces.list(actorOf(req)) }));

@@ -7,7 +7,7 @@
  * One registry for both sides: the server guards `api` prefixes, the web app builds its navigation
  * and route guards from the same keys.
  */
-export const MODULE_KEYS = ['forms', 'dashboards', 'workload', 'monthly_report', 'trainings', 'procedures', 'compliance'] as const;
+export const MODULE_KEYS = ['forms', 'dashboards', 'workload', 'monthly_report', 'trainings', 'procedures', 'compliance', 'webhooks'] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
 export interface ModuleDefinition {
@@ -18,6 +18,8 @@ export interface ModuleDefinition {
   api: string[];
   /** API paths that are a pattern rather than a prefix (e.g. nested under a board). */
   apiPatterns?: RegExp[];
+  /** Off until an administrator switches it on (modules that send data out of the system). */
+  defaultOff?: boolean;
 }
 
 export const MODULES: readonly ModuleDefinition[] = [
@@ -34,11 +36,20 @@ export const MODULES: readonly ModuleDefinition[] = [
   { key: 'trainings', label: 'הדרכות', description: 'הדרכות, מטריצת כשירות ותזכורות לפני פקיעה.', api: ['/trainings', '/training-records', '/me/trainings'] },
   { key: 'procedures', label: 'נהלים', description: 'נהלים בגרסאות ואישורי קריאה.', api: ['/procedures', '/procedure-versions', '/me/procedures'] },
   { key: 'compliance', label: 'תאימות', description: 'מעקב בדיקות תקופתיות ואחוז עמידה.', api: ['/compliance'] },
+  {
+    key: 'webhooks',
+    label: 'Webhooks (שליחת אירועים למערכת חיצונית)',
+    description: 'בעלי לוח יכולים להגדיר כתובת HTTPS שתקבל הודעה חתומה על יצירה ושינוי של פריטים. מידע מהלוח יוצא מהמערכת — כבוי כברירת מחדל.',
+    api: ['/webhooks'],
+    apiPatterns: [/^\/boards\/[^/]+\/webhooks(\/|$)/],
+    defaultOff: true,
+  },
 ];
 
 export type ModuleState = Record<ModuleKey, boolean>;
 
-export const allModulesOn = (): ModuleState => Object.fromEntries(MODULE_KEYS.map((k) => [k, true])) as ModuleState;
+/** The state of a fresh installation: everything on, except modules marked `defaultOff`. */
+export const defaultModuleState = (): ModuleState => Object.fromEntries(MODULES.map((m) => [m.key, !m.defaultOff])) as ModuleState;
 
 /** The module an API path (without `/api` and without the query string) belongs to, if any. */
 export function moduleOfApiPath(path: string): ModuleKey | null {

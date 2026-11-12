@@ -12,6 +12,8 @@ export function AdminModulesPage() {
   const { toast, confirm } = useFeedback();
 
   const toggle = async (key: ModuleKey, label: string, on: boolean) => {
+    // Modules that send data out of the system are switched on deliberately.
+    if (on && MODULES.find((m) => m.key === key)?.defaultOff && !(await confirm({ title: `הפעלת המודול "${label}"`, message: 'המודול מאפשר לבעלי לוחות לשלוח מידע מהלוח למערכת חיצונית. הפעילו רק אם זה תואם את מדיניות אבטחת המידע של הארגון.', confirmLabel: 'הפעלה' }))) return;
     if (!on && !(await confirm({ title: `כיבוי המודול "${label}"`, message: 'המודול ייעלם מהתפריט של כל המשתמשים ולא יהיה נגיש. הנתונים שלו נשמרים ויחזרו כשיופעל מחדש.', confirmLabel: 'כיבוי' }))) return;
     set.mutate({ [key]: on }, { onSuccess: () => toast(on ? `המודול "${label}" הופעל` : `המודול "${label}" כובה`), onError: (e) => toast(errorMessage(e), 'error') });
   };

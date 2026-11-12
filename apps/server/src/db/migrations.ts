@@ -704,4 +704,34 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE INDEX idx_boards_workspace ON boards(workspace_id);
     `,
   },
+  {
+    version: 20,
+    name: 'webhooks',
+    sql: /* sql */ `
+      -- Outgoing webhooks of a board. The signing secret is stored encrypted (it must be usable to sign).
+      CREATE TABLE webhooks (
+        id TEXT PRIMARY KEY,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        url TEXT NOT NULL,
+        secret_enc TEXT NOT NULL,
+        events TEXT NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1,
+        failures INTEGER NOT NULL DEFAULT 0,
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_webhooks_board ON webhooks(board_id);
+      -- Outcome of recent deliveries (never the message body).
+      CREATE TABLE webhook_deliveries (
+        id TEXT PRIMARY KEY,
+        webhook_id TEXT NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
+        event TEXT NOT NULL,
+        ok INTEGER NOT NULL,
+        http_status INTEGER,
+        error TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_webhook_deliveries ON webhook_deliveries(webhook_id, created_at);
+    `,
+  },
 ];

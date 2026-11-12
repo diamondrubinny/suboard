@@ -25,7 +25,7 @@ describe('optional modules', () => {
 
     const all = (await noa.get('/api/modules')).json().modules;
     expect(Object.keys(all).sort()).toEqual([...MODULE_KEYS].sort());
-    expect(Object.values(all).every(Boolean)).toBe(true);
+    expect(all).toMatchObject({ forms: true, trainings: true, webhooks: false }); // modules that send data out start switched off
     expect((await boss.get('/api/trainings')).statusCode).toBe(200);
 
     // only administrators change it; unknown keys are ignored
