@@ -1,6 +1,7 @@
 import { DateField } from '../DateField';
 import { RelationCell } from './RelationCell';
-import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser, type LinkStat, type RelatedItem } from '@suboard/shared';
+import { TimeCell } from './TimeCell';
+import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser, type LinkStat, type RelatedItem, type TimeTotal } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { colorStyle, StatusPill } from '../StatusPill';
 import { ContactEditor, DateRangeEditor, ProgressEditor, RatingEditor, TagsPicker } from './ExtraCells';
@@ -40,6 +41,9 @@ export interface CellEditorProps {
   mirrored?: string[];
   /** For `files` columns: how many files the item has. */
   fileCount?: number;
+  /** For `time` columns: the item's logged time, and whether the viewer may log (editors). */
+  timeTotal?: TimeTotal;
+  canLogTime?: boolean;
 }
 
 /** Text-like input that commits on blur / Enter and reverts on Escape. */
@@ -110,7 +114,7 @@ function checklistLabel(label: string, column: Column, value: unknown): string {
 }
 
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, columns, values, linkStat, itemId, boardId, related, mirrored, fileCount } = props;
+  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, columns, values, linkStat, itemId, boardId, related, mirrored, fileCount, timeTotal, canLogTime } = props;
   const options = column.settings.options ?? [];
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -122,6 +126,10 @@ export function CellEditor(props: CellEditorProps) {
           {seq ? formatAutoId(seq, column.settings.prefix) : '—'}
         </span>
       );
+
+    case 'time':
+      if (!itemId || !boardId) return <span className="cell-readonly" id={inputId}>—</span>;
+      return <TimeCell boardId={boardId} itemId={itemId} total={timeTotal} canLog={Boolean(canLogTime)} label={label} mode={mode} id={inputId} />;
 
     case 'files': {
       const n = fileCount ?? 0;

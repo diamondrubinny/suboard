@@ -753,4 +753,24 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE INDEX idx_api_tokens_user ON api_tokens(user_id);
     `,
   },
+  {
+    version: 22,
+    name: 'time_tracking',
+    sql: /* sql */ `
+      -- Time logged on items. ended_at NULL = a running timer (at most one per user).
+      CREATE TABLE time_entries (
+        id TEXT PRIMARY KEY,
+        item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        board_id TEXT NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        seconds INTEGER,
+        note TEXT NOT NULL DEFAULT ''
+      );
+      CREATE INDEX idx_time_item ON time_entries(item_id);
+      CREATE INDEX idx_time_board ON time_entries(board_id);
+      CREATE UNIQUE INDEX idx_time_running ON time_entries(user_id) WHERE ended_at IS NULL;
+    `,
+  },
 ];

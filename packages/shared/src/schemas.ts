@@ -271,6 +271,7 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
     case 'relation':
     case 'mirror':
     case 'files':
+    case 'time':
       // Computed from the item; any client value is rejected.
       return z.never();
     case 'risk':
@@ -300,6 +301,12 @@ export const createBoardSchema = z.object({
 const webhookEvents = z.array(z.enum(['item_created', 'item_updated'])).min(1, 'יש לבחור לפחות אירוע אחד').max(2);
 export const createWebhookSchema = z.object({ url: z.string().trim().min(1, 'יש להזין כתובת').max(500), events: webhookEvents });
 export const updateWebhookSchema = z.object({ active: z.boolean().optional(), events: webhookEvents.optional() }).refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+
+export const manualTimeSchema = z.object({
+  minutes: z.number().int().min(1, 'לפחות דקה אחת').max(720, 'עד 12 שעות ברישום אחד'),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'תאריך לא תקין'),
+  note: z.string().trim().max(200).optional(),
+});
 
 export const createApiTokenSchema = z.object({
   name: line(60),

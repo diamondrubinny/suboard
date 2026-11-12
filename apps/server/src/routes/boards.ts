@@ -152,7 +152,9 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
 
   // ---- columns
   app.post('/boards/:id/columns', async (req, reply) => {
-    const column = boards.createColumn(actorOf(req), param(req, 'id'), createColumnSchema.parse(req.body));
+    const input = createColumnSchema.parse(req.body);
+    if (input.type === 'time' && !services.modules.enabled('time_tracking')) throw badRequest('מודול מעקב הזמן כבוי. מנהל המערכת מפעיל אותו במסך "מודולים".', { type: 'המודול כבוי' });
+    const column = boards.createColumn(actorOf(req), param(req, 'id'), input);
     return reply.code(201).send({ column });
   });
   app.patch('/columns/:id', async (req) => ({

@@ -43,6 +43,12 @@ export class BoardService {
     private readonly audit: AuditService,
   ) {}
 
+  /** Optional modules add their own per-item data to the board payload (e.g. time totals). */
+  private readonly extensions: ((actor: Actor, boardId: string, columns: Column[]) => Partial<BoardDetail>)[] = [];
+  extend(fn: (actor: Actor, boardId: string, columns: Column[]) => Partial<BoardDetail>): void {
+    this.extensions.push(fn);
+  }
+
   // ---------------------------------------------------------------- boards
   list(actor: Actor): BoardSummary[] {
     const rows = (
@@ -147,6 +153,7 @@ export class BoardService {
       ...(this.columns(boardId).some((c) => c.type === 'linked') ? { linkStats: this.linkStats(actor, boardId) } : {}),
       ...this.relationData(actor, boardId),
       ...(this.columns(boardId).some((c) => c.type === 'files') ? { fileCounts: this.fileCounts(boardId) } : {}),
+      ...Object.assign({}, ...this.extensions.map((f) => f(actor, boardId, this.columns(boardId)))),
       favorite: this.db.prepare('SELECT 1 FROM board_favorites WHERE user_id = ? AND board_id = ?').get(actor.id, boardId) !== undefined,
     };
   }

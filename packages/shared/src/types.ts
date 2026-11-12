@@ -39,6 +39,33 @@ export interface AdminUser {
   authSource: 'local' | 'sso' | 'scim';
 }
 
+export interface TimeTotal {
+  /** Seconds logged on the item by everyone (the viewer's own running timer is not included — it is counted live). */
+  seconds: number;
+  /** When the viewer's own timer on this item was started, if it is running. */
+  runningSince: string | null;
+  /** How many other people have a timer running on the item right now. */
+  othersRunning: number;
+}
+export interface TimeEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  startedAt: string;
+  endedAt: string | null;
+  seconds: number;
+  note: string;
+  mine: boolean;
+}
+export interface ItemTime {
+  totalSeconds: number;
+  mineSeconds: number;
+  /** The viewer's own entries; for board owners, everyone's. */
+  entries: TimeEntry[];
+  /** True when `entries` holds everyone's entries (board owners). */
+  detailed: boolean;
+}
+
 export interface ApiTokenInfo {
   id: string;
   name: string;
@@ -161,6 +188,8 @@ export interface BoardDetail {
   updatedAt: string;
   /** Present when the board has a `linked` column: per item, linked items the viewer may see and how many are done. */
   linkStats?: Record<string, LinkStat>;
+  /** Present when the board has a `time` column and the module is on: time logged per item. */
+  timeTotals?: Record<string, TimeTotal>;
   /** Present when the board has a `files` column: item id → number of attached files (not counting blocked ones). */
   fileCounts?: Record<string, number>;
   /** Relation columns: item id → column id → connected items the viewer may see. */

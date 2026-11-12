@@ -1,4 +1,4 @@
-import { evaluateFormula, formatFormulaValue, todayIso, formatDateTimeHe, checklistStats, formatRisk, isDateRange, formatAutoId, formatDateHe, formatDateRangeHe, type BoardDetail, type CellValue, type Column, type Item } from '@suboard/shared';
+import { formatDuration, evaluateFormula, formatFormulaValue, todayIso, formatDateTimeHe, checklistStats, formatRisk, isDateRange, formatAutoId, formatDateHe, formatDateRangeHe, type BoardDetail, type CellValue, type Column, type Item } from '@suboard/shared';
 import writeXlsxFile from 'write-excel-file/node';
 import type { DB } from '../db/index.js';
 import type { AccessService, Actor } from './access.js';
@@ -19,7 +19,11 @@ export function csvField(value: string): string {
 }
 
 /** Human-readable text for a cell (labels instead of ids, Israeli dates, names instead of user ids). */
-export function formatCell(c: Column, v: CellValue | undefined, item: Item, users: Map<string, string>, allColumns: Column[] = [], linkStats?: Record<string, { total: number; done: number }>, related?: Pick<BoardDetail, 'relations' | 'mirrors' | 'fileCounts'>): string {
+export function formatCell(c: Column, v: CellValue | undefined, item: Item, users: Map<string, string>, allColumns: Column[] = [], linkStats?: Record<string, { total: number; done: number }>, related?: Pick<BoardDetail, 'relations' | 'mirrors' | 'fileCounts' | 'timeTotals'>): string {
+  if (c.type === 'time') {
+    const t = related?.timeTotals?.[item.id];
+    return t && t.seconds > 0 ? formatDuration(t.seconds) : '';
+  }
   if (c.type === 'files') return String(related?.fileCounts?.[item.id] ?? 0);
   if (c.type === 'relation') return (related?.relations?.[item.id]?.[c.id] ?? []).map((r) => r.name).join('; ');
   if (c.type === 'mirror') return (related?.mirrors?.[item.id]?.[c.id] ?? []).join('; ');

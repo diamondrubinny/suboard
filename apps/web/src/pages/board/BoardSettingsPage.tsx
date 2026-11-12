@@ -230,6 +230,7 @@ function optionUsage(board: BoardDetail, columnId: string): Record<string, numbe
 
 function ColumnsSection({ board }: { board: BoardDetail }) {
   const { create, update, remove } = useColumnMutations(board.id);
+  const modules = useModules();
   const { toast, confirm } = useFeedback();
   const [title, setTitle] = useState('');
   const [type, setType] = useState<ColumnType>('text');
@@ -358,7 +359,7 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
           סוג עמודה
         </label>
         <select id="new-col-type" className="select" value={type} onChange={(e) => setType(e.target.value as ColumnType)}>
-          {COLUMN_TYPES.map((t) => (
+          {COLUMN_TYPES.filter((t) => t !== 'time' || modules.data?.time_tracking === true).map((t) => (
             <option key={t} value={t}>
               {COLUMN_TYPE_LABELS[t]}
             </option>

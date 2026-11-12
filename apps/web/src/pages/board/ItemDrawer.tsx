@@ -209,6 +209,8 @@ function DetailsPanel({
               related={board.relations?.[item.id]?.[c.id]}
               mirrored={board.mirrors?.[item.id]?.[c.id]}
               fileCount={board.fileCounts?.[item.id]}
+              timeTotal={board.timeTotals?.[item.id]}
+              canLogTime={board.myRole !== 'viewer'}
               overdue={overdue && c.settings.role === 'due'}
               onChange={(v) => undo.setValue(item, c.id, v)}
             />

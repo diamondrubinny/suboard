@@ -1,5 +1,6 @@
 import {
   addLinkSchema,
+  manualTimeSchema,
   setRelationSchema,
   complianceSettingsSchema,
   createFormSchema,
@@ -45,6 +46,16 @@ export async function fieldRoutes(app: FastifyInstance, { services }: { services
   app.get('/boards/:id/item-names', async (req) => ({
     items: links.itemNames(actorOf(req), param(req, 'id'), String((req.query as { q?: string }).q ?? '')),
   }));
+  // ---- time tracking (module off by default)
+  app.get('/items/:id/time', async (req) => ({ time: services.time.item(actorOf(req), param(req, 'id')) }));
+  app.post('/items/:id/time/start', async (req) => ({ time: services.time.start(actorOf(req), param(req, 'id')) }));
+  app.post('/items/:id/time/stop', async (req) => ({ time: services.time.stop(actorOf(req), param(req, 'id')) }));
+  app.post('/items/:id/time', async (req) => ({ time: services.time.addManual(actorOf(req), param(req, 'id'), manualTimeSchema.parse(req.body)) }));
+  app.delete('/time/:id', async (req) => {
+    services.time.remove(actorOf(req), param(req, 'id'));
+    return { ok: true };
+  });
+
   app.delete('/links/:id', async (req) => {
     links.remove(actorOf(req), param(req, 'id'));
     return { ok: true };

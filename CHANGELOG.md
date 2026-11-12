@@ -2,6 +2,11 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.10.0 — 2026-11-12
+
+### Added
+- Time tracking (module off by default): a time column with a start / stop timer and manual entries. Every board member sees an item's total; who logged what is visible only to that person and to the board's owners. Nothing is measured automatically.
+
 ## 1.9.0 — 2026-11-12
 
 ### Added

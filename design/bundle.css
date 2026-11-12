@@ -4203,3 +4203,34 @@ kbd {
   margin: 0;
   font-size: 1.05rem;
 }
+
+/* ---- time tracking */
+.time-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.time-running {
+  display: inline-block;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  margin-inline-start: 0.35rem;
+  border-radius: 50%;
+  background: var(--success);
+}
+.time-toggle {
+  inline-size: 1.9rem;
+  block-size: 1.9rem;
+}
+.time-manual h3 {
+  font-size: 1rem;
+  margin: var(--space-4) 0 var(--space-2);
+}
+.time-manual-row {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.time-manual-row .field {
+  flex: 1 1 6rem;
+}

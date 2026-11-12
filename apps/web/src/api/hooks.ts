@@ -11,6 +11,7 @@ import type {
   Workspace,
   Webhook,
   ApiTokenInfo,
+  ItemTime,
   WebhookDelivery,
   WebhookEvent,
   BoardFile,
@@ -882,6 +883,20 @@ export function useSessionMutations() {
   return {
     revoke: useMutation({ mutationFn: (handle: string) => api<{ ok: true; signedOut: boolean }>(`/auth/sessions/${handle}`, 'DELETE'), onSuccess: refresh }),
     revokeOthers: useMutation({ mutationFn: () => api<{ sessions: ActiveSession[] }>('/auth/sessions/revoke-others', 'POST', {}), onSuccess: refresh }),
+  };
+}
+export const useItemTime = (itemId: string) => useQuery({ queryKey: ['item-time', itemId] as const, queryFn: () => api<{ time: ItemTime }>(`/items/${itemId}/time`).then((r) => r.time) });
+export function useTimeMutations(boardId: string, itemId: string) {
+  const qc = useQueryClient();
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: qk.board(boardId) });
+    void qc.invalidateQueries({ queryKey: ['item-time', itemId] });
+  };
+  return {
+    start: useMutation({ mutationFn: () => api(`/items/${itemId}/time/start`, 'POST', {}), onSuccess: refresh }),
+    stop: useMutation({ mutationFn: () => api(`/items/${itemId}/time/stop`, 'POST', {}), onSuccess: refresh }),
+    addManual: useMutation({ mutationFn: (input: { minutes: number; date: string; note?: string }) => api(`/items/${itemId}/time`, 'POST', input), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/time/${id}`, 'DELETE'), onSuccess: refresh }),
   };
 }
 export const useApiTokens = () => useQuery({ queryKey: ['api-tokens'] as const, queryFn: () => api<{ tokens: ApiTokenInfo[] }>('/auth/tokens').then((r) => r.tokens) });

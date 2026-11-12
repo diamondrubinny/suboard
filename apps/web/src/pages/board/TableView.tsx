@@ -430,6 +430,8 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
               related={board.relations?.[item.id]?.[c.id]}
               mirrored={board.mirrors?.[item.id]?.[c.id]}
               fileCount={board.fileCounts?.[item.id]}
+              timeTotal={board.timeTotals?.[item.id]}
+              canLogTime={board.myRole !== 'viewer'}
               onChange={(v) => setValue(item, c.id, v)}
               onOpenItem={() => onOpenItem(item.id)}
             />

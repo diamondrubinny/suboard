@@ -10,6 +10,12 @@ export function findPrimaryStatusColumn(columns: Column[]): Column | undefined {
   return columns.find((c) => c.type === 'status');
 }
 
+/** 5400 → "1:30" (hours:minutes). */
+export function formatDuration(seconds: number): string {
+  const m = Math.floor(Math.max(0, seconds) / 60);
+  return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+}
+
 /** May someone with this board role change the cells of the column? (Viewers never; locked columns: owners only.) */
 export function canEditColumn(column: Column, role: 'owner' | 'editor' | 'viewer' | null | undefined): boolean {
   if (role === 'owner') return true;
