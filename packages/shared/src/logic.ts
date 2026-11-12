@@ -10,6 +10,25 @@ export function findPrimaryStatusColumn(columns: Column[]): Column | undefined {
   return columns.find((c) => c.type === 'status');
 }
 
+/** The Sunday that starts the week of an ISO date (weeks run Sunday–Saturday). */
+export function weekStartIso(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+  return d.toISOString().slice(0, 10);
+}
+/** "09/11 – 15/11/2026" for the week that starts on the given Sunday. */
+export function formatWeekHe(startIso: string): string {
+  const end = addDaysIso(startIso, 6);
+  const dm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  return `${dm(startIso)} – ${dm(end)}/${end.slice(0, 4)}`;
+}
+/** A number as shown in a cell: the column's decimals and unit (currency signs go before the number). */
+export function formatNumberCell(n: number, settings: { unit?: string; decimals?: number | null }): string {
+  const text = typeof settings.decimals === 'number' ? n.toLocaleString('he-IL', { minimumFractionDigits: settings.decimals, maximumFractionDigits: settings.decimals }) : n.toLocaleString('he-IL', { maximumFractionDigits: 4 });
+  if (!settings.unit) return text;
+  return /^[₪$€£]$/.test(settings.unit) ? `${settings.unit}${text}` : `${text} ${settings.unit}`;
+}
+
 /** 5400 → "1:30" (hours:minutes). */
 export function formatDuration(seconds: number): string {
   const m = Math.floor(Math.max(0, seconds) / 60);

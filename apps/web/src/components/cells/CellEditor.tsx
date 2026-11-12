@@ -1,7 +1,8 @@
 import { DateField } from '../DateField';
 import { RelationCell } from './RelationCell';
 import { TimeCell } from './TimeCell';
-import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser, type LinkStat, type RelatedItem, type TimeTotal } from '@suboard/shared';
+import { ButtonCell, ColorCell, HourCell, VoteCell, WeekCell } from './MoreCells';
+import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser, type LinkStat, type RelatedItem, type TimeTotal, type ColorKey, PALETTE, formatWeekHe, formatNumberCell } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { colorStyle, StatusPill } from '../StatusPill';
 import { ContactEditor, DateRangeEditor, ProgressEditor, RatingEditor, TagsPicker } from './ExtraCells';
@@ -29,6 +30,8 @@ export interface CellEditorProps {
   createdBy?: string | null;
   /** Last update time (`updated_at` columns). */
   updatedAt?: string;
+  /** Creation time (`created_at` columns). */
+  createdAt?: string;
   /** For `formula` columns: the board's columns and the item's cells the formula reads. */
   columns?: Column[];
   values?: Record<string, CellValue>;
@@ -44,6 +47,8 @@ export interface CellEditorProps {
   /** For `time` columns: the item's logged time, and whether the viewer may log (editors). */
   timeTotal?: TimeTotal;
   canLogTime?: boolean;
+  /** For `button` columns: set another column of the same item. */
+  onSetValue?: (columnId: string, value: CellValue) => void;
 }
 
 /** Text-like input that commits on blur / Enter and reverts on Escape. */
@@ -114,7 +119,7 @@ function checklistLabel(label: string, column: Column, value: unknown): string {
 }
 
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, columns, values, linkStat, itemId, boardId, related, mirrored, fileCount, timeTotal, canLogTime } = props;
+  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, createdAt, columns, values, linkStat, itemId, boardId, related, mirrored, fileCount, timeTotal, canLogTime, onSetValue } = props;
   const options = column.settings.options ?? [];
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -126,6 +131,49 @@ export function CellEditor(props: CellEditorProps) {
           {seq ? formatAutoId(seq, column.settings.prefix) : '—'}
         </span>
       );
+
+    case 'hour': {
+      const v = typeof value === 'string' ? value : '';
+      if (readOnly) return <span className="cell-readonly num" id={inputId} dir="ltr">{v || '—'}</span>;
+      return <HourCell id={inputId} value={v} label={label} onChange={onChange} />;
+    }
+
+    case 'week': {
+      const v = typeof value === 'string' ? value : '';
+      if (readOnly) return <span className="cell-readonly num" id={inputId}>{v ? formatWeekHe(v) : '—'}</span>;
+      return <WeekCell id={inputId} value={v} label={label} onChange={onChange} />;
+    }
+
+    case 'color': {
+      const v = typeof value === 'string' && value in PALETTE ? (value as ColorKey) : '';
+      if (readOnly)
+        return (
+          <span className="cell-readonly color-cell" id={inputId}>
+            {v ? (
+              <>
+                <span className="color-swatch" aria-hidden="true" style={{ background: PALETTE[v].bg }} /> {PALETTE[v].label}
+              </>
+            ) : (
+              '—'
+            )}
+          </span>
+        );
+      return <ColorCell id={inputId} value={v} label={label} onChange={onChange} />;
+    }
+
+    case 'vote':
+      if (!itemId || !boardId) return <span className="cell-readonly" id={inputId}>—</span>;
+      return <VoteCell id={inputId} boardId={boardId} itemId={itemId} column={column} votes={Array.isArray(value) ? (value as string[]) : []} canVote={Boolean(canLogTime)} label={label} />;
+
+    case 'created_at':
+      return (
+        <span className="cell-readonly num" id={inputId}>
+          {createdAt ? <time dateTime={createdAt}>{formatDateTimeHe(createdAt)}</time> : '—'}
+        </span>
+      );
+
+    case 'button':
+      return <ButtonCell id={inputId} column={column} columns={columns ?? []} disabled={readOnly || !onSetValue} label={label} onPress={(cid, oid) => onSetValue?.(cid, oid)} />;
 
     case 'time':
       if (!itemId || !boardId) return <span className="cell-readonly" id={inputId}>—</span>;
@@ -182,7 +230,7 @@ export function CellEditor(props: CellEditorProps) {
       const result = columns && values ? evaluateFormula(column, { values, seq: seq ?? 0 }, columns, todayIso()) : null;
       return (
         <span className={`cell-readonly formula-cell${typeof result === 'number' ? ' num' : ''}`} id={inputId}>
-          {result === null || result === '' ? <span aria-label="אין תוצאה">—</span> : formatFormulaValue(result)}
+          {result === null || result === '' ? <span aria-label="אין תוצאה">—</span> : typeof result === 'number' && (column.settings.unit || typeof column.settings.decimals === 'number') ? formatNumberCell(result, column.settings) : formatFormulaValue(result)}
         </span>
       );
     }
@@ -274,7 +322,26 @@ export function CellEditor(props: CellEditorProps) {
 
     case 'number': {
       const v = typeof value === 'number' ? String(value) : '';
-      if (readOnly) return <span className="cell-readonly">{v || '—'}</span>;
+      if (readOnly) return <span className="cell-readonly num">{typeof value === 'number' ? formatNumberCell(value, column.settings) : '—'}</span>;
+      if (column.settings.unit)
+        return (
+          <span className="unit-cell">
+            <CommitInput
+              id={inputId}
+              type="number"
+              value={v}
+              label={`${label} (${column.settings.unit})`}
+              onCommit={(s) => {
+                if (s.trim() === '') return onChange(null);
+                const n = Number(s);
+                if (Number.isFinite(n)) onChange(n);
+              }}
+            />
+            <span className="muted" aria-hidden="true">
+              {column.settings.unit}
+            </span>
+          </span>
+        );
       return (
         <CommitInput
           id={inputId}

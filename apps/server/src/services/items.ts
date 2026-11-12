@@ -1,4 +1,4 @@
-import { MAX_SUBITEM_DEPTH, isReadonlyColumnType, cellValueSchema, LIMITS, REACTIONS, type CellValue, type Group, type Reaction, type UpdateReaction, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
+import { weekStartIso, MAX_SUBITEM_DEPTH, isReadonlyColumnType, cellValueSchema, LIMITS, REACTIONS, type CellValue, type Group, type Reaction, type UpdateReaction, type ChecklistResult, type ChecklistValue, type Column, type ImportResult, type Item, type ItemUpdate, type TrashedItem } from '@suboard/shared';
 import { nowIso, type DB } from '../db/index.js';
 import { newId } from '../lib/crypto.js';
 import { AppError, badRequest, forbidden, notFound } from '../lib/errors.js';
@@ -164,6 +164,7 @@ export class ItemService {
       const parsed = cellValueSchema(col.type).safeParse(value);
       if (!parsed.success) throw badRequest(`ערך לא תקין בעמודה "${col.title}"`, { [columnId]: parsed.error.issues[0]?.message ?? 'ערך לא תקין' });
       let v = parsed.data as CellValue;
+      if (col.type === 'week' && typeof v === 'string') v = weekStartIso(v);
       const optionIds = new Set(col.settings.options?.map((o) => o.id));
       if (col.type === 'status' && typeof v === 'string' && !optionIds.has(v)) {
         throw badRequest(`תווית לא קיימת בעמודה "${col.title}"`, { [columnId]: 'תווית לא קיימת' });
@@ -219,6 +220,26 @@ export class ItemService {
     if (!columnIds.length || this.access.boardRole(actor, boardId) === 'owner') return;
     const locked = this.boards.columns(boardId).find((c) => columnIds.includes(c.id) && c.settings.editBy === 'owners');
     if (locked) throw forbidden(`רק בעלי הלוח יכולים לערוך את העמודה "${locked.title}"`);
+  }
+
+  /**
+   * Vote column: adds or removes the actor's own vote. A person can only ever change their own
+   * vote, which is why this is not an ordinary cell edit. No history entry (votes are not edits).
+   */
+  toggleVote(actor: Actor, itemId: string, columnId: string): { votes: string[] } {
+    const boardId = this.access.boardIdForItem(itemId);
+    this.access.requireBoard(actor, boardId, 'editor');
+    const col = this.boards.columns(boardId).find((c) => c.id === columnId);
+    if (!col || col.type !== 'vote') throw notFound('העמודה לא נמצאה');
+    const item = this.getRow(itemId);
+    const current = Array.isArray(item.values[columnId]) ? (item.values[columnId] as string[]) : [];
+    const votes = current.includes(actor.id) ? current.filter((id) => id !== actor.id) : [...current, actor.id];
+    const values = { ...item.values } as Record<string, CellValue>;
+    if (votes.length) values[columnId] = votes;
+    else delete values[columnId];
+    this.db.prepare('UPDATE items SET cell_values = ? WHERE id = ?').run(JSON.stringify(values), itemId);
+    this.boards.touch(boardId);
+    return { votes };
   }
 
   // ---------------------------------------------------------------- CRUD

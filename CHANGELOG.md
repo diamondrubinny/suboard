@@ -2,6 +2,15 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.11.0 — 2026-11-12
+
+### Added
+- Column types: time of day, week, colour, vote (one per person), creation date, and an action button that sets a status.
+- Column options: a description for any column, and a unit and number of decimals for number and formula columns (also in exports).
+
+### Changed
+- Updating a column's settings now merges with the existing ones, so saving labels no longer drops the lock, description or unit.
+
 ## 1.10.1 — 2026-11-12
 
 ### Fixed

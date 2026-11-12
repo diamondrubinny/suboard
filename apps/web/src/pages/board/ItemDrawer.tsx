@@ -201,6 +201,8 @@ function DetailsPanel({
               seq={item.seq}
               createdBy={item.createdBy}
               updatedAt={item.updatedAt}
+              createdAt={item.createdAt}
+              onSetValue={(cid, v) => undo.setValue(item, cid, v)}
               columns={board.columns}
               values={item.values}
               linkStat={board.linkStats?.[item.id]}
@@ -214,6 +216,7 @@ function DetailsPanel({
               overdue={overdue && c.settings.role === 'due'}
               onChange={(v) => undo.setValue(item, c.id, v)}
             />
+            {c.settings.description && <span className="hint">{c.settings.description}</span>}
             {c.type === 'date' && canEdit && <DateShortcuts label={c.title} value={item.values[c.id]} onPick={(v) => undo.setValue(item, c.id, v)} />}
           </FieldRow>
         ))}

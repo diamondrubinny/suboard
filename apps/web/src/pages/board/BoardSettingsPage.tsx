@@ -25,6 +25,7 @@ import { colorStyle } from '../../components/StatusPill';
 import { ChecklistSettingsEditor, ComplianceSection } from './FieldSettings';
 import { FormulaEditor } from './FormulaEditor';
 import { RelationSetup } from './RelationSetup';
+import { ColumnOptions } from './ColumnOptions';
 import { WebhooksSection } from './WebhooksSection';
 
 export function BoardSettingsPage() {
@@ -235,6 +236,7 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<ColumnType>('text');
   const [editing, setEditing] = useState<string | null>(null);
+  const [optionsFor, setOptionsFor] = useState<string | null>(null);
   const onErr = (e: unknown) => toast(errorMessage(e), 'error');
 
   const add = (e: FormEvent) => {
@@ -296,6 +298,9 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
                     נעילה
                   </button>
                 ) : null}
+                <button type="button" className="btn btn-sm" aria-expanded={optionsFor === c.id} onClick={() => setOptionsFor(optionsFor === c.id ? null : c.id)}>
+                  אפשרויות<span className="sr-only"> של העמודה {c.title}</span>
+                </button>
                 {c.type === 'formula' && (
                   <button type="button" className="btn btn-sm" aria-expanded={editing === c.id} onClick={() => setEditing(editing === c.id ? null : c.id)}>
                     עריכת הנוסחה
@@ -326,6 +331,16 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
                 }
               />
             )}
+            {optionsFor === c.id && (
+              <ColumnOptions
+                key={c.id}
+                column={c}
+                board={board}
+                saving={update.isPending}
+                onSave={(settings) => update.mutate({ columnId: c.id, patch: { settings } }, { onSuccess: () => (setOptionsFor(null), toast('האפשרויות נשמרו')), onError: onErr })}
+              />
+            )}
+            {c.settings.description && optionsFor !== c.id && <small className="muted">{c.settings.description}</small>}
             {editing === c.id && c.type === 'formula' && (
               <FormulaEditor
                 column={c}

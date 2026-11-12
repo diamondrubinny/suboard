@@ -163,6 +163,13 @@ export const columnSettingsSchema = z
     role: z.enum(['due']).optional(),
     /** Who may change this column's cells: every editor (default), or the board's owners only. */
     editBy: z.enum(['editors', 'owners']).optional(),
+    /** Any column: a short explanation shown next to the title. */
+    description: z.string().trim().max(200).optional(),
+    /** number / formula: a unit shown with the value ("₪", "ק\"ג", "%"), and how many decimals to show. */
+    unit: z.string().trim().max(8).regex(/^[^<>\n]*$/, 'תווים לא מותרים').optional(),
+    decimals: z.number().int().min(0).max(4).nullable().optional(),
+    /** button: what the button is called and which status it sets on the item when pressed. */
+    button: z.object({ label: line(30), columnId: idSchema, optionId: z.string().min(1).max(40) }).optional(),
     /** formula: the expression, with columns referenced by id — `{<column id>}` (or `{#n}` inside a template). */
     formula: z.string().trim().min(1, 'יש להזין נוסחה').max(500).optional(),
     /** relation: the board whose items this column connects to. */
@@ -263,6 +270,13 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
         .trim()
         .regex(/^\+?[0-9][0-9 ()-]{2,19}$/, 'מספר טלפון לא תקין')
         .nullable();
+    case 'hour':
+      return z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'שעה לא תקינה (לדוגמה 08:30)').nullable();
+    case 'week':
+      // The first day (Sunday) of the week.
+      return isoDateSchema.nullable();
+    case 'color':
+      return colorKeySchema.nullable();
     case 'auto_id':
     case 'created_by':
     case 'updated_at':
@@ -272,6 +286,9 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
     case 'mirror':
     case 'files':
     case 'time':
+    case 'vote':
+    case 'created_at':
+    case 'button':
       // Computed from the item; any client value is rejected.
       return z.never();
     case 'risk':

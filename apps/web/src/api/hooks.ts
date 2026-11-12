@@ -885,6 +885,13 @@ export function useSessionMutations() {
     revokeOthers: useMutation({ mutationFn: () => api<{ sessions: ActiveSession[] }>('/auth/sessions/revoke-others', 'POST', {}), onSuccess: refresh }),
   };
 }
+export function useToggleVote(boardId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, columnId }: { itemId: string; columnId: string }) => api<{ votes: string[] }>(`/items/${itemId}/vote/${columnId}`, 'POST', {}),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.board(boardId) }),
+  });
+}
 export const useItemTime = (itemId: string) => useQuery({ queryKey: ['item-time', itemId] as const, queryFn: () => api<{ time: ItemTime }>(`/items/${itemId}/time`).then((r) => r.time) });
 export function useTimeMutations(boardId: string, itemId: string) {
   const qc = useQueryClient();

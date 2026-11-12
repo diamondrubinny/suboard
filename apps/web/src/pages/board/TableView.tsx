@@ -153,7 +153,10 @@ function SortHeader({
   onSort,
   onResize,
   className,
+  description,
 }: {
+  /** Shown as a tooltip on the header and read out after the title. */
+  description?: string;
   id: string;
   title: string;
   config: ViewConfig;
@@ -224,8 +227,9 @@ function SortHeader({
       style={width ? { width, minWidth: width, maxWidth: width } : undefined}
       aria-sort={dir === 'asc' ? 'ascending' : dir === 'desc' ? 'descending' : 'none'}
     >
-      <button type="button" className="sort-btn" onClick={() => onSort(next())}>
+      <button type="button" className="sort-btn" onClick={() => onSort(next())} title={description || undefined}>
         {title}
+        {description && <span className="sr-only"> — {description}</span>}
         <span aria-hidden="true" className="sort-ind">
           {dir === 'asc' ? '▲' : dir === 'desc' ? '▼' : '↕'}
         </span>
@@ -422,6 +426,8 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
               seq={item.seq}
               createdBy={item.createdBy}
               updatedAt={item.updatedAt}
+              createdAt={item.createdAt}
+              onSetValue={(cid, v) => setValue(item, cid, v)}
               columns={board.columns}
               values={item.values}
               linkStat={board.linkStats?.[item.id]}
@@ -545,7 +551,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                       </th>
                       <SortHeader id="name" title="פריט" config={config} onSort={onSort} onResize={onResize} className="col-name" />
                       {columns.map((c) => (
-                        <SortHeader key={c.id} id={c.id} title={c.title} config={config} onSort={onSort} onResize={onResize} className={narrow(c) ? 'cell-narrow' : 'cell'} />
+                        <SortHeader key={c.id} id={c.id} title={c.title} description={c.settings.description} config={config} onSort={onSort} onResize={onResize} className={narrow(c) ? 'cell-narrow' : 'cell'} />
                       ))}
                     </tr>
                   </thead>

@@ -1,4 +1,4 @@
-import { formatDuration, evaluateFormula, formatFormulaValue, todayIso, formatDateTimeHe, checklistStats, formatRisk, isDateRange, formatAutoId, formatDateHe, formatDateRangeHe, type BoardDetail, type CellValue, type Column, type Item } from '@suboard/shared';
+import { PALETTE, formatNumberCell, formatWeekHe, formatDuration, evaluateFormula, formatFormulaValue, todayIso, formatDateTimeHe, checklistStats, formatRisk, isDateRange, formatAutoId, formatDateHe, formatDateRangeHe, type BoardDetail, type CellValue, type Column, type Item } from '@suboard/shared';
 import writeXlsxFile from 'write-excel-file/node';
 import type { DB } from '../db/index.js';
 import type { AccessService, Actor } from './access.js';
@@ -20,6 +20,9 @@ export function csvField(value: string): string {
 
 /** Human-readable text for a cell (labels instead of ids, Israeli dates, names instead of user ids). */
 export function formatCell(c: Column, v: CellValue | undefined, item: Item, users: Map<string, string>, allColumns: Column[] = [], linkStats?: Record<string, { total: number; done: number }>, related?: Pick<BoardDetail, 'relations' | 'mirrors' | 'fileCounts' | 'timeTotals'>): string {
+  if (c.type === 'created_at') return formatDateTimeHe(item.createdAt);
+  if (c.type === 'button') return '';
+  if (c.type === 'vote') return String(Array.isArray(v) ? v.length : 0);
   if (c.type === 'time') {
     const t = related?.timeTotals?.[item.id];
     return t && t.seconds > 0 ? formatDuration(t.seconds) : '';
@@ -50,6 +53,12 @@ export function formatCell(c: Column, v: CellValue | undefined, item: Item, user
       return isDateRange(v) ? formatDateRangeHe(v) : '';
     case 'checkbox':
       return v ? 'כן' : 'לא';
+    case 'number':
+      return typeof v === 'number' ? formatNumberCell(v, c.settings) : String(v);
+    case 'week':
+      return formatWeekHe(String(v));
+    case 'color':
+      return PALETTE[v as keyof typeof PALETTE]?.label ?? '';
     case 'progress':
       return `${String(v)}%`;
     case 'risk':

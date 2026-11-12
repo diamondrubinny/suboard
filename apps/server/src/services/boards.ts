@@ -440,6 +440,21 @@ export class BoardService {
       s.role = 'due';
     }
     if (settings?.editBy === 'owners') s.editBy = 'owners';
+    if (settings?.description) s.description = settings.description;
+    if (settings?.unit !== undefined || settings?.decimals !== undefined) {
+      if (type !== 'number' && type !== 'formula') throw badRequest('יחידה ומספר ספרות אחרי הנקודה מותרים רק בעמודת מספר או נוסחה');
+      if (settings.unit) s.unit = settings.unit;
+      if (typeof settings.decimals === 'number') s.decimals = settings.decimals;
+    }
+    if (settings?.button) {
+      if (type !== 'button') throw badRequest('הגדרות כפתור מותרות רק בעמודת כפתור');
+      // The button sets a label of a status column of the same board.
+      const target = boardId ? this.columns(boardId).find((c) => c.id === settings.button!.columnId) : undefined;
+      if (boardId && (!target || target.type !== 'status' || !target.settings.options?.some((o) => o.id === settings.button!.optionId))) {
+        throw badRequest('יש לבחור עמודת סטטוס ותווית קיימות', { button: 'יעד לא תקין' });
+      }
+      s.button = settings.button;
+    }
     return s;
   }
 
@@ -480,8 +495,9 @@ export class BoardService {
       if (input.title !== undefined) this.db.prepare('UPDATE board_columns SET title = ? WHERE id = ?').run(input.title, columnId);
       if (input.position !== undefined) this.db.prepare('UPDATE board_columns SET position = ? WHERE id = ?').run(input.position, columnId);
       if (input.settings !== undefined) {
-        // The lock is a setting of its own: saving labels or a formula must not silently unlock the column.
-        const settings = this.normalizeSettings(col.type, { ...input.settings, editBy: input.settings.editBy ?? col.settings.editBy }, actor, boardId);
+        // A settings update changes what it names and keeps the rest: saving the labels must not drop
+        // the lock, the description or the unit. (To clear: an empty description / unit, decimals null, editBy 'editors'.)
+        const settings = this.normalizeSettings(col.type, { ...col.settings, ...input.settings }, actor, boardId);
         this.db.prepare('UPDATE board_columns SET settings = ? WHERE id = ?').run(JSON.stringify(settings), columnId);
         if (settings.role === 'due') this.clearOtherDueColumns(boardId, columnId);
         // Clear cell values that point to status options which no longer exist.

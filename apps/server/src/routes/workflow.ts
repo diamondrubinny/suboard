@@ -47,6 +47,8 @@ export async function workflowRoutes(app: FastifyInstance, { services }: { servi
   });
 
   app.post('/items/:id/promote', async (req) => ({ item: items.promote(actorOf(req), param(req, 'id')) }));
+  app.post('/items/:id/vote/:columnId', { config: { rateLimit: { max: 300, timeWindow: 15 * 60_000 } } }, async (req) => items.toggleVote(actorOf(req), param(req, 'id'), param(req, 'columnId')));
+
   app.post('/items/:id/duplicate', async (req, reply) => reply.code(201).send({ item: items.duplicate(actorOf(req), param(req, 'id')) }));
 
   app.post('/items/:id/move', async (req) => items.moveToBoard(actorOf(req), param(req, 'id'), moveItemSchema.parse(req.body)));

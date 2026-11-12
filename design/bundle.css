@@ -4234,3 +4234,34 @@ kbd {
 .time-manual-row .field {
   flex: 1 1 6rem;
 }
+
+/* ---- more cell types */
+.hour-input {
+  inline-size: 5rem;
+  font-variant-numeric: tabular-nums;
+}
+.week-cell {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.color-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.color-swatch {
+  inline-size: 0.9rem;
+  block-size: 0.9rem;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  flex: none;
+}
+.vote-btn {
+  white-space: nowrap;
+}
+.unit-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
