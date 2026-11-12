@@ -6,6 +6,8 @@ export interface Actor {
   id: string;
   name: string;
   role: GlobalRole;
+  /** An outside party limited to the boards it was invited to. */
+  guest?: boolean;
 }
 
 const RANK: Record<BoardRole, number> = { viewer: 1, editor: 2, owner: 3 };

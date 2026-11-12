@@ -7,7 +7,7 @@
  * One registry for both sides: the server guards `api` prefixes, the web app builds its navigation
  * and route guards from the same keys.
  */
-export const MODULE_KEYS = ['forms', 'dashboards', 'workload', 'monthly_report', 'trainings', 'procedures', 'compliance', 'webhooks', 'api_tokens', 'time_tracking'] as const;
+export const MODULE_KEYS = ['forms', 'dashboards', 'workload', 'monthly_report', 'trainings', 'procedures', 'compliance', 'webhooks', 'api_tokens', 'time_tracking', 'guests'] as const;
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
 export interface ModuleDefinition {
@@ -57,6 +57,13 @@ export const MODULES: readonly ModuleDefinition[] = [
     description: 'עמודת זמן בלוחות: שעון התחלה / עצירה ורישום ידני. מידע על זמן העבודה של עובדים — יש לבדוק מול ממונה הפרטיות לפני הפעלה. כבוי כברירת מחדל.',
     api: ['/time'],
     apiPatterns: [/^\/items\/[^/]+\/time(\/|$)/],
+    defaultOff: true,
+  },
+  {
+    key: 'guests',
+    label: 'חשבונות אורח',
+    description: 'מנהל מערכת יכול ליצור חשבון לגורם חיצוני שרואה רק לוחות שהוזמן אליהם, עם תאריך תפוגה ואימות דו-שלבי. מידע מהלוח נחשף לגורם חיצוני — יש לבדוק מול ממונה הפרטיות לפני הפעלה. כשהמודול כבוי אורחים אינם יכולים להתחבר. כבוי כברירת מחדל.',
+    api: [],
     defaultOff: true,
   },
 ];

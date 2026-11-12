@@ -1,7 +1,8 @@
-import { createUserSchema, GLOBAL_ROLE_LABELS, GLOBAL_ROLES, LIMITS, type AdminUser, type GlobalRole } from '@suboard/shared';
+import { addDaysIso, createUserSchema, formatDateHe, GLOBAL_ROLE_LABELS, GLOBAL_ROLES, GUEST_DEFAULT_DAYS, LIMITS, todayIso, type AdminUser, type GlobalRole } from '@suboard/shared';
 import { useRef, useState, type FormEvent } from 'react';
 import { ApiError, errorMessage } from '../api/client';
-import { useRevokeUserSessions, useUserMutations, useUsers } from '../api/hooks';
+import { useModules, useRevokeUserSessions, useUserMutations, useUsers } from '../api/hooks';
+import { DateField } from '../components/DateField';
 import { useAuth } from '../auth/AuthContext';
 import { Dialog } from '../components/Dialog';
 import { ErrorState, LoadingState, useFeedback } from '../components/Feedback';
@@ -21,20 +22,27 @@ function UserFormDialog({ open, onClose }: { open: boolean; onClose: () => void 
   const { toast } = useFeedback();
   const [form, setForm] = useState({ email: '', name: '', role: 'member' as GlobalRole, password: generatePassword() });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const guestsOn = useModules().data?.guests === true;
+  const [guest, setGuest] = useState(false);
+  const [guestUntil, setGuestUntil] = useState(() => addDaysIso(todayIso(), GUEST_DEFAULT_DAYS));
+  const [guestOrg, setGuestOrg] = useState('');
   const firstRef = useRef<HTMLInputElement>(null);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const parsed = createUserSchema.safeParse(form);
+    const asGuest = guest && guestsOn;
+    const parsed = createUserSchema.safeParse(asGuest ? { ...form, role: 'member', guest: { expiresAt: guestUntil, org: guestOrg.trim() || undefined } } : form);
     if (!parsed.success) {
       const fe: Record<string, string> = {};
-      for (const i of parsed.error.issues) fe[String(i.path[0])] ??= i.message;
+      for (const i of parsed.error.issues) fe[i.path[0] === 'guest' ? 'guestExpiresAt' : String(i.path[0])] ??= i.message;
       return setErrors(fe);
     }
     try {
       await create.mutateAsync(parsed.data);
       toast(`המשתמש ${parsed.data.name} נוצר. מסרו לו את הסיסמה הזמנית בערוץ מאובטח.`);
       setForm({ email: '', name: '', role: 'member', password: generatePassword() });
+      setGuest(false);
+      setGuestOrg('');
       setErrors({});
       onClose();
     } catch (err) {
@@ -90,7 +98,7 @@ function UserFormDialog({ open, onClose }: { open: boolean; onClose: () => void 
         {input('name', 'שם מלא', { maxLength: 80 })}
         <div className="field">
           <label htmlFor="u-role">תפקיד במערכת</label>
-          <select id="u-role" className="select" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as GlobalRole }))}>
+          <select id="u-role" className="select" value={guest && guestsOn ? 'member' : form.role} disabled={guest && guestsOn} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as GlobalRole }))}>
             {GLOBAL_ROLES.map((r) => (
               <option key={r} value={r}>
                 {GLOBAL_ROLE_LABELS[r]}
@@ -99,6 +107,34 @@ function UserFormDialog({ open, onClose }: { open: boolean; onClose: () => void 
           </select>
           <span className="hint">מנהל — יכול ליצור לוחות. מנהל מערכת — גישה מלאה לכל הלוחות, למשתמשים וליומן האבטחה.</span>
         </div>
+        {guestsOn && (
+          <fieldset className="formula-editor">
+            <legend>חשבון אורח</legend>
+            <label className="check">
+              <input type="checkbox" checked={guest} onChange={(e) => setGuest(e.target.checked)} aria-describedby="u-guest-hint" /> זהו גורם חיצוני (קבלן, ספק)
+            </label>
+            <span id="u-guest-hint" className="hint">
+              אורח רואה רק לוחות שהוזמן אליהם, אינו רואה כתובות דוא"ל או משתמשים אחרים, אינו יכול להיות בעלים של לוח או לייצא נתונים, וחייב אימות דו-שלבי. החשבון פג בתאריך שנקבע.
+            </span>
+            {guest && (
+              <>
+                <div className="field">
+                  <label htmlFor="u-guest-until">תוקף עד</label>
+                  <DateField id="u-guest-until" value={guestUntil} min={todayIso()} onChange={setGuestUntil} aria-invalid={Boolean(errors.guestExpiresAt)} />
+                  {errors.guestExpiresAt && (
+                    <span className="error" role="alert">
+                      {errors.guestExpiresAt}
+                    </span>
+                  )}
+                </div>
+                <div className="field">
+                  <label htmlFor="u-guest-org">ארגון (לא חובה)</label>
+                  <input id="u-guest-org" className="input" maxLength={80} value={guestOrg} onChange={(e) => setGuestOrg(e.target.value)} />
+                </div>
+              </>
+            )}
+          </fieldset>
+        )}
         {input('password', 'סיסמה זמנית', { dir: 'ltr', autoComplete: 'new-password', minLength: LIMITS.passwordMin })}
         <p className="hint muted">המשתמש יידרש להחליף את הסיסמה בכניסה הראשונה.</p>
       </form>
@@ -169,6 +205,11 @@ function UserRow({ u, isSelf, onIssued }: { u: AdminUser; isSelf: boolean; onIss
       <td>
         {u.name}
         {isSelf && <span className="badge" style={{ marginInlineStart: '0.4rem' }}>את/ה</span>}
+        {u.guest && (
+          <span className="badge warning" style={{ marginInlineStart: '0.4rem' }}>
+            אורח{u.guestOrg ? ` · ${u.guestOrg}` : ''}
+          </span>
+        )}
         {u.authSource !== 'local' && (
           <span className="badge" style={{ marginInlineStart: '0.4rem' }} title={u.authSource === 'scim' ? 'נוצר ומנוהל ע"י סנכרון SCIM מספק הזהות' : 'מקושר לחשבון הארגוני (SSO)'}>
             {u.authSource === 'scim' ? 'SCIM' : 'SSO'}
@@ -179,7 +220,7 @@ function UserRow({ u, isSelf, onIssued }: { u: AdminUser; isSelf: boolean; onIss
         {u.email}
       </td>
       <td>
-        <select className="select" value={u.role} disabled={isSelf} aria-label={`תפקיד עבור ${u.name}`}
+        <select className="select" value={u.role} disabled={isSelf || u.guest} title={u.guest ? 'חשבון אורח הוא תמיד בתפקיד "חבר"' : undefined} aria-label={`תפקיד עבור ${u.name}`}
           onChange={(e) => update.mutate({ id: u.id, patch: { role: e.target.value as GlobalRole } }, { onSuccess: () => toast('התפקיד עודכן'), onError: onErr })}>
           {GLOBAL_ROLES.map((r) => (
             <option key={r} value={r}>
@@ -196,11 +237,26 @@ function UserRow({ u, isSelf, onIssued }: { u: AdminUser; isSelf: boolean; onIss
           </span>
         )}
         {u.mustChangePassword && <span className="badge" style={{ marginInlineStart: '0.3rem' }}>סיסמה זמנית</span>}
+        {u.guest && u.guestExpiresAt && (
+          <span className={Date.parse(u.guestExpiresAt) <= Date.now() ? 'badge danger' : 'badge'} style={{ marginInlineStart: '0.3rem' }}>
+            {Date.parse(u.guestExpiresAt) <= Date.now() ? 'פג תוקף' : 'בתוקף עד'} <span className="num">{formatDateHe(u.guestExpiresAt.slice(0, 10))}</span>
+          </span>
+        )}
         {u.mfaEnabled && <span className="badge success" style={{ marginInlineStart: '0.3rem' }}>MFA</span>}
       </td>
       <td className="muted nowrap">{u.lastLoginAt ? formatDateTime(u.lastLoginAt) : 'מעולם לא'}</td>
       <td>
         <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+          {u.guest && (
+            <button
+              type="button"
+              className="btn btn-sm"
+              aria-label={`הארכה ב-${GUEST_DEFAULT_DAYS} יום מהיום: התוקף של ${u.name}`}
+              onClick={() => update.mutate({ id: u.id, patch: { guestExpiresAt: addDaysIso(todayIso(), GUEST_DEFAULT_DAYS) } }, { onSuccess: () => toast('התוקף הוארך'), onError: onErr })}
+            >
+              הארכה ב-{GUEST_DEFAULT_DAYS} יום
+            </button>
+          )}
           {u.lockedUntil && (
             <button type="button" className="btn btn-sm" onClick={() => update.mutate({ id: u.id, patch: { unlock: true } }, { onSuccess: () => toast('החשבון שוחרר'), onError: onErr })}>
               שחרור נעילה

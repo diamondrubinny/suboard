@@ -124,12 +124,17 @@ export const preferencesSchema = z
 export const markNotificationsReadSchema = z.union([z.object({ all: z.literal(true) }), z.object({ ids: z.array(idSchema).min(1).max(200) })]);
 
 // ---------- Users ----------
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'תאריך לא תקין');
+
 export const createUserSchema = z.object({
   email: emailSchema,
   name: line(80),
   role: z.enum(GLOBAL_ROLES),
   password: passwordSchema,
-});
+  /** A guest account (role must be "member"): when it expires, and which organisation the person is from. */
+  guest: z.object({ expiresAt: isoDay, org: z.string().trim().max(80).optional() }).optional(),
+})
+  .refine((v) => !v.guest || v.role === 'member', { message: 'חשבון אורח הוא תמיד בתפקיד "חבר"', path: ['role'] });
 
 export const updateUserSchema = z
   .object({
@@ -139,6 +144,9 @@ export const updateUserSchema = z
     password: passwordSchema.optional(),
     /** Clear a temporary lockout caused by failed logins. */
     unlock: z.literal(true).optional(),
+    /** Guest accounts only: a new expiry date / organisation. */
+    guestExpiresAt: isoDay.optional(),
+    guestOrg: z.string().trim().max(80).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
 

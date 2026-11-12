@@ -65,7 +65,7 @@ export function GlobalSearch() {
     if (!needle) {
       for (const b of recent.data ?? []) out.push({ key: `r-${b.id}`, group: 'recent', label: b.name, icon: b.favorite ? 'star' : 'table', to: `/boards/${b.id}` });
     }
-    for (const p of visibleNav(user?.role, modules.data, modules.isPending)) if (match(p.label, p.keywords)) out.push({ key: `p-${p.id}`, group: 'pages', label: p.label, icon: p.icon, to: pathOf(p, user!.role) });
+    for (const p of visibleNav(user?.role, modules.data, modules.isPending, user?.guest)) if (match(p.label, p.keywords)) out.push({ key: `p-${p.id}`, group: 'pages', label: p.label, icon: p.icon, to: pathOf(p, user!.role) });
     if (needle) {
       const list = [...(boards.data ?? [])].sort((x, y) => Number(y.favorite) - Number(x.favorite));
       for (const b of list) if (match(b.name, b.description)) out.push({ key: `b-${b.id}`, group: 'boards', label: b.name, sub: b.favorite ? 'מועדף' : undefined, icon: b.favorite ? 'star' : 'table', to: `/boards/${b.id}` });

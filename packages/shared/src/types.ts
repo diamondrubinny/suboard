@@ -17,11 +17,16 @@ export interface SessionUser {
   monthlyReport: boolean;
   /** How the account is managed: local password, SSO, or provisioned by SCIM. */
   authSource: 'local' | 'sso' | 'scim';
+  /** An outside party: sees only the boards it was invited to. */
+  guest: boolean;
+  guestExpiresAt: string | null;
 }
 
 export interface DirectoryUser {
   id: string;
   name: string;
+  /** Present (true) for guest accounts, so nobody mistakes an outside party for a colleague. */
+  guest?: boolean;
 }
 
 export interface AdminUser {
@@ -37,6 +42,9 @@ export interface AdminUser {
   createdAt: string;
   /** local password / SSO-linked / provisioned by SCIM. */
   authSource: 'local' | 'sso' | 'scim';
+  guest: boolean;
+  guestExpiresAt: string | null;
+  guestOrg: string;
 }
 
 export interface TimeTotal {
@@ -175,8 +183,11 @@ export interface Item {
 export interface BoardMember {
   userId: string;
   name: string;
+  /** Empty when the viewer is a guest. */
   email: string;
   role: BoardRole;
+  /** Present (true) for guest accounts. */
+  guest?: boolean;
 }
 
 export interface BoardDetail {

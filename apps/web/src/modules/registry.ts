@@ -21,13 +21,15 @@ export interface NavEntry {
   roles?: GlobalRole[];
   /** Extra words the command palette matches. */
   keywords?: string;
+  /** Shown to guest accounts too (they see nothing else). */
+  guest?: boolean;
   section: 'main' | 'admin';
 }
 
 export const NAV: readonly NavEntry[] = [
   { id: 'home', label: 'לוח בקרה', icon: 'home', to: '/', end: true, keywords: 'בית ראשי', section: 'main' },
-  { id: 'my-work', label: 'המשימות שלי', icon: 'checks', to: '/my-work', keywords: 'משימות שלי action items תת-פריטים', section: 'main' },
-  { id: 'boards', label: 'כל הלוחות', icon: 'boards', to: '/boards', end: true, section: 'main' },
+  { id: 'my-work', label: 'המשימות שלי', icon: 'checks', to: '/my-work', guest: true, keywords: 'משימות שלי action items תת-פריטים', section: 'main' },
+  { id: 'boards', label: 'כל הלוחות', icon: 'boards', to: '/boards', end: true, guest: true, section: 'main' },
   { id: 'dashboards', label: 'דשבורדים', icon: 'chart', to: '/dashboards', module: 'dashboards', keywords: 'גרפים', section: 'main' },
   { id: 'workload', label: 'עומס צוות', icon: 'users', to: '/workload', module: 'workload', section: 'main' },
   { id: 'monthly', label: 'מבט מנהל', icon: 'history', to: '/reports/monthly', module: 'monthly_report', roles: ['admin', 'manager'], keywords: 'דוח חודשי', section: 'main' },
@@ -35,7 +37,7 @@ export const NAV: readonly NavEntry[] = [
   { id: 'procedures', label: 'נהלים', icon: 'clipboard', to: '/procedures', module: 'procedures', section: 'main' },
   { id: 'compliance', label: 'תאימות', icon: 'checks', to: '/compliance', module: 'compliance', section: 'main' },
   { id: 'forms', label: 'טפסים ודיווחים', icon: 'clipboard', to: '/forms', module: 'forms', section: 'main' },
-  { id: 'profile', label: 'הפרופיל שלי', icon: 'user', to: '/profile', keywords: 'סיסמה אימות דו-שלבי חיבורים מכשירים מפתח גישה passkey', section: 'main' },
+  { id: 'profile', label: 'הפרופיל שלי', icon: 'user', to: '/profile', guest: true, keywords: 'סיסמה אימות דו-שלבי חיבורים מכשירים מפתח גישה passkey', section: 'main' },
   { id: 'admin-users', label: 'ניהול משתמשים', icon: 'users', to: '/admin/users', roles: ['admin'], section: 'admin' },
   { id: 'admin-modules', label: 'מודולים', icon: 'grid', to: '/admin/modules', roles: ['admin'], keywords: 'הפעלה כיבוי הגדרות מערכת', section: 'admin' },
   { id: 'admin-audit', label: 'יומן אבטחה', icon: 'shield', to: '/admin/audit', roles: ['admin'], section: 'admin' },
@@ -49,6 +51,7 @@ export const pathOf = (e: NavEntry, role: GlobalRole): string => (typeof e.to ==
  * switched-off module never flashes in the menu; if the state cannot be loaded they are shown, and
  * the server still refuses what is off.
  */
-export function visibleNav(role: GlobalRole | undefined, modules: Partial<Record<ModuleKey, boolean>> | undefined, pending = false): NavEntry[] {
+export function visibleNav(role: GlobalRole | undefined, modules: Partial<Record<ModuleKey, boolean>> | undefined, pending = false, guest = false): NavEntry[] {
+  if (guest) return NAV.filter((e) => e.guest);
   return NAV.filter((e) => (!e.roles || (role !== undefined && e.roles.includes(role))) && (!e.module || (modules ? modules[e.module] !== false : !pending)));
 }

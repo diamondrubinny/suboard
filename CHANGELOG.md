@@ -2,6 +2,20 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.17.0 — 2026-11-12
+
+### Added
+- Guest accounts (module, off by default). An administrator creates an account for an outside party with a mandatory expiry date (90 days by default, a year at most). A guest:
+  - sees only the boards it was invited to, as a viewer or an editor — never as an owner;
+  - works on items (create, edit, updates, files) and nothing else: no export, structure changes, automations, forms, dashboards, cross-board reports, user list or API tokens;
+  - sees the names of people on shared boards only, and never e-mail addresses;
+  - must enrol two-step verification before doing anything.
+- Guests are marked "אורח" wherever they appear to others (user list, board members, member picker).
+- Switching the module off, or reaching the expiry date, signs the guest out and refuses sign-in; the data stays.
+
+### Security
+- Guest access is default-deny on the server: one allowlist of API paths (`packages/shared/src/guestAccess.ts`); any new endpoint is closed to guests until listed.
+
 ## 1.16.0 — 2026-11-12
 
 ### Added

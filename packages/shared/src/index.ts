@@ -5,3 +5,4 @@ export * from './logic.js';
 export * from './formula.js';
 export * from './modules.js';
 export * from './filters.js';
+export * from './guestAccess.js';

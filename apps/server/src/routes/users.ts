@@ -11,7 +11,7 @@ function requireAdmin(req: FastifyRequest) {
 }
 
 export async function userRoutes(app: FastifyInstance, { services }: { services: Services }) {
-  app.get('/users/directory', async () => ({ users: services.users.directory() }));
+  app.get('/users/directory', async (req) => ({ users: services.users.directory(actorOf(req)) }));
 
   app.get('/users', async (req) => {
     requireAdmin(req);

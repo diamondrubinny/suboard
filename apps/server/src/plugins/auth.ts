@@ -1,3 +1,4 @@
+import { guestMayCall } from '@suboard/shared';
 import type { SessionUser } from '@suboard/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import fp from 'fastify-plugin';
@@ -62,6 +63,10 @@ export const authPlugin = fp(async (app: FastifyInstance, opts: { auth: AuthServ
       }
       if (req.tokenScope === 'read' && !['GET', 'HEAD'].includes(req.method)) throw new AppError(403, 'TOKEN_READ_ONLY', 'האסימון מאפשר קריאה בלבד');
     }
+    // Guests: default deny. Only the listed paths are open; each of them still checks board membership.
+    if (req.user.guest && !guestMayCall(req.method, req.url.slice(4).split('?')[0]!)) {
+      throw new AppError(403, 'GUEST_NOT_ALLOWED', 'הפעולה אינה זמינה לחשבון אורח');
+    }
     if (req.user.mustChangePassword && !cfg?.allowPendingPasswordChange) {
       throw new AppError(403, 'PASSWORD_CHANGE_REQUIRED', 'יש להחליף את הסיסמה הזמנית לפני המשך עבודה');
     }
@@ -89,5 +94,5 @@ export function clearSessionCookie(reply: FastifyReply, config: AppConfig): void
 /** The authenticated actor for a request (routes are already guarded by the preHandler). */
 export function actorOf(req: FastifyRequest): Actor {
   if (!req.user) throw unauthorized();
-  return { id: req.user.id, name: req.user.name, role: req.user.role };
+  return { id: req.user.id, name: req.user.name, role: req.user.role, ...(req.user.guest ? { guest: true } : {}) };
 }

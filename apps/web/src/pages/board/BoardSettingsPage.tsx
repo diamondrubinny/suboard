@@ -563,7 +563,14 @@ function MembersSection({ board }: { board: BoardDetail }) {
           <tbody>
             {board.members.map((m) => (
               <tr key={m.userId}>
-                <td>{m.name}</td>
+                <td>
+                  {m.name}
+                  {m.guest && (
+                    <span className="badge warning" style={{ marginInlineStart: '0.4rem' }}>
+                      אורח
+                    </span>
+                  )}
+                </td>
                 <td dir="ltr" style={{ textAlign: 'end' }}>
                   {m.email}
                 </td>
@@ -614,6 +621,7 @@ function MembersSection({ board }: { board: BoardDetail }) {
           {candidates.map((u) => (
             <option key={u.id} value={u.id}>
               {u.name}
+              {u.guest ? ' (אורח)' : ''}
             </option>
           ))}
         </select>

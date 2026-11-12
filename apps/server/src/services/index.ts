@@ -139,6 +139,8 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const passwordReset = new PasswordResetService(db, config, audit, auth, mailer);
   const passkeys = new PasskeyService(db, config, audit, auth);
   const modules = new ModuleService(db, audit);
+  auth.guestsEnabled = () => modules.enabled('guests');
+  users.guestsEnabled = () => modules.enabled('guests');
   const workspaces = new WorkspaceService(db, access, audit);
   const webhooks = new WebhookService(db, config, access, boards, modules, audit, items);
   const apiTokens = new ApiTokenService(db, auth, modules, audit);

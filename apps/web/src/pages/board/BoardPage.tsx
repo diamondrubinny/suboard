@@ -131,6 +131,9 @@ export function BoardPage() {
           <span className="badge" title="ההרשאה שלך בלוח">
             {BOARD_ROLE_LABELS[b.myRole]}
           </span>
+          {user?.guest && <span className="badge warning">חשבון אורח</span>}
+          {!user?.guest && (
+          <>
           <a href={apiUrl(`/boards/${b.id}/export.xlsx`)} className="btn" download>
             <Icon name="download" /> Excel
           </a>
@@ -153,9 +156,13 @@ export function BoardPage() {
               <Icon name="grid" /> תוכניות קומה
             </Link>
           )}
+          </>
+          )}
           <Link to={`/boards/${b.id}/files`} className="btn btn-ghost">
             <Icon name="image" /> גלריית קבצים
           </Link>
+          {!user?.guest && (
+          <>
           <Link to={`/boards/${b.id}/qr`} className="btn btn-ghost">
             <Icon name="grid" /> מדבקות QR
           </Link>
@@ -177,6 +184,8 @@ export function BoardPage() {
                 <Icon name="trash" /> סל מחזור
               </button>
             </>
+          )}
+          </>
           )}
           {b.myRole === 'owner' && (
             <Link to={`/boards/${b.id}/settings`} className="btn">
@@ -308,7 +317,7 @@ export function BoardPage() {
 
       {isFiltered && shownCount === 0 && <p className="muted">לא נמצאו פריטים התואמים לסינון.</p>}
 
-      {canEdit && config.view === 'table' && (
+      {canEdit && !user?.guest && config.view === 'table' && (
         <form onSubmit={addGroup} className="toolbar" style={{ marginTop: 'var(--space-2)' }}>
           <label htmlFor="new-group" className="sr-only">
             שם קבוצה חדשה

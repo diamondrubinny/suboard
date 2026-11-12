@@ -107,7 +107,7 @@ export function Layout() {
 
   if (!user) return null;
   const pending = pendingSetup;
-  const nav = visibleNav(user.role, modules.data, modules.isPending);
+  const nav = visibleNav(user.role, modules.data, modules.isPending, user.guest);
   const navItem = (e: NavEntry) => (
     <li key={e.id}>
       <NavLink to={pathOf(e, user.role)} end={e.end} className="nav-link">

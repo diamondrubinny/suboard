@@ -22,6 +22,8 @@ interface UserRow {
   auth_source: 'local' | 'sso' | 'scim';
   sso_subject: string | null;
   monthly_report: number;
+  is_guest: number;
+  guest_expires_at: string | null;
 }
 
 export interface ResolvedSession {
@@ -58,7 +60,7 @@ export class AuthService {
     }
 
     const ok = await verifyPassword(password, row.password_hash);
-    if (!ok || !row.is_active) {
+    if (!ok || !row.is_active || this.guestBlocked(row)) {
       if (!ok) this.registerFailure(row, meta.ip);
       else this.audit.log('login_failed', { userId: row.id, ip: meta.ip, meta: { reason: 'inactive' } });
       throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
@@ -81,7 +83,7 @@ export class AuthService {
   async completeMfaLogin(challengeToken: string, code: string, meta: { ip: string; userAgent?: string }): Promise<LoginResult> {
     const userId = this.mfa.completeChallenge(challengeToken, code, meta.ip);
     const row = this.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined;
-    if (!row || !row.is_active) throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
+    if (!row || !row.is_active || this.guestBlocked(row)) throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
     return this.startSession(row, meta);
   }
 
@@ -91,7 +93,7 @@ export class AuthService {
    */
   ssoLogin(userId: string, idpMfa: boolean, meta: { ip: string; userAgent?: string }): LoginResult {
     const row = this.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined;
-    if (!row || !row.is_active) throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
+    if (!row || !row.is_active || this.guestBlocked(row)) throw new AppError(401, 'INVALID_CREDENTIALS', INVALID_CREDENTIALS);
     if (row.mfa_enabled && !idpMfa) return { kind: 'mfa', challengeToken: this.mfa.createChallenge(row.id) };
     return this.startSession(row, meta, { sso: true, idpMfa });
   }
@@ -102,7 +104,7 @@ export class AuthService {
    */
   passkeyLogin(userId: string, meta: { ip: string; userAgent?: string }): LoginResult {
     const row = this.db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as UserRow | undefined;
-    if (!row || !row.is_active) {
+    if (!row || !row.is_active || this.guestBlocked(row)) {
       this.audit.log('login_failed', { userId: row?.id, ip: meta.ip, meta: { reason: 'inactive', method: 'passkey' } });
       throw new AppError(401, 'INVALID_CREDENTIALS', 'הכניסה עם מפתח הגישה נכשלה');
     }
@@ -154,7 +156,7 @@ export class AuthService {
 
     const now = Date.now();
     const expired = Date.parse(row.expires_at) <= now || Date.parse(row.last_seen_at) + this.config.sessionIdleMs <= now;
-    if (expired || !row.is_active) {
+    if (expired || !row.is_active || this.guestBlocked(row)) {
       this.db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
       return null;
     }
@@ -262,6 +264,15 @@ export class AuthService {
     return this.db.prepare('DELETE FROM sessions WHERE expires_at < ? OR last_seen_at < ?').run(nowIso(), idleCutoff).changes;
   }
 
+  /** Wired after construction: is the guest-accounts module switched on? */
+  guestsEnabled: () => boolean = () => false;
+
+  /** A guest account that may not be used right now: the module is off, or the account has expired. */
+  guestBlocked(row: { is_guest: number; guest_expires_at: string | null }): boolean {
+    if (row.is_guest !== 1) return false;
+    return !this.guestsEnabled() || !row.guest_expires_at || Date.parse(row.guest_expires_at) <= Date.now();
+  }
+
   private toSessionUser(row: UserRow, idpMfa = false): SessionUser {
     const mfaEnabled = row.mfa_enabled === 1;
     return {
@@ -272,10 +283,13 @@ export class AuthService {
       mustChangePassword: row.must_change_password === 1,
       mfaEnabled,
       // MFA done at the identity provider satisfies the requirement for this session.
-      mfaSetupRequired: !mfaEnabled && !idpMfa && this.config.mfaRequiredRoles.includes(row.role),
+      // Guests always need MFA: the account is used from outside the organisation.
+      mfaSetupRequired: !mfaEnabled && !idpMfa && (row.is_guest === 1 || this.config.mfaRequiredRoles.includes(row.role)),
       authSource: row.auth_source,
       emailNotifications: row.email_notifications === 1,
       monthlyReport: row.monthly_report === 1,
+      guest: row.is_guest === 1,
+      guestExpiresAt: row.is_guest === 1 ? row.guest_expires_at : null,
     };
   }
 }

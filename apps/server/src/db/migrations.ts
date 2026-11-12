@@ -790,4 +790,14 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE INDEX idx_boards_folder ON boards(folder_id);
     `,
   },
+  {
+    version: 24,
+    name: 'guest_accounts',
+    sql: /* sql */ `
+      -- Guest accounts: outside parties limited to the boards they were invited to. Always expire.
+      ALTER TABLE users ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE users ADD COLUMN guest_expires_at TEXT;
+      ALTER TABLE users ADD COLUMN guest_org TEXT NOT NULL DEFAULT '';
+    `,
+  },
 ];

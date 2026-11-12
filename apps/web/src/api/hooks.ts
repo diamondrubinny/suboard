@@ -513,7 +513,7 @@ export function useUserMutations() {
       onSuccess: refresh,
     }),
     update: useMutation({
-      mutationFn: ({ id, patch }: { id: string; patch: { name?: string; role?: GlobalRole; isActive?: boolean; password?: string; unlock?: true } }) =>
+      mutationFn: ({ id, patch }: { id: string; patch: { name?: string; role?: GlobalRole; isActive?: boolean; password?: string; unlock?: true; guestExpiresAt?: string; guestOrg?: string } }) =>
         api<{ user: AdminUser }>(`/users/${id}`, 'PATCH', patch),
       onSuccess: refresh,
     }),

@@ -81,6 +81,7 @@ export class ApiTokenService {
     // Throttle writes: remember the last use at most once a minute.
     if (!r.last_used_at || Date.now() - Date.parse(r.last_used_at) > 60_000) this.db.prepare('UPDATE api_tokens SET last_used_at = ? WHERE id = ?').run(nowIso(), r.id);
     const user = this.auth.getSessionUser(r.user_id);
+    if (user.guest) return null; // guests have no API access
     // A token is created from a fully signed-in session; it does not have to enrol MFA again.
     return { user: { ...user, mfaSetupRequired: false }, scope: r.scope };
   }

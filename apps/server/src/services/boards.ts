@@ -150,7 +150,8 @@ export class BoardService {
       groups: this.groups(boardId),
       columns: this.columns(boardId),
       items: (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL ORDER BY position, created_at').all(boardId) as ItemRow[]).map(toItem),
-      members: this.members(boardId),
+      // A guest sees who is on the board, never their e-mail addresses.
+      members: actor.guest ? this.members(boardId).map((m) => ({ ...m, email: '' })) : this.members(boardId),
       createdAt: b.created_at,
       updatedAt: b.updated_at,
       ...(this.columns(boardId).some((c) => c.type === 'linked') ? { linkStats: this.linkStats(actor, boardId) } : {}),
@@ -290,17 +291,18 @@ export class BoardService {
     return (
       this.db
         .prepare(
-          `SELECT m.user_id, u.name, u.email, m.role FROM board_members m JOIN users u ON u.id = m.user_id
+          `SELECT m.user_id, u.name, u.email, m.role, u.is_guest FROM board_members m JOIN users u ON u.id = m.user_id
            WHERE m.board_id = ? ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END, u.name`,
         )
-        .all(boardId) as { user_id: string; name: string; email: string; role: BoardRole }[]
-    ).map((r) => ({ userId: r.user_id, name: r.name, email: r.email, role: r.role }));
+        .all(boardId) as { user_id: string; name: string; email: string; role: BoardRole; is_guest: number }[]
+    ).map((r) => ({ userId: r.user_id, name: r.name, email: r.email, role: r.role, ...(r.is_guest === 1 ? { guest: true } : {}) }));
   }
 
   setMember(actor: Actor, boardId: string, userId: string, role: BoardRole): BoardMember[] {
     this.access.requireBoard(actor, boardId, 'owner');
-    const user = this.db.prepare('SELECT id FROM users WHERE id = ? AND is_active = 1').get(userId);
+    const user = this.db.prepare('SELECT id, is_guest FROM users WHERE id = ? AND is_active = 1').get(userId) as { id: string; is_guest: number } | undefined;
     if (!user) throw badRequest('המשתמש לא נמצא או אינו פעיל', { userId: 'משתמש לא תקין' });
+    if (user.is_guest === 1 && role === 'owner') throw badRequest('חשבון אורח אינו יכול להיות בעלים של לוח', { role: 'אורח אינו יכול להיות בעלים' });
     const current = this.db.prepare('SELECT role FROM board_members WHERE board_id = ? AND user_id = ?').get(boardId, userId) as
       | { role: BoardRole }
       | undefined;

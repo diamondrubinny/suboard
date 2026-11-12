@@ -1,6 +1,6 @@
 import { BASE } from './api/base';
 import { Component, lazy, Suspense, type ReactNode } from 'react';
-import { BrowserRouter, Outlet, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { FeedbackProvider } from './components/Feedback';
 import { Layout, RequireAuth } from './components/Layout';
@@ -65,6 +65,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   }
 }
 
+/** Guests have no dashboard: their home is the list of boards they were invited to. */
+function HomeRoute() {
+  const { user } = useAuth();
+  return user?.guest ? <Navigate to="/boards" replace /> : <DashboardPage />;
+}
+
 export function App() {
   return (
     <ErrorBoundary>
@@ -77,7 +83,7 @@ export function App() {
               <Route path="/reset-password" element={lazyPage(<ResetPasswordPage />)} />
               <Route element={<RequireAuth />}>
                 <Route element={<Layout />}>
-                  <Route index element={<DashboardPage />} />
+                  <Route index element={<HomeRoute />} />
                   <Route path="my-work" element={lazyPage(<MyWorkPage />)} />
                   <Route path="boards" element={<BoardsPage />} />
                   <Route path="boards/:boardId" element={<BoardPage />} />
