@@ -37,6 +37,7 @@ import { WorkspaceService } from './workspaces.js';
 import { WebhookService } from './webhooks.js';
 import { ApiTokenService } from './apiTokens.js';
 import { TimeTrackingService } from './timeTracking.js';
+import { KitService } from './kits.js';
 import { ScimService } from './scim.js';
 import { DashboardService as CustomDashboardService, DependencyService, MonthlyReportJob } from './planning.js';
 import { ClamdScanner, UnsafeNoopScanner, type Scanner } from '../lib/clamav.js';
@@ -85,6 +86,7 @@ export interface Services {
   webhooks: WebhookService;
   apiTokens: ApiTokenService;
   time: TimeTrackingService;
+  kits: KitService;
 }
 
 /** Infrastructure that tests (or alternative deployments) can substitute. */
@@ -143,10 +145,11 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const webhooks = new WebhookService(db, config, access, boards, modules, audit, items);
   const apiTokens = new ApiTokenService(db, auth, modules, audit);
   const time = new TimeTrackingService(db, access, boards);
+  const kits = new KitService(db, boards, workspaces, audit);
   boards.extend((actor, boardId, columns) => (modules.enabled('time_tracking') && columns.some((c) => c.type === 'time') ? { timeTotals: time.totals(actor, boardId) } : {}));
   const personal = new PersonalService(db, access, boards, items, activity, notifications);
   return {
     audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
-    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset, personal, passkeys, modules, workspaces, webhooks, apiTokens, time,
+    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset, personal, passkeys, modules, workspaces, webhooks, apiTokens, time, kits,
   };
 }

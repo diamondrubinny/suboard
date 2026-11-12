@@ -2,7 +2,7 @@ import { BOARD_ROLE_LABELS, createBoardSchema } from '@suboard/shared';
 import { useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { errorMessage } from '../api/client';
-import { useBoards, useCreateBoard, useTemplates, useWorkspaceMutations, useWorkspaces } from '../api/hooks';
+import { useBoards, useCreateBoard, useCreateMaintenanceKit, useTemplates, useWorkspaceMutations, useWorkspaces } from '../api/hooks';
 import { useAuth } from '../auth/AuthContext';
 import { Dialog } from '../components/Dialog';
 import { EmptyState, ErrorState, LoadingState, useFeedback } from '../components/Feedback';
@@ -158,6 +158,7 @@ export function BoardsPage() {
   const { user } = useAuth();
   const boards = useBoards();
   const [creating, setCreating] = useState(false);
+  const [kit, setKit] = useState(false);
   const canCreate = user?.role === 'admin' || user?.role === 'manager';
   const workspaces = useWorkspaces();
   const sorted = [...(boards.data ?? [])].sort((x, y) => Number(y.favorite) - Number(x.favorite));
@@ -173,6 +174,9 @@ export function BoardsPage() {
         <h1>לוחות</h1>
         {canCreate && (
           <div className="actions">
+            <button type="button" className="btn" onClick={() => setKit(true)}>
+              <Icon name="wrench" /> ערכת תחזוקה וביקורות
+            </button>
             <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
               <Icon name="plus" /> לוח חדש
             </button>
@@ -220,6 +224,7 @@ export function BoardsPage() {
           </section>
         ))}
       {canCreate && <CreateBoardDialog open={creating} onClose={() => setCreating(false)} />}
+      {canCreate && kit && <MaintenanceKitDialog onClose={() => setKit(false)} />}
     </>
   );
 }
@@ -291,5 +296,71 @@ function WorkspaceName({ name, onSave }: { name: string; onSave: (n: string) => 
       }}
       onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
     />
+  );
+}
+
+/** Three connected boards in one step: equipment, the inspections done on it, and the faults found. */
+function MaintenanceKitDialog({ onClose }: { onClose: () => void }) {
+  const create = useCreateMaintenanceKit();
+  const navigate = useNavigate();
+  const { toast } = useFeedback();
+  const [workspace, setWorkspace] = useState('תחזוקה וביקורות');
+  const [error, setError] = useState<string | null>(null);
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    create.mutate(
+      { workspaceName: workspace.trim() || undefined },
+      {
+        onSuccess: (r) => {
+          toast('הערכה נוצרה: ציוד, ביקורות ותקלות');
+          onClose();
+          navigate(`/boards/${r.equipment.id}`);
+        },
+        onError: (err) => setError(errorMessage(err)),
+      },
+    );
+  };
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title="ערכת תחזוקה וביקורות"
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onClose}>
+            ביטול
+          </button>
+          <button type="submit" form="kit-form" className="btn btn-primary" disabled={create.isPending}>
+            {create.isPending ? 'יוצר…' : 'יצירת שלושת הלוחות'}
+          </button>
+        </>
+      }
+    >
+      <form id="kit-form" onSubmit={submit} noValidate>
+        {error && (
+          <div className="form-error" role="alert">
+            {error}
+          </div>
+        )}
+        <p>שלושה לוחות שמחוברים זה לזה:</p>
+        <ul>
+          <li>
+            <strong>ציוד</strong> — סטטוס, מיקום, אחראי, ביקורת אחרונה והבאה, וכמה ביקורות ותקלות מחוברות לכל פריט.
+          </li>
+          <li>
+            <strong>ביקורות</strong> — כל ביקורת מחוברת לפריט הציוד שלה, עם צ׳קליסט. סעיף שנכשל פותח תקלה אוטומטית.
+          </li>
+          <li>
+            <strong>תקלות</strong> — מחוברות לציוד, עם עדיפות, אחראי טיפול ותאריך יעד.
+          </li>
+        </ul>
+        <p className="muted">אפשר לשנות אחר כך כל עמודה, תווית וסעיף. בלוחות יהיו רק את/ה — הוסיפו חברים בהגדרות כל לוח.</p>
+        <div className="field">
+          <label htmlFor="kit-ws">סביבת עבודה ללוחות (לא חובה)</label>
+          <input id="kit-ws" className="input" value={workspace} maxLength={60} onChange={(e) => setWorkspace(e.target.value)} />
+        </div>
+      </form>
+    </Dialog>
   );
 }

@@ -315,6 +315,8 @@ export const createApiTokenSchema = z.object({
   days: z.union([z.literal(30), z.literal(90), z.literal(365)]),
 });
 
+export const maintenanceKitSchema = z.object({ workspaceName: z.string().trim().max(60).optional() });
+
 export const workspaceSchema = z.object({ name: line(60) });
 export const moveBoardSchema = z.object({ workspaceId: idSchema.nullable() });
 
