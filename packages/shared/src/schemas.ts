@@ -1,3 +1,4 @@
+import { FILTER_OPS, MAX_FILTER_RULES } from './filters.js';
 import { z } from 'zod';
 import { BOARD_ROLES, CAUSE_CATEGORIES, COLOR_KEYS, COLUMN_TYPES, GLOBAL_ROLES, LIMITS, REACTIONS, COLUMN_WIDTH, type ColorKey, type ColumnType } from './constants.js';
 
@@ -196,6 +197,11 @@ export const updateColumnSchema = z
     title: line(LIMITS.columnTitle).optional(),
     settings: columnSettingsSchema.optional(),
     position: z.number().finite().optional(),
+    /**
+     * With `settings.options`: what happens to cells that hold a label being removed — move them to
+     * another label of the column, or `null` to clear them. Required for every removed label in use.
+     */
+    replaceOptions: z.record(z.string().max(40), z.string().max(40).nullable()).optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
 
@@ -362,6 +368,21 @@ export const viewConfigSchema = z.object({
   search: z.string().max(LIMITS.searchQuery).optional(),
   statusFilter: z.string().max(40).optional(),
   mine: z.boolean().optional(),
+  /** Advanced filter: rules on columns, combined with all (AND) / any (OR). */
+  filter: z
+    .object({
+      match: z.enum(['all', 'any']),
+      rules: z
+        .array(
+          z.object({
+            columnId: z.string().regex(/^(name|[0-9a-f-]{36})$/),
+            op: z.enum(FILTER_OPS),
+            value: z.union([z.string().max(200), z.number().finite(), z.array(z.string().max(40)).max(50)]).optional(),
+          }),
+        )
+        .max(MAX_FILTER_RULES),
+    })
+    .optional(),
   sort: sortSchema.optional(),
   hidden: z.array(idSchema).max(LIMITS.columnsPerBoard).optional(),
   kanbanColumnId: idSchema.optional(),

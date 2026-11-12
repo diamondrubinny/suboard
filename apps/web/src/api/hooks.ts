@@ -443,7 +443,7 @@ export function useColumnMutations(boardId: string) {
       onSuccess: refresh,
     }),
     update: useMutation({
-      mutationFn: ({ columnId, patch }: { columnId: string; patch: { title?: string; settings?: ColumnSettings; position?: number } }) =>
+      mutationFn: ({ columnId, patch }: { columnId: string; patch: { title?: string; settings?: ColumnSettings; position?: number; replaceOptions?: Record<string, string | null> } }) =>
         api<{ column: Column }>(`/columns/${columnId}`, 'PATCH', patch).then((r) => r.column),
       onSuccess: refresh,
     }),

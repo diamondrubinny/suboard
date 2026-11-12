@@ -269,8 +269,25 @@ function GroupSummary({ columns, allColumns, items, groupName }: { columns: Colu
     if (c.type === 'checkbox') return `${vals.filter((v) => v === true).length} מתוך ${items.length}`;
     return null;
   };
+  /** Status columns: how the group's items split between the labels (a "battery"). */
+  const battery = (c: Column) => {
+    if (c.type !== 'status') return null;
+    const parts = (c.settings.options ?? []).map((o) => ({ o, n: items.filter((i) => i.values[c.id] === o.id).length })).filter((p) => p.n > 0);
+    const none = items.length - parts.reduce((a, p) => a + p.n, 0);
+    if (!parts.length) return null;
+    const text = [...parts.map((p) => `${p.o.label} ${p.n}`), ...(none ? [`ללא ${none}`] : [])].join(' · ');
+    return (
+      <span className="status-battery" role="img" aria-label={`${c.title}: ${text}`} title={text}>
+        {parts.map((p) => (
+          <span key={p.o.id} style={{ flexGrow: p.n, background: PALETTE[p.o.color]?.bg }} />
+        ))}
+        {none > 0 && <span className="status-battery-none" style={{ flexGrow: none }} />}
+      </span>
+    );
+  };
   const cells = columns.map(cell);
-  if (!items.length || cells.every((x) => x === null)) return null;
+  const batteries = columns.map(battery);
+  if (!items.length || (cells.every((x) => x === null) && batteries.every((x) => x === null))) return null;
   return (
     <tfoot>
       <tr className="summary-row">
@@ -281,6 +298,7 @@ function GroupSummary({ columns, allColumns, items, groupName }: { columns: Colu
         </th>
         {columns.map((c, i) => (
           <td key={c.id} className="cell summary-cell">
+            {batteries[i]}
             {cells[i] && (
               <>
                 <span className="sr-only">{c.title}: </span>

@@ -276,3 +276,64 @@ describe('formula columns', () => {
     expect(mapFormulaRefs(portable, (r) => ['new-a', 'new-b'][Number(r.slice(1))] ?? null).formula).toBe('{new-a} * {new-b}');
   });
 });
+
+// ---------------------------------------------------------------- advanced filter
+import { filterOpsFor, matchesBoardFilter, type BoardFilter } from './filters.js';
+import type { Column as XCol, Item as XItem } from './types.js';
+
+describe('advanced board filter', () => {
+  const c = (id: string, type: XCol['type'], settings: XCol['settings'] = {}): XCol => ({ id, boardId: 'b', title: id, type, settings, position: 0 });
+  const cols = [c('st', 'status', { options: [{ id: 'open', label: 'פתוח', color: 'gray' }, { id: 'done', label: 'בוצע', color: 'green', done: true }] }), c('who', 'person'), c('due', 'date'), c('cost', 'number'), c('txt', 'text'), c('ok', 'checkbox'), c('span', 'date_range'), c('f', 'formula', { formula: '{cost} * 2' }), c('files', 'checklist')];
+  const mk = (values: Record<string, unknown>, name = 'מנדף 3'): XItem => ({ id: 'i', boardId: 'b', groupId: 'g', parentId: null, name, values: values as XItem['values'], position: 0, seq: 1, createdBy: null, createdAt: '', updatedAt: '' });
+  const pass = (f: BoardFilter, values: Record<string, unknown>, name?: string) => matchesBoardFilter(f, mk(values, name), cols, '2026-11-12');
+  const one = (columnId: string, op: BoardFilter['rules'][number]['op'], value?: BoardFilter['rules'][number]['value']): BoardFilter => ({ match: 'all', rules: [{ columnId, op, value }] });
+
+  it('matches choices, people, text, numbers and checkboxes', () => {
+    expect(pass(one('st', 'any_of', ['open']), { st: 'open' })).toBe(true);
+    expect(pass(one('st', 'any_of', ['open']), { st: 'done' })).toBe(false);
+    expect(pass(one('st', 'none_of', ['done']), {})).toBe(true);
+    expect(pass(one('who', 'any_of', ['u1', 'u2']), { who: ['u2', 'u9'] })).toBe(true);
+    expect(pass(one('who', 'empty'), { who: [] })).toBe(true);
+    expect(pass(one('who', 'not_empty'), {})).toBe(false);
+    expect(pass(one('txt', 'contains', 'מעבדה'), { txt: 'ליד מעבדה 214' })).toBe(true);
+    expect(pass(one('txt', 'not_contains', 'מעבדה'), { txt: 'מסדרון' })).toBe(true);
+    expect(pass(one('name', 'contains', 'מנדף'), {})).toBe(true);
+    expect(pass(one('name', 'contains', 'כיור'), {})).toBe(false);
+    expect(pass(one('cost', 'gt', 100), { cost: 150 })).toBe(true);
+    expect(pass(one('cost', 'lt', 100), { cost: 150 })).toBe(false);
+    expect(pass(one('cost', 'eq', 150), { cost: 150 })).toBe(true);
+    expect(pass(one('cost', 'gt', 100), {})).toBe(false);
+    expect(pass(one('f', 'gt', 250), { cost: 150 })).toBe(true); // formula result
+    expect(pass(one('ok', 'checked'), { ok: true })).toBe(true);
+    expect(pass(one('ok', 'unchecked'), {})).toBe(true);
+  });
+
+  it('understands dates relative to today and ranges', () => {
+    expect(pass(one('due', 'overdue'), { due: '2026-11-11' })).toBe(true);
+    expect(pass(one('due', 'overdue'), { due: '2026-11-12' })).toBe(false);
+    expect(pass(one('due', 'next_days', 7), { due: '2026-11-19' })).toBe(true);
+    expect(pass(one('due', 'next_days', 7), { due: '2026-11-20' })).toBe(false);
+    expect(pass(one('due', 'next_days', 7), { due: '2026-11-01' })).toBe(false);
+    expect(pass(one('due', 'last_days', 3), { due: '2026-11-10' })).toBe(true);
+    expect(pass(one('due', 'before', '2026-12-01'), { due: '2026-11-30' })).toBe(true);
+    expect(pass(one('due', 'after', '2026-12-01'), { due: '2026-11-30' })).toBe(false);
+    expect(pass(one('due', 'on', '2026-11-30'), { due: '2026-11-30' })).toBe(true);
+    expect(pass(one('due', 'overdue'), {})).toBe(false);
+    expect(pass(one('span', 'on', '2026-11-15'), { span: { from: '2026-11-10', to: '2026-11-20' } })).toBe(true);
+    expect(pass(one('span', 'overdue'), { span: { from: '2026-11-01', to: '2026-11-20' } })).toBe(false);
+  });
+
+  it('combines rules with all / any and never hides items because of a broken rule', () => {
+    const two = (match: 'all' | 'any'): BoardFilter => ({ match, rules: [{ columnId: 'st', op: 'any_of', value: ['open'] }, { columnId: 'cost', op: 'gt', value: 100 }] });
+    expect(pass(two('all'), { st: 'open', cost: 50 })).toBe(false);
+    expect(pass(two('any'), { st: 'open', cost: 50 })).toBe(true);
+    expect(pass(two('any'), { st: 'done', cost: 50 })).toBe(false);
+    expect(matchesBoardFilter(undefined, mk({}), cols, '2026-11-12')).toBe(true);
+    expect(pass({ match: 'all', rules: [] }, {})).toBe(true);
+    expect(pass(one('deleted-column', 'contains', 'x'), {})).toBe(true); // column no longer exists
+    expect(pass(one('st', 'gt', 5), { st: 'open' })).toBe(true); // operator does not fit the type
+    expect(pass(one('st', 'any_of', []), { st: 'done' })).toBe(true); // nothing chosen yet
+    expect(filterOpsFor('checklist')).toEqual([]);
+    expect(filterOpsFor('date')).toContain('overdue');
+  });
+});

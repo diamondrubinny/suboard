@@ -63,9 +63,9 @@ describe('A1 new column types', () => {
     expect(vals[col('תגיות').id]).toEqual(['fire', 'chem']);
     expect(vals[col('מייל').id]).toBe('a@b.org');
 
-    // Removing a tag option strips it from every item.
+    // Removing a tag option strips it from every item (cleared on purpose).
     const tags = col('תגיות');
-    await m.patch(`/api/columns/${tags.id}`, { settings: { options: tags.settings.options!.filter((x) => x.id !== 'fire') } });
+    await m.patch(`/api/columns/${tags.id}`, { settings: { options: tags.settings.options!.filter((x) => x.id !== 'fire') }, replaceOptions: { fire: null } });
     await refresh();
     expect(board.items.find((i) => i.id === it.id)!.values[tags.id]).toEqual(['chem']);
   });

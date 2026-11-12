@@ -135,11 +135,12 @@ describe('cell value validation', () => {
 });
 
 describe('structure changes keep data consistent', () => {
-  it('removing a status option clears values that used it', async () => {
+  it('removing a status option in use needs an explicit decision, then clears values that used it', async () => {
     const status = col('סטטוס');
     const item = await newItem('x', { [status.id]: 'verify' });
     const options = status.settings.options!.filter((o) => o.id !== 'verify');
-    expect((await manager.patch(`/api/columns/${status.id}`, { settings: { options } })).statusCode).toBe(200);
+    expect((await manager.patch(`/api/columns/${status.id}`, { settings: { options } })).statusCode).toBe(400);
+    expect((await manager.patch(`/api/columns/${status.id}`, { settings: { options }, replaceOptions: { verify: null } })).statusCode).toBe(200);
     const after = (await manager.get(`/api/boards/${board.id}`)).json().board as BoardDetail;
     expect(after.items.find((i) => i.id === item.id)!.values[status.id]).toBeUndefined();
   });

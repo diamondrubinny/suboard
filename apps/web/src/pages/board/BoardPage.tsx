@@ -1,3 +1,4 @@
+import { FilterBuilder } from './FilterBuilder';
 import { apiUrl } from '../../api/base';
 import { BOARD_ROLE_LABELS, findPrimaryStatusColumn, viewConfigSchema, type SavedView, type ViewConfig } from '@suboard/shared';
 import { useMemo, useState, type FormEvent } from 'react';
@@ -104,7 +105,7 @@ export function BoardPage() {
   const users = directory.data ?? [];
   const canEdit = b.myRole !== 'viewer';
   const statusCol = findPrimaryStatusColumn(b.columns);
-  const isFiltered = Boolean(config.search?.trim() || config.mine || config.statusFilter);
+  const isFiltered = Boolean(config.search?.trim() || config.mine || config.statusFilter || config.filter?.rules.length);
   const topCount = b.items.filter((i) => !i.parentId).length;
   const shownCount = filteredItems.filter((i) => !i.parentId).length;
   const members = b.members.map((m) => ({ id: m.userId, name: m.name }));
@@ -234,6 +235,7 @@ export function BoardPage() {
           <input type="checkbox" checked={Boolean(config.mine)} onChange={(e) => patch({ mine: e.target.checked || undefined })} />
           רק פריטים שלי
         </label>
+        <FilterBuilder board={b} users={users} value={config.filter} onChange={(filter) => patch({ filter })} />
         {config.view === 'table' && <ColumnsMenu board={b} hidden={config.hidden ?? []} onChange={(hidden) => patch({ hidden })} />}
         {config.sort && config.view === 'table' && (
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => patch({ sort: undefined })}>
@@ -241,7 +243,7 @@ export function BoardPage() {
           </button>
         )}
         {isFiltered && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => patch({ search: undefined, mine: undefined, statusFilter: undefined })}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => patch({ search: undefined, mine: undefined, statusFilter: undefined, filter: undefined })}>
             ניקוי סינון
           </button>
         )}

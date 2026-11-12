@@ -4073,3 +4073,71 @@ kbd {
   display: grid;
   gap: var(--space-1);
 }
+
+/* ---- advanced filter */
+.filter-match {
+  border: 0;
+  padding: 0;
+  margin: 0 0 var(--space-3);
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.filter-match legend {
+  font-weight: 600;
+  padding: 0;
+  margin-block-end: var(--space-1);
+}
+.filter-rules {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-end: var(--space-3);
+}
+.filter-rule {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+.filter-rule > .select {
+  inline-size: auto;
+  max-inline-size: 100%;
+}
+.filter-rule > .input {
+  inline-size: 12rem;
+  max-inline-size: 100%;
+}
+.filter-rule > .filter-number {
+  inline-size: 6rem;
+}
+.filter-rule > .icon-btn {
+  margin-inline-start: auto;
+}
+.filter-choices {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  flex: 1 1 100%;
+}
+
+/* ---- status "battery" in the group summary */
+.status-battery {
+  display: flex;
+  block-size: 0.7rem;
+  min-inline-size: 3rem;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.status-battery > span {
+  min-inline-size: 3px;
+}
+.status-battery-none {
+  background: var(--surface-sunken);
+}

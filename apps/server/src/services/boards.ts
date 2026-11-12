@@ -458,10 +458,25 @@ export class BoardService {
         // Clear cell values that point to status options which no longer exist.
         if (col.type === 'status' || col.type === 'tags') {
           const valid = new Set(settings.options?.map((o) => o.id));
+          // Labels that disappear while items still use them: the caller must say where those items go
+          // (another label, or cleared on purpose). Nothing is ever dropped silently.
+          const usage = new Map<string, number>();
+          for (const r of this.db.prepare('SELECT cell_values FROM items WHERE board_id = ? AND deleted_at IS NULL').all(boardId) as { cell_values: string }[]) {
+            const v = (JSON.parse(r.cell_values) as Record<string, unknown>)[columnId];
+            for (const id of Array.isArray(v) ? (v as string[]) : typeof v === 'string' ? [v] : []) if (!valid.has(id)) usage.set(id, (usage.get(id) ?? 0) + 1);
+          }
+          const plan = input.replaceOptions ?? {};
+          for (const [id, n] of usage) {
+            const label = col.settings.options?.find((o) => o.id === id)?.label ?? id;
+            if (!(id in plan)) throw badRequest(`התווית "${label}" בשימוש ב-${n} פריטים. יש לבחור לאיזו תווית להעביר אותם, או לאשר ניקוי.`, { replaceOptions: `התווית "${label}" בשימוש` });
+            const to = plan[id];
+            if (to !== null && to !== undefined && !valid.has(to)) throw badRequest('תווית היעד אינה קיימת בעמודה', { replaceOptions: 'תווית יעד לא תקינה' });
+          }
+          const move = (id: string): string | undefined => (valid.has(id) ? id : (plan[id] ?? undefined));
           this.rewriteColumnValues(boardId, columnId, (v) => {
-            if (typeof v === 'string') return valid.has(v) ? v : undefined;
+            if (typeof v === 'string') return move(v);
             if (Array.isArray(v)) {
-              const kept = (v as string[]).filter((id) => valid.has(id));
+              const kept = [...new Set((v as string[]).map(move).filter((id): id is string => Boolean(id)))];
               return kept.length ? kept : undefined;
             }
             return v;

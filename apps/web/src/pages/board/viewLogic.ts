@@ -1,4 +1,4 @@
-import { evaluateFormula, todayIso, isDateRange, findPrimaryStatusColumn, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Item, type ViewConfig } from '@suboard/shared';
+import { matchesBoardFilter, evaluateFormula, todayIso, isDateRange, findPrimaryStatusColumn, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Item, type ViewConfig } from '@suboard/shared';
 
 /** Items matching the view's search / status / "mine" filters (parents and sub-items alike). */
 export function filterItems(board: BoardDetail, config: ViewConfig, userId: string | undefined): Item[] {
@@ -6,10 +6,12 @@ export function filterItems(board: BoardDetail, config: ViewConfig, userId: stri
   const textCols = board.columns.filter((c) => ['text', 'long_text', 'link', 'email', 'phone'].includes(c.type));
   const personCols = board.columns.filter((c) => c.type === 'person');
   const statusCol = findPrimaryStatusColumn(board.columns);
+  const today = todayIso();
   return board.items.filter((i) => {
     if (q && !i.name.toLowerCase().includes(q) && !textCols.some((c) => String(i.values[c.id] ?? '').toLowerCase().includes(q))) return false;
     if (config.mine && !personCols.some((c) => Array.isArray(i.values[c.id]) && (i.values[c.id] as string[]).includes(userId ?? ''))) return false;
     if (config.statusFilter && statusCol && i.values[statusCol.id] !== config.statusFilter) return false;
+    if (!matchesBoardFilter(config.filter, i, board.columns, today)) return false;
     return true;
   });
 }

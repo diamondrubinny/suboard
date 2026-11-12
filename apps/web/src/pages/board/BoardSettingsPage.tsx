@@ -97,8 +97,12 @@ function GeneralSection({ board }: { board: BoardDetail }) {
   );
 }
 
-function StatusOptionsEditor({ column, onSave, saving }: { column: Column; onSave: (options: StatusOption[]) => void; saving: boolean }) {
+function StatusOptionsEditor({ column, usage, onSave, saving }: { column: Column; usage: Record<string, number>; onSave: (options: StatusOption[], replaceOptions: Record<string, string | null>) => void; saving: boolean }) {
   const [options, setOptions] = useState<StatusOption[]>(column.settings.options ?? []);
+  // Labels removed here while items still use them: where should those items go?
+  const [plan, setPlan] = useState<Record<string, string>>({});
+  const removedInUse = (column.settings.options ?? []).filter((o) => !options.some((x) => x.id === o.id) && (usage[o.id] ?? 0) > 0);
+  const planReady = removedInUse.every((o) => plan[o.id] === '__clear__' || options.some((x) => x.id === plan[o.id]));
   const set = (idx: number, patch: Partial<StatusOption>) => setOptions((o) => o.map((x, i) => (i === idx ? { ...x, ...patch } : x)));
   const add = () =>
     setOptions((o) => [...o, { id: `opt_${Math.random().toString(36).slice(2, 10)}`, label: 'תווית חדשה', color: COLOR_KEYS[o.length % COLOR_KEYS.length]! }]);
@@ -147,19 +151,45 @@ function StatusOptionsEditor({ column, onSave, saving }: { column: Column; onSav
           ))}
         </tbody>
       </table>
+      {removedInUse.map((o) => (
+        <div className="field" key={o.id} role="group" aria-label={`התווית ${o.label} בשימוש`}>
+          <label htmlFor={`repl-${column.id}-${o.id}`}>
+            התווית "{o.label}" בשימוש ב-{usage[o.id]} פריטים. מה לעשות איתם?
+          </label>
+          <select id={`repl-${column.id}-${o.id}`} className="select" value={plan[o.id] ?? ''} onChange={(e) => setPlan((p) => ({ ...p, [o.id]: e.target.value }))}>
+            <option value="">— בחירה —</option>
+            {options.map((x) => (
+              <option key={x.id} value={x.id}>
+                להעביר אל "{x.label.trim() || 'תווית ללא שם'}"
+              </option>
+            ))}
+            <option value="__clear__">לרוקן את התא בפריטים האלה</option>
+          </select>
+        </div>
+      ))}
       <p className="hint muted" style={{ fontSize: '0.85rem' }}>
-        הסרת תווית תנקה אותה מכל הפריטים שבהם היא בשימוש. בעמודת הסטטוס הראשית, תוויות "סגור" קובעות אילו פריטים אינם נחשבים פתוחים או באיחור.
+        תווית שנמצאת בשימוש אינה נמחקת בשקט: בוחרים לאיזו תווית להעביר את הפריטים, או לרוקן אותם. בעמודת הסטטוס הראשית, תוויות "סגור" קובעות אילו פריטים אינם נחשבים פתוחים או באיחור.
       </p>
       <div className="toolbar">
         <button type="button" className="btn btn-sm" onClick={add} disabled={options.length >= LIMITS.statusOptions}>
           <Icon name="plus" /> תווית
         </button>
-        <button type="button" className="btn btn-primary btn-sm" disabled={!valid || saving} onClick={() => onSave(options.map((o) => ({ ...o, label: o.label.trim() })))}>
+        <button type="button" className="btn btn-primary btn-sm" disabled={!valid || !planReady || saving} onClick={() => onSave(options.map((o) => ({ ...o, label: o.label.trim() })), Object.fromEntries(removedInUse.map((o) => [o.id, plan[o.id] === '__clear__' ? null : plan[o.id]!])))}>
           שמירת תוויות
         </button>
       </div>
     </fieldset>
   );
+}
+
+/** How many items use each label of a status / tags column. */
+function optionUsage(board: BoardDetail, columnId: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const i of board.items) {
+    const v = i.values[columnId];
+    for (const id of Array.isArray(v) ? (v as string[]) : typeof v === 'string' ? [v] : []) out[id] = (out[id] ?? 0) + 1;
+  }
+  return out;
 }
 
 function ColumnsSection({ board }: { board: BoardDetail }) {
@@ -254,9 +284,10 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
               <StatusOptionsEditor
                 column={c}
                 saving={update.isPending}
-                onSave={(options) =>
+                usage={optionUsage(board, c.id)}
+                onSave={(options, replaceOptions) =>
                   update.mutate(
-                    { columnId: c.id, patch: { settings: { options } } },
+                    { columnId: c.id, patch: { settings: { options }, replaceOptions } },
                     { onSuccess: () => (setEditing(null), toast('התוויות נשמרו')), onError: onErr },
                   )
                 }

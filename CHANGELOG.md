@@ -2,6 +2,15 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.3.0 — 2026-11-12
+
+### Added
+- Advanced filter: rules per column combined with "all" or "any", relative dates ("passed", "in the next N days"), saved with the view.
+- Status split ("battery") in each group's summary row.
+
+### Changed
+- Removing a status or tag label that items still use now requires a decision — move those items to another label, or clear them on purpose. Previously the values were cleared silently. API: `replaceOptions` on column update.
+
 ## 1.2.0 — 2026-11-12
 
 ### Added
