@@ -634,4 +634,26 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       ALTER TABLE sessions ADD COLUMN via_passkey INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 15,
+    name: 'manual_item_links',
+    sql: /* sql */ `
+      -- Manual links between items ('related'). SQLite cannot alter a CHECK, so the table is rebuilt.
+      CREATE TABLE item_links_new (
+        id TEXT PRIMARY KEY,
+        from_item TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        to_item TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('checklist_capa','investigation_action','related')),
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+      INSERT INTO item_links_new (id, from_item, to_item, kind, created_by, created_at)
+        SELECT id, from_item, to_item, kind, created_by, created_at FROM item_links;
+      DROP TABLE item_links;
+      ALTER TABLE item_links_new RENAME TO item_links;
+      CREATE INDEX idx_links_from ON item_links(from_item);
+      CREATE INDEX idx_links_to ON item_links(to_item);
+      CREATE UNIQUE INDEX idx_links_related ON item_links(from_item, to_item) WHERE kind = 'related';
+    `,
+  },
 ];

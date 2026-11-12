@@ -1,4 +1,4 @@
-import { mapFormulaRefs, validateFormula,
+import { mapFormulaRefs, validateFormula, findPrimaryStatusColumn, isItemDone, type LinkStat,
   COLOR_KEYS,
   LIMITS,
   type BoardDetail,
@@ -133,8 +133,38 @@ export class BoardService {
       members: this.members(boardId),
       createdAt: b.created_at,
       updatedAt: b.updated_at,
+      ...(this.columns(boardId).some((c) => c.type === 'linked') ? { linkStats: this.linkStats(actor, boardId) } : {}),
       favorite: this.db.prepare('SELECT 1 FROM board_favorites WHERE user_id = ? AND board_id = ?').get(actor.id, boardId) !== undefined,
     };
+  }
+
+  /**
+   * Per item of the board: how many linked items there are and how many are done. Only items on
+   * boards the actor may see are counted, so the numbers reveal nothing about other boards.
+   */
+  linkStats(actor: Actor, boardId: string): Record<string, LinkStat> {
+    const rows = this.db
+      .prepare(
+        `SELECT me.id AS item_id, o.*
+         FROM items me
+         JOIN item_links l ON l.from_item = me.id OR l.to_item = me.id
+         JOIN items o ON o.id = CASE WHEN l.from_item = me.id THEN l.to_item ELSE l.from_item END
+         JOIN boards b ON b.id = o.board_id
+         WHERE me.board_id = ? AND me.deleted_at IS NULL AND o.deleted_at IS NULL AND b.archived_at IS NULL`,
+      )
+      .all(boardId) as (ItemRow & { item_id: string })[];
+    const visible = new Map<string, boolean>();
+    const statusOf = new Map<string, Column | undefined>();
+    const out: Record<string, LinkStat> = {};
+    for (const r of rows) {
+      if (!visible.has(r.board_id)) visible.set(r.board_id, this.access.boardRole(actor, r.board_id) !== null);
+      if (!visible.get(r.board_id)) continue;
+      if (!statusOf.has(r.board_id)) statusOf.set(r.board_id, findPrimaryStatusColumn(this.columns(r.board_id)));
+      const s = (out[r.item_id] ??= { total: 0, done: 0 });
+      s.total++;
+      if (isItemDone(toItem(r), statusOf.get(r.board_id))) s.done++;
+    }
+    return out;
   }
 
   update(actor: Actor, boardId: string, input: { name?: string; description?: string }): BoardDetail {

@@ -604,6 +604,19 @@ export const useItemCard = (itemId: string) =>
 export const useItemLinks = (itemId: string) =>
   useQuery({ queryKey: qk.links(itemId), queryFn: () => api<{ links: ItemLink[] }>(`/items/${itemId}/links`).then((r) => r.links) });
 
+export function useLinkMutations(itemId: string, boardId: string) {
+  const qc = useQueryClient();
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: ['links'] });
+    void qc.invalidateQueries({ queryKey: qk.board(boardId) });
+    void qc.invalidateQueries({ queryKey: qk.itemActivity(itemId) });
+  };
+  return {
+    add: useMutation({ mutationFn: (toItemId: string) => api<{ links: ItemLink[] }>(`/items/${itemId}/links`, 'POST', { toItemId }), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (linkId: string) => api(`/links/${linkId}`, 'DELETE'), onSuccess: refresh }),
+  };
+}
+
 export const useInvestigation = (itemId: string) =>
   useQuery({ queryKey: qk.investigation(itemId), queryFn: () => api<{ investigation: Investigation }>(`/items/${itemId}/investigation`).then((r) => r.investigation) });
 

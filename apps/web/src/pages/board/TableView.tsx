@@ -403,6 +403,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
               updatedAt={item.updatedAt}
               columns={board.columns}
               values={item.values}
+              linkStat={board.linkStats?.[item.id]}
               onChange={(v) => setValue(item, c.id, v)}
               onOpenItem={() => onOpenItem(item.id)}
             />

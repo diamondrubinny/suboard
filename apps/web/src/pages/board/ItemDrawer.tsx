@@ -202,6 +202,7 @@ function DetailsPanel({
               updatedAt={item.updatedAt}
               columns={board.columns}
               values={item.values}
+              linkStat={board.linkStats?.[item.id]}
               overdue={overdue && c.settings.role === 'due'}
               onChange={(v) => undo.setValue(item, c.id, v)}
             />
@@ -214,7 +215,7 @@ function DetailsPanel({
       </p>
       {depthOf(board, item) < MAX_DEPTH && <SubitemsSection board={board} parentId={item.id} users={users} onOpenItem={onOpenItem} />}
       <PersonalSection itemId={item.id} />
-      <LinksSection itemId={item.id} />
+      <LinksSection itemId={item.id} boardId={board.id} canEdit={canEdit} />
       {!parent && <DependenciesSection board={board} itemId={item.id} onOpenItem={onOpenItem} />}
       <div className="toolbar" style={{ marginTop: 'var(--space-3)' }}>
         <button type="button" className="btn btn-sm" onClick={() => setQrOpen(true)}>

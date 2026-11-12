@@ -1,4 +1,5 @@
 import {
+  addLinkSchema,
   complianceSettingsSchema,
   createFormSchema,
   quickFormSchema,
@@ -34,6 +35,13 @@ export async function fieldRoutes(app: FastifyInstance, { services }: { services
 
   app.get('/items/:id/card', async (req) => ({ card: links.card(actorOf(req), param(req, 'id')) }));
   app.get('/items/:id/links', async (req) => ({ links: links.list(actorOf(req), param(req, 'id')) }));
+  app.post('/items/:id/links', { config: { rateLimit: { max: 120, timeWindow: 15 * 60_000 } } }, async (req, reply) =>
+    reply.code(201).send({ links: links.add(actorOf(req), param(req, 'id'), addLinkSchema.parse(req.body).toItemId) }),
+  );
+  app.delete('/links/:id', async (req) => {
+    links.remove(actorOf(req), param(req, 'id'));
+    return { ok: true };
+  });
 
   app.get('/items/:id/investigation', async (req) => ({ investigation: investigations.get(actorOf(req), param(req, 'id')) }));
   app.put('/items/:id/investigation', async (req) => ({

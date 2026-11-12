@@ -114,6 +114,8 @@ export interface BoardDetail {
   members: BoardMember[];
   createdAt: string;
   updatedAt: string;
+  /** Present when the board has a `linked` column: per item, linked items the viewer may see and how many are done. */
+  linkStats?: Record<string, LinkStat>;
   favorite: boolean;
 }
 
@@ -347,9 +349,15 @@ export interface BoardReportSummary {
 }
 
 // ---------- Wave C ----------
+export interface LinkStat {
+  total: number;
+  done: number;
+}
+export const MAX_MANUAL_LINKS = 50;
+
 export interface ItemLink {
   id: string;
-  kind: 'checklist_capa' | 'investigation_action';
+  kind: 'checklist_capa' | 'investigation_action' | 'related';
   direction: 'out' | 'in';
   /** null when the linked item is on a board the viewer cannot see (name hidden). */
   item: { id: string; name: string; boardId: string; boardName: string; statusLabel: string | null; statusColor: ColorKey | null; done: boolean } | null;

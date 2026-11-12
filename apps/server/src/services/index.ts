@@ -110,7 +110,7 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const recurrences = new RecurrenceService(db, config, access, boards, items, activity);
   const reports = new ReportService(db, config, access, boards, items, activity, notifications);
   const calendar = new CalendarService(db, config, access, boards, audit);
-  const links = new LinkService(db, access, boards, items);
+  const links = new LinkService(db, access, boards, items, activity);
   const investigations = new InvestigationService(db, config, access, boards, items, activity, notifications);
   const compliance = new ComplianceService(db, config, access, boards, activity);
   const forms = new FormService(db, access, boards, items, attachments, activity, notifications);

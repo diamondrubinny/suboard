@@ -19,10 +19,14 @@ export function csvField(value: string): string {
 }
 
 /** Human-readable text for a cell (labels instead of ids, Israeli dates, names instead of user ids). */
-export function formatCell(c: Column, v: CellValue | undefined, item: Item, users: Map<string, string>, allColumns: Column[] = []): string {
+export function formatCell(c: Column, v: CellValue | undefined, item: Item, users: Map<string, string>, allColumns: Column[] = [], linkStats?: Record<string, { total: number; done: number }>): string {
   if (c.type === 'auto_id') return formatAutoId(item.seq, c.settings.prefix);
   if (c.type === 'created_by') return item.createdBy ? (users.get(item.createdBy) ?? '') : 'אוטומציה';
   if (c.type === 'updated_at') return formatDateTimeHe(item.updatedAt);
+  if (c.type === 'linked') {
+    const s = linkStats?.[item.id];
+    return s ? `${s.done}/${s.total}` : '';
+  }
   if (c.type === 'formula') return formatFormulaValue(evaluateFormula(c, item, allColumns, todayIso()));
   if (v === undefined || v === null) return '';
   const label = (id: unknown) => c.settings.options?.find((o) => o.id === id)?.label ?? '';
@@ -82,7 +86,7 @@ export class ExportService {
       groups.get(i.groupId) ?? '',
       i.name,
       i.parentId ? (byId.get(i.parentId)?.name ?? '') : '',
-      ...board.columns.map((c) => formatCell(c, i.values[c.id], i, users, board.columns)),
+      ...board.columns.map((c) => formatCell(c, i.values[c.id], i, users, board.columns, board.linkStats)),
       formatDateHe(i.createdAt.slice(0, 10)),
       formatDateHe(i.updatedAt.slice(0, 10)),
     ]);

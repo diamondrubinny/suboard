@@ -253,6 +253,7 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
     case 'created_by':
     case 'updated_at':
     case 'formula':
+    case 'linked':
       // Computed from the item; any client value is rejected.
       return z.never();
     case 'risk':
@@ -276,6 +277,8 @@ export const createBoardSchema = z.object({
   /** Create from an organisation template (structure saved from another board) instead. */
   customTemplateId: idSchema.optional(),
 });
+
+export const addLinkSchema = z.object({ toItemId: idSchema });
 
 export const duplicateBoardSchema = z.object({
   name: line(LIMITS.boardName),

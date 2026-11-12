@@ -1,4 +1,4 @@
-import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser } from '@suboard/shared';
+import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser, type LinkStat } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { colorStyle, StatusPill } from '../StatusPill';
 import { ContactEditor, DateRangeEditor, ProgressEditor, RatingEditor, TagsPicker } from './ExtraCells';
@@ -29,6 +29,8 @@ export interface CellEditorProps {
   /** For `formula` columns: the board's columns and the item's cells the formula reads. */
   columns?: Column[];
   values?: Record<string, CellValue>;
+  /** For `linked` columns: linked items the viewer may see, and how many are done. */
+  linkStat?: LinkStat;
 }
 
 /** Text-like input that commits on blur / Enter and reverts on Escape. */
@@ -99,7 +101,7 @@ function checklistLabel(label: string, column: Column, value: unknown): string {
 }
 
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, columns, values } = props;
+  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, columns, values, linkStat } = props;
   const options = column.settings.options ?? [];
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -111,6 +113,28 @@ export function CellEditor(props: CellEditorProps) {
           {seq ? formatAutoId(seq, column.settings.prefix) : '—'}
         </span>
       );
+
+    case 'linked': {
+      if (!linkStat?.total) return <span className="cell-readonly" id={inputId}><span aria-label="אין פריטים מקושרים">—</span></span>;
+      const text = `${linkStat.done}/${linkStat.total} בוצעו`;
+      const body = (
+        <>
+          <span className="progress-bar" aria-hidden="true">
+            <span style={{ inlineSize: `${Math.round((linkStat.done / linkStat.total) * 100)}%` }} />
+          </span>
+          <span className="nowrap">{text}</span>
+        </>
+      );
+      return mode === 'table' && onOpenItem ? (
+        <button type="button" className="long-text-btn progress-cell" id={inputId} onClick={onOpenItem} aria-label={`${text} — ${label}: פתיחת הפריט`}>
+          {body}
+        </button>
+      ) : (
+        <span className="cell-readonly progress-cell" id={inputId}>
+          {body}
+        </span>
+      );
+    }
 
     case 'formula': {
       const result = columns && values ? evaluateFormula(column, { values, seq: seq ?? 0 }, columns, todayIso()) : null;

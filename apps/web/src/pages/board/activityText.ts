@@ -75,6 +75,10 @@ export function activityText(entry: ActivityEntry, board: BoardDetail, users: Di
       return `שחזר/ה את הפריט "${String(d.name ?? '')}" מסל המחזור`;
     case 'item_promoted':
       return `הפך/ה את תת-המשימה לפריט ראשי (היה תחת "${String(d.fromParent ?? '')}")`;
+    case 'item_linked':
+      return 'קישר/ה פריט אחר לפריט הזה';
+    case 'item_unlinked':
+      return 'הסיר/ה קישור לפריט אחר';
     case 'group_duplicated':
       return `שכפל/ה את הקבוצה "${String(d.name ?? '')}" (${Number(d.items ?? 0)} פריטים)`;
     case 'item_duplicated':

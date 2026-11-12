@@ -26,6 +26,8 @@ export type ActivityAction =
   | 'item_duplicated'
   | 'group_duplicated'
   | 'item_promoted'
+  | 'item_linked'
+  | 'item_unlinked'
   | 'item_template_saved'
   | 'item_template_deleted'
   | 'item_moved_out'

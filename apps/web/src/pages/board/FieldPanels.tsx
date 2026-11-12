@@ -115,7 +115,7 @@ export function InvestigationPanel({ board, itemId }: { board: BoardDetail; item
             </button>
           )}
         </div>
-        <LinksSection itemId={itemId} />
+        <LinksSection itemId={itemId} boardId={board.id} canEdit={false} />
       </section>
 
       <fieldset className="rule-block" disabled={!canEdit}>
