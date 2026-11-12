@@ -256,9 +256,13 @@ function SortHeader({
 const fmt = (n: number) => new Intl.NumberFormat('he-IL', { maximumFractionDigits: 1 }).format(n);
 
 /** Totals row of a group (top-level items shown): sum / average for numbers, average for progress and rating, count for checkboxes. */
-function GroupSummary({ columns, allColumns, items, groupName }: { columns: Column[]; allColumns: Column[]; items: Item[]; groupName: string }) {
+function GroupSummary({ columns, allColumns, items, groupName, mirrorSums }: { columns: Column[]; allColumns: Column[]; items: Item[]; groupName: string; mirrorSums?: BoardDetail['mirrorSums'] }) {
   const today = todayIso();
   const cell = (c: Column): string | null => {
+    if (c.type === 'mirror') {
+      const nums = items.map((i) => mirrorSums?.[i.id]?.[c.id]).filter((v): v is number => typeof v === 'number');
+      return nums.length ? `סה"כ ${fmt(nums.reduce((a, b) => a + b, 0))}` : null;
+    }
     if (c.type === 'formula') {
       const nums = items.map((i) => evaluateFormula(c, i, allColumns, today)).filter((v): v is number => typeof v === 'number');
       if (!nums.length) return null;
@@ -568,7 +572,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                     )}
                     {canEdit && !virtual && <AddRow boardId={board.id} groupId={group.id} colSpan={columns.length} label={`פריט חדש בקבוצה ${group.name}`} term={board.itemTerm} />}
                   </tbody>
-                  <GroupSummary columns={columns} allColumns={board.columns} items={tops} groupName={group.name} />
+                  <GroupSummary columns={columns} allColumns={board.columns} items={tops} groupName={group.name} mirrorSums={board.mirrorSums} />
                 </table>
               </div>
             )}

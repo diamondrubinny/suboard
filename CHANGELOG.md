@@ -2,6 +2,13 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.14.0 — 2026-11-12
+
+### Added
+- Webhooks: an optional "item deleted" event. It carries only the item's id, name and parent — not its values.
+- Mirror columns that reflect numbers are totalled in each group's summary row.
+- Replies to updates have the same format bar as updates (bold, italic, lists).
+
 ## 1.13.0 — 2026-11-12
 
 ### Added

@@ -1,7 +1,7 @@
 {
   "name": "suboard",
   "private": true,
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "Work-management boards for an organizational safety unit (Hebrew / RTL)",
   "workspaces": [
     "packages/*",

@@ -52,6 +52,7 @@ export class WebhookService {
     items: ItemService,
   ) {
     items.onItemEvent((e) => this.onItemEvent(e));
+    items.onItemRemoved((e) => this.onItemRemoved(e));
   }
 
   private get insecure(): boolean {
@@ -150,16 +151,29 @@ export class WebhookService {
     return this.deliveries(actor, id)[0]!;
   }
 
-  private onItemEvent(e: ItemEvent): void {
-    if (!this.modules.enabled('webhooks')) return;
-    const event: WebhookEvent = e.kind === 'created' ? 'item_created' : 'item_updated';
-    const hooks = (this.db.prepare('SELECT * FROM webhooks WHERE board_id = ? AND active = 1').all(e.boardId) as Row[]).filter((h) => {
+  private hooksFor(boardId: string, event: WebhookEvent): Row[] {
+    if (!this.modules.enabled('webhooks')) return [];
+    return (this.db.prepare('SELECT * FROM webhooks WHERE board_id = ? AND active = 1').all(boardId) as Row[]).filter((h) => {
       try {
         return (JSON.parse(h.events) as string[]).includes(event);
       } catch {
         return false;
       }
     });
+  }
+
+  /** An item went to the trash: only which item — its values are not sent again. */
+  private onItemRemoved(e: { boardId: string; item: { id: string; name: string; parentId: string | null } }): void {
+    const hooks = this.hooksFor(e.boardId, 'item_deleted');
+    if (!hooks.length) return;
+    const board = this.db.prepare('SELECT name FROM boards WHERE id = ?').get(e.boardId) as { name: string } | undefined;
+    const payload = { event: 'item_deleted', at: nowIso(), board: { id: e.boardId, name: board?.name ?? '' }, item: { id: e.item.id, name: e.item.name, parentId: e.item.parentId } };
+    for (const h of hooks) this.enqueue(h, 'item_deleted', payload);
+  }
+
+  private onItemEvent(e: ItemEvent): void {
+    const event: WebhookEvent = e.kind === 'created' ? 'item_created' : 'item_updated';
+    const hooks = this.hooksFor(e.boardId, event);
     if (!hooks.length) return;
     const columns = this.boards.columns(e.boardId);
     const users = new Map((this.db.prepare('SELECT id, name FROM users').all() as { id: string; name: string }[]).map((u) => [u.id, u.name]));

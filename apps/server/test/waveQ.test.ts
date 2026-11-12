@@ -50,6 +50,13 @@ describe('wave Q — connect-boards and mirror columns', () => {
     // the mirrored value follows the source
     await c.patch(`/api/items/${hood.id}`, { values: { [mail.id]: 'new@x.org' } });
     expect((await get(c, faults.id)).mirrors![fault.id]![mirror.id]).toEqual(['new@x.org', 'gas@x.org']);
+    // a mirrored number is also summed over the connected items; text mirrors have no sum
+    const cost = (await col(c, equipment, 'עלות', 'number')).json().column;
+    const costMirror = (await col(c, faults, 'עלות ציוד', 'mirror', { mirror: { relationColumnId: rel.id, targetColumnId: cost.id } })).json().column;
+    await c.patch(`/api/items/${hood.id}`, { values: { [cost.id]: 1200 } });
+    await c.patch(`/api/items/${panel.id}`, { values: { [cost.id]: 300.5 } });
+    b = await get(c, faults.id);
+    expect(b.mirrorSums![fault.id]).toEqual({ [costMirror.id]: 1500.5 });
     // export shows names and mirrored values
     const csv = (await c.get(`/api/boards/${faults.id}/export.csv`)).body;
     expect(csv).toContain('מנדף 3; פאנל גז 7');

@@ -61,6 +61,12 @@ export class ItemService {
     this.commentListeners.push(fn);
   }
 
+  private removalListeners: ((e: { boardId: string; item: Item }) => void)[] = [];
+  /** Subscribe to items moved to the trash (used by webhooks). Kept apart from item events so rules never run on a deletion. */
+  onItemRemoved(fn: (e: { boardId: string; item: Item }) => void): void {
+    this.removalListeners.push(fn);
+  }
+
   /** Subscribe to committed user changes (used by the automation engine). */
   onItemEvent(fn: (e: ItemEvent) => void): void {
     this.listeners.push(fn);
@@ -452,6 +458,14 @@ export class ItemService {
       }
       this.boards.touch(boardId);
     })();
+    for (const item of items)
+      for (const fn of this.removalListeners) {
+        try {
+          fn({ boardId, item });
+        } catch {
+          /* a listener must never break a deletion */
+        }
+      }
   }
 
   trash(actor: Actor, boardId: string): TrashedItem[] {

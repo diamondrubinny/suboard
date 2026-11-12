@@ -1,4 +1,4 @@
-import { mapFormulaRefs, validateFormula, BUTTON_ACTIONS, type ButtonAction, type Item, findPrimaryStatusColumn, isItemDone, type LinkStat,
+import { evaluateFormula, todayIso, mapFormulaRefs, validateFormula, BUTTON_ACTIONS, type ButtonAction, type Item, findPrimaryStatusColumn, isItemDone, type LinkStat,
   COLOR_KEYS,
   LIMITS,
   type BoardDetail,
@@ -170,7 +170,7 @@ export class BoardService {
    * Relation and mirror columns of a board. Connected items on boards the actor cannot see are left
    * out entirely (no name, no mirrored value).
    */
-  relationData(actor: Actor, boardId: string): Pick<BoardDetail, 'relations' | 'mirrors'> {
+  relationData(actor: Actor, boardId: string): Pick<BoardDetail, 'relations' | 'mirrors' | 'mirrorSums'> {
     const columns = this.columns(boardId);
     const relCols = columns.filter((c) => c.type === 'relation' && c.settings.relation);
     if (!relCols.length) return {};
@@ -200,6 +200,8 @@ export class BoardService {
     if (!mirrorCols.length) return { relations };
     const users = new Map((this.db.prepare('SELECT id, name FROM users').all() as { id: string; name: string }[]).map((u) => [u.id, u.name]));
     const mirrors: NonNullable<BoardDetail['mirrors']> = {};
+    const mirrorSums: NonNullable<BoardDetail['mirrorSums']> = {};
+    const today = todayIso();
     for (const mc of mirrorCols) {
       const rel = relCols.find((c) => c.id === mc.settings.mirror!.relationColumnId);
       if (!rel || !visible.get(rel.id)) continue;
@@ -209,9 +211,13 @@ export class BoardService {
       for (const [itemId, list] of targets.get(rel.id) ?? []) {
         const texts = list.map((o) => formatCell(tc, o.values[tc.id], o, users, targetCols)).filter(Boolean);
         if (texts.length) (mirrors[itemId] ??= {})[mc.id] = texts;
+        // Numbers are also summed, so the board can total a mirrored amount.
+        if (!['number', 'progress', 'rating', 'formula'].includes(tc.type)) continue;
+        const nums = list.map((o) => (tc.type === 'formula' ? evaluateFormula(tc, o, targetCols, today) : o.values[tc.id])).filter((v): v is number => typeof v === 'number');
+        if (nums.length) (mirrorSums[itemId] ??= {})[mc.id] = nums.reduce((a, b) => a + b, 0);
       }
     }
-    return { relations, mirrors };
+    return { relations, mirrors, mirrorSums };
   }
 
   /**

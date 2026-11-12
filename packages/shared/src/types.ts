@@ -77,9 +77,9 @@ export interface ApiTokenInfo {
   expiresAt: string;
 }
 
-export const WEBHOOK_EVENTS = ['item_created', 'item_updated'] as const;
+export const WEBHOOK_EVENTS = ['item_created', 'item_updated', 'item_deleted'] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
-export const WEBHOOK_EVENT_LABELS: Record<WebhookEvent, string> = { item_created: 'פריט נוצר', item_updated: 'פריט השתנה' };
+export const WEBHOOK_EVENT_LABELS: Record<WebhookEvent, string> = { item_created: 'פריט נוצר', item_updated: 'פריט השתנה', item_deleted: 'פריט נמחק (הועבר לסל)' };
 export interface WebhookDelivery {
   id: string;
   event: string;
@@ -196,6 +196,8 @@ export interface BoardDetail {
   relations?: Record<string, Record<string, RelatedItem[]>>;
   /** Mirror columns: item id → column id → the mirrored values as text (one per connected item). */
   mirrors?: Record<string, Record<string, string[]>>;
+  /** Mirror columns that reflect numbers: item id → column id → the sum over the connected items. */
+  mirrorSums?: Record<string, Record<string, number>>;
   favorite: boolean;
 }
 

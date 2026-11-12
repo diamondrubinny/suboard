@@ -195,6 +195,21 @@ describe('webhooks', () => {
     expect(r.got).toHaveLength(2);
     hook = (await admin.get(`/api/boards/${b.id}/webhooks`)).json().webhooks[0];
     expect(hook).toMatchObject({ active: true, failures: 0, last: { ok: true } });
+    // deletion: opt-in event, carries the item's identity only
+    state.status = 200;
+    r.got.length = 0;
+    const victim = (await admin.post(`/api/boards/${b.id}/items`, { groupId: b.groups[0]!.id, name: 'למחיקה' })).json().item as { id: string };
+    await admin.del(`/api/items/${victim.id}`);
+    await hooks.idle(true);
+    expect(r.got.map((g) => g.headers['x-suboard-event'])).toEqual(['item_created']); // not subscribed to deletions
+    expect((await admin.patch(`/api/webhooks/${webhook.id}`, { events: ['item_deleted'] })).statusCode).toBe(200);
+    r.got.length = 0;
+    const second = (await admin.post(`/api/boards/${b.id}/items`, { groupId: b.groups[0]!.id, name: 'למחיקה 2' })).json().item as { id: string };
+    await admin.del(`/api/items/${second.id}`);
+    await hooks.idle(true);
+    expect(r.got).toHaveLength(1);
+    expect(JSON.parse(r.got[0]!.body)).toMatchObject({ event: 'item_deleted', item: { id: second.id, name: 'למחיקה 2', parentId: null } });
+    expect(JSON.parse(r.got[0]!.body).item.fields).toBeUndefined();
     // a test ping is never retried
     state.status = 500;
     r.got.length = 0;
