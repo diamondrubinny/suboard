@@ -2,6 +2,11 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.0.1 — 2026-11-12
+
+### Fixed
+- Installer: re-running it to update an existing installation stopped at the code step (git refused the checkout owned by the service user), so servers stayed on the version first installed. Updates now work, and the script prints the old and new revision.
+
 ## 1.0.0 — 2026-11-12
 
 First stable release. The `main` branch is the stable line; install or update with `deploy/install.sh`.

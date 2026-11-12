@@ -17,7 +17,7 @@
 #     kept, config tested, rolled back on failure). A dedicated address with no site yet gets its own
 #     nginx site; HTTPS for it comes from certbot (SUBOARD_CERTBOT=1 runs it for you).
 #
-# Options (environment): SUBOARD_PORT=3000  SUBOARD_REF=main (branch or tag, e.g. v1.0.0)
+# Options (environment): SUBOARD_PORT=3000  SUBOARD_REF=main (branch or tag, e.g. v1.0.0)  SUBOARD_SKIP_BACKUP=1
 #                        SUBOARD_WIRE=0 (do not touch the web server)  SUBOARD_CERTBOT=1
 set -euo pipefail
 
@@ -71,11 +71,16 @@ install -d -m 0700 -o suboard -g suboard "$DATA_DIR" "$DATA_DIR/uploads"
 echo "==> Code ($BRANCH)"
 if [ -d "$APP_DIR/.git" ]; then
   # Update: keep a copy of the database as it is before the new version migrates it.
-  if [ -f "$DATA_DIR/suboard.db" ] && [ -f "$APP_DIR/apps/server/dist/scripts/backup.js" ]; then
+  if [ "${SUBOARD_SKIP_BACKUP:-0}" != "1" ] && [ -f "$DATA_DIR/suboard.db" ] && [ -f "$APP_DIR/apps/server/dist/scripts/backup.js" ]; then
     runuser -u suboard -- env HOME="$DATA_DIR" bash -c "cd '$APP_DIR/apps/server' && node --env-file='$APP_DIR/.env' dist/scripts/backup.js --out '$DATA_DIR/backups' --keep 14" \
-      || die "could not back up the database before updating — nothing was changed"
+      || die "could not back up the database before updating — nothing was changed (to update anyway: SUBOARD_SKIP_BACKUP=1)"
   fi
-  git -C "$APP_DIR" fetch --depth 1 origin "$BRANCH" && git -C "$APP_DIR" checkout --detach FETCH_HEAD
+  # The checkout belongs to the "suboard" user; git run by root refuses it ("dubious ownership") unless told it is safe.
+  GIT="git -c safe.directory=$APP_DIR -C $APP_DIR"
+  BEFORE="$($GIT rev-parse --short HEAD 2>/dev/null || echo none)"
+  $GIT fetch --depth 1 origin "$BRANCH" || die "could not download the code ($BRANCH) — nothing was changed"
+  $GIT checkout -f --detach FETCH_HEAD || die "could not switch to the new code — nothing was changed"
+  echo "code: $BEFORE -> $($GIT rev-parse --short HEAD)"
 else
   git clone --depth 1 -b "$BRANCH" "$REPO" "$APP_DIR"
 fi
