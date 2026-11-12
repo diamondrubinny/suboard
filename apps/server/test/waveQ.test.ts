@@ -81,6 +81,40 @@ describe('wave Q — connect-boards and mirror columns', () => {
     expect(ctx.db.prepare('SELECT COUNT(*) AS n FROM item_links WHERE column_id IS NOT NULL').get()).toEqual({ n: 0 });
   });
 
+  it('connects the column to a different board only with a confirmation, and never while a mirror depends on it', async () => {
+    ctx = await setup();
+    const { client: c } = await loggedIn(ctx, 'boss@x.org', 'manager');
+    const equipment = await mkBoard(c, 'ציוד');
+    const faults = await mkBoard(c, 'תקלות');
+    const rooms = await mkBoard(c, 'חדרים');
+    const mail = (await col(c, equipment, 'מייל', 'email')).json().column;
+    const hood = await item(c, equipment, 'מנדף 3', { [mail.id]: 'tech@x.org' });
+    const panel = await item(c, equipment, 'פאנל גז 7');
+    const fault = await item(c, faults, 'דליפה');
+    const rel = (await col(c, faults, 'ציוד', 'relation', { relation: { boardId: equipment.id } })).json().column;
+    const mirror = (await col(c, faults, 'מייל', 'mirror', { mirror: { relationColumnId: rel.id, targetColumnId: mail.id } })).json().column;
+    await c.put(`/api/items/${fault.id}/relations/${rel.id}`, { itemIds: [hood.id, panel.id] });
+
+    const change = (extra: object = {}) => c.patch(`/api/columns/${rel.id}`, { settings: { relation: { boardId: rooms.id } }, ...extra });
+    expect((await change({ clearLinks: true })).statusCode).toBe(400); // a mirror column depends on it
+    expect((await c.del(`/api/columns/${mirror.id}`)).statusCode).toBe(200);
+    expect((await change()).statusCode).toBe(400); // two connections would be removed
+    expect((await get(c, faults.id)).relations![fault.id]![rel.id]).toHaveLength(2); // nothing was touched
+    expect((await c.patch(`/api/columns/${rel.id}`, { settings: { relation: { boardId: '00000000-0000-4000-8000-000000000000' } }, clearLinks: true })).statusCode).toBe(400);
+    // saving other options of the column (same board) needs no confirmation and keeps the connections
+    expect((await c.patch(`/api/columns/${rel.id}`, { settings: { description: 'הציוד שבתקלה' } })).statusCode).toBe(200);
+    expect((await get(c, faults.id)).relations![fault.id]![rel.id]).toHaveLength(2);
+
+    expect((await change({ clearLinks: true })).json().column.settings).toMatchObject({ relation: { boardId: rooms.id }, description: 'הציוד שבתקלה' });
+    expect((await get(c, faults.id)).relations?.[fault.id]).toBeUndefined();
+    expect(ctx.db.prepare('SELECT COUNT(*) AS n FROM item_links WHERE column_id = ?').get(rel.id)).toEqual({ n: 0 });
+    expect(ctx.db.prepare('SELECT COUNT(*) AS n FROM items WHERE board_id = ? AND deleted_at IS NULL').get(equipment.id)).toEqual({ n: 2 }); // the items stay
+    const room214 = await item(c, rooms, '214');
+    expect((await c.put(`/api/items/${fault.id}/relations/${rel.id}`, { itemIds: [room214.id] })).json().related.map((r: { name: string }) => r.name)).toEqual(['214']);
+    expect((await c.put(`/api/items/${fault.id}/relations/${rel.id}`, { itemIds: [hood.id] })).statusCode).toBe(400); // the old board no longer fits
+  });
+
+
   it('hides connected items and mirrored values from people who cannot see the connected board', async () => {
     ctx = await setup();
     const { client: boss } = await loggedIn(ctx, 'boss@x.org', 'manager');

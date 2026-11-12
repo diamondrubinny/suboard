@@ -225,6 +225,8 @@ export const updateColumnSchema = z
      * another label of the column, or `null` to clear them. Required for every removed label in use.
      */
     replaceOptions: z.record(z.string().max(40), z.string().max(40).nullable()).optional(),
+    /** With `settings.relation` naming another board: confirms that the existing connections of the column are removed. */
+    clearLinks: z.boolean().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
 

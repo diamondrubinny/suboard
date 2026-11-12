@@ -69,6 +69,9 @@ export function filterOpsFor(type: ColumnType | 'name'): FilterOp[] {
     case 'vote':
     case 'files':
       return NUMBER_OPS;
+    case 'time':
+      // tracked time, compared in hours; "empty" = nothing logged
+      return NUMBER_OPS;
     case 'hour':
       return ['eq', 'gt', 'lt', 'empty', 'not_empty'];
     case 'date':
@@ -98,6 +101,7 @@ export interface FilterExtras {
   relations?: Record<string, Record<string, { name: string }[]>>;
   mirrors?: Record<string, Record<string, string[]>>;
   fileCounts?: Record<string, number>;
+  timeTotals?: Record<string, { seconds: number }>;
 }
 
 const minutesOf = (hhmm: unknown): number | null => {
@@ -132,8 +136,8 @@ function matchRule(rule: FilterRule, item: Item, columns: Column[], today: strin
 
   if (c.type === 'checkbox') return rule.op === 'checked' ? raw === true : raw !== true;
 
-  if (c.type === 'formula' || c.type === 'number' || c.type === 'progress' || c.type === 'rating' || c.type === 'vote' || c.type === 'files') {
-    const v = c.type === 'formula' ? evaluateFormula(c, item, columns, today) : c.type === 'vote' ? (Array.isArray(raw) ? raw.length : 0) : c.type === 'files' ? (extras.fileCounts?.[item.id] ?? 0) : raw;
+  if (c.type === 'formula' || c.type === 'number' || c.type === 'progress' || c.type === 'rating' || c.type === 'vote' || c.type === 'files' || c.type === 'time') {
+    const v = c.type === 'formula' ? evaluateFormula(c, item, columns, today) : c.type === 'vote' ? (Array.isArray(raw) ? raw.length : 0) : c.type === 'files' ? (extras.fileCounts?.[item.id] ?? 0) : c.type === 'time' ? ((extras.timeTotals?.[item.id]?.seconds ?? 0) > 0 ? extras.timeTotals![item.id]!.seconds / 3600 : null) : raw;
     const n = typeof v === 'number' ? v : null;
     if (rule.op === 'empty') return n === null;
     if (rule.op === 'not_empty') return n !== null;

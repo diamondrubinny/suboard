@@ -517,6 +517,15 @@ export class BoardService {
         const settings = this.normalizeSettings(col.type, { ...col.settings, ...input.settings }, actor, boardId);
         this.db.prepare('UPDATE board_columns SET settings = ? WHERE id = ?').run(JSON.stringify(settings), columnId);
         if (settings.role === 'due') this.clearOtherDueColumns(boardId, columnId);
+        // Connecting the column to a different board: the old connections point to the old board and
+        // cannot stay. Nothing is removed without an explicit confirmation, and mirrors must go first.
+        if (col.type === 'relation' && col.settings.relation && settings.relation && settings.relation.boardId !== col.settings.relation.boardId) {
+          const mirrors = this.columns(boardId).filter((c) => c.type === 'mirror' && c.settings.mirror?.relationColumnId === columnId);
+          if (mirrors.length) throw badRequest(`עמודות מראה מציגות ערכים דרך החיבור הזה (${mirrors.map((m) => `"${m.title}"`).join(', ')}). יש למחוק אותן לפני שינוי הלוח המחובר.`, { relation: 'יש עמודות מראה תלויות' });
+          const n = (this.db.prepare("SELECT COUNT(*) AS n FROM item_links WHERE kind = 'related' AND column_id = ?").get(columnId) as { n: number }).n;
+          if (n > 0 && input.clearLinks !== true) throw badRequest(`בעמודה יש ${n} חיבורים ללוח הנוכחי. שינוי הלוח ינתק אותם — יש לאשר זאת.`, { clearLinks: 'נדרש אישור' });
+          this.db.prepare("DELETE FROM item_links WHERE kind = 'related' AND column_id = ?").run(columnId);
+        }
         // Clear cell values that point to status options which no longer exist.
         if (col.type === 'status' || col.type === 'tags') {
           const valid = new Set(settings.options?.map((o) => o.id));

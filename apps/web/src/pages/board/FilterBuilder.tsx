@@ -160,8 +160,9 @@ function RuleValue({ index, target, rule, users, board, onChange }: { index: num
       <input
         type="number"
         className="input filter-number"
-        aria-label={days ? `מספר ימים לתנאי ${index + 1}` : label}
-        placeholder={days ? 'ימים' : undefined}
+        aria-label={days ? `מספר ימים לתנאי ${index + 1}` : target.type === 'time' ? `מספר שעות לתנאי ${index + 1}` : label}
+        placeholder={days ? 'ימים' : target.type === 'time' ? 'שעות' : undefined}
+        step="any"
         min={days ? 0 : undefined}
         value={typeof rule.value === 'number' ? rule.value : ''}
         onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))}

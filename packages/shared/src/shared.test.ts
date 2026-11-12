@@ -367,6 +367,16 @@ describe('filters and formulas on the newer column types', () => {
     expect(pass('mir', 'not_contains', 'tech@', {})).toBe(false);
     expect(pass('f', 'gt', 1, {})).toBe(true);
     expect(pass('f', 'eq', 2, {})).toBe(true);
+    // tracked time is compared in hours; an item with nothing logged is "empty"
+    const tcols = [c('t', 'time')];
+    const tpass = (op: BoardFilter['rules'][number]['op'], value: number | undefined, seconds: number | undefined) =>
+      matchesBoardFilter({ match: 'all', rules: [{ columnId: 't', op, value }] }, item({}), tcols, '2026-11-12', seconds === undefined ? {} : { timeTotals: { i1: { seconds } } });
+    expect(tpass('gt', 1, 5400)).toBe(true);
+    expect(tpass('lt', 1, 5400)).toBe(false);
+    expect(tpass('eq', 1.5, 5400)).toBe(true);
+    expect(tpass('empty', undefined, undefined)).toBe(true);
+    expect(tpass('not_empty', undefined, 60)).toBe(true);
+    expect(tpass('gt', 0, undefined)).toBe(false);
   });
 
   it('formulas read votes, hours (as minutes) and the creation date', () => {

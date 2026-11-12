@@ -357,7 +357,7 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
                 column={c}
                 board={board}
                 saving={update.isPending}
-                onSave={(settings) => update.mutate({ columnId: c.id, patch: { settings } }, { onSuccess: () => (setOptionsFor(null), toast('האפשרויות נשמרו')), onError: onErr })}
+                onSave={(settings, extra) => update.mutate({ columnId: c.id, patch: { settings, ...extra } }, { onSuccess: () => (setOptionsFor(null), toast('האפשרויות נשמרו')), onError: onErr })}
               />
             )}
             {c.settings.description && optionsFor !== c.id && <small className="muted">{c.settings.description}</small>}

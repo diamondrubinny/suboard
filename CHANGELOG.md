@@ -2,6 +2,12 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.16.0 — 2026-11-12
+
+### Added
+- A "connect boards" column can be pointed at a different board from its options. Existing connections are removed only after an explicit confirmation, items are never deleted, and the change is refused while a mirror column depends on the connection.
+- Advanced filter by tracked time (in hours).
+
 ## 1.15.0 — 2026-11-12
 
 ### Added

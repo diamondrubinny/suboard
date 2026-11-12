@@ -1,11 +1,12 @@
 import { BUTTON_ACTIONS, type BoardDetail, type ButtonAction, type Column, type ColumnSettings } from '@suboard/shared';
 import { useId, useState } from 'react';
+import { useBoards } from '../../api/hooks';
 
 /**
  * Options of an existing column: a description for everyone; unit and decimals for numbers and
  * formulas; label and target for an action button. Saved together; other settings are untouched.
  */
-export function ColumnOptions({ column, board, saving, onSave }: { column: Column; board: BoardDetail; saving: boolean; onSave: (settings: ColumnSettings) => void }) {
+export function ColumnOptions({ column, board, saving, onSave }: { column: Column; board: BoardDetail; saving: boolean; onSave: (settings: ColumnSettings, extra?: { clearLinks?: boolean }) => void }) {
   const ids = useId();
   const [description, setDescription] = useState(column.settings.description ?? '');
   const [unit, setUnit] = useState(column.settings.unit ?? '');
@@ -20,6 +21,14 @@ export function ColumnOptions({ column, board, saving, onSave }: { column: Colum
   const [group, setGroup] = useState(column.settings.button?.groupId ?? board.groups[0]?.id ?? '');
   const [error, setError] = useState<string | null>(null);
   const numeric = column.type === 'number' || column.type === 'formula';
+  // "Connect boards": the connected board can be replaced; existing connections are then removed.
+  const boards = useBoards();
+  const currentBoard = column.settings.relation?.boardId ?? '';
+  const [relBoard, setRelBoard] = useState(currentBoard);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const linkCount = column.type === 'relation' ? Object.values(board.relations ?? {}).reduce((n, byCol) => n + (byCol[column.id]?.length ?? 0), 0) : 0;
+  const dependentMirrors = board.columns.filter((c) => c.type === 'mirror' && c.settings.mirror?.relationColumnId === column.id);
+  const relChanged = column.type === 'relation' && relBoard !== currentBoard;
 
   const save = () => {
     const settings: ColumnSettings = { description: description.trim() };
@@ -34,8 +43,13 @@ export function ColumnOptions({ column, board, saving, onSave }: { column: Colum
       if (action === 'move_group' && !group) return setError('יש לבחור קבוצה');
       settings.button = { label: label.trim(), action, ...(need ? { columnId: targetCol!.id } : { groupId: group }), ...(action === 'set_status' ? { optionId: option } : {}) };
     }
+    if (relChanged) {
+      if (dependentMirrors.length) return setError('יש למחוק קודם את עמודות המראה שמציגות ערכים דרך החיבור הזה');
+      if (linkCount > 0 && !confirmClear) return setError('יש לאשר את ניתוק החיבורים הקיימים');
+      settings.relation = { boardId: relBoard };
+    }
     setError(null);
-    onSave(settings);
+    onSave(settings, relChanged ? { clearLinks: true } : undefined);
   };
 
   return (
@@ -70,6 +84,34 @@ export function ColumnOptions({ column, board, saving, onSave }: { column: Colum
               ))}
             </select>
           </div>
+        </div>
+      )}
+      {column.type === 'relation' && (
+        <div className="field">
+          <label htmlFor={`${ids}-rb`}>הלוח המחובר</label>
+          <select id={`${ids}-rb`} className="select" value={relBoard} onChange={(e) => (setRelBoard(e.target.value), setConfirmClear(false))} aria-describedby={`${ids}-rbh`}>
+            {!(boards.data ?? []).some((b) => b.id === currentBoard) && <option value={currentBoard}>(הלוח הנוכחי — אין לך גישה אליו)</option>}
+            {(boards.data ?? [])
+              .filter((b) => b.id !== board.id)
+              .map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+          </select>
+          <span id={`${ids}-rbh`} className="hint">
+            החלפת הלוח מנתקת את החיבורים הקיימים בעמודה — הפריטים עצמם, בשני הלוחות, אינם נמחקים.
+          </span>
+          {relChanged && dependentMirrors.length > 0 && (
+            <p className="error" role="alert">
+              עמודות מראה מציגות ערכים דרך החיבור הזה ({dependentMirrors.map((m) => `"${m.title}"`).join(', ')}). יש למחוק אותן לפני החלפת הלוח.
+            </p>
+          )}
+          {relChanged && dependentMirrors.length === 0 && linkCount > 0 && (
+            <label className="check">
+              <input type="checkbox" checked={confirmClear} onChange={(e) => setConfirmClear(e.target.checked)} /> ידוע לי ש-{linkCount} חיבורים קיימים ינותקו
+            </label>
+          )}
         </div>
       )}
       {column.type === 'button' && (
