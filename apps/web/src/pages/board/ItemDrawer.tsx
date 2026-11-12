@@ -821,6 +821,7 @@ function ReplyForm({ itemId, parent }: { itemId: string; parent: ItemUpdate }) {
   const [body, setBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const id = `reply-${parent.id}`;
+  const ref = useRef<HTMLTextAreaElement>(null);
   if (!open)
     return (
       <button type="button" className="btn btn-ghost btn-sm" onClick={() => setOpen(true)} aria-label={`תשובה לעדכון של ${parent.userName}`}>
@@ -850,8 +851,10 @@ function ReplyForm({ itemId, parent }: { itemId: string; parent: ItemUpdate }) {
     >
       <div className="field">
         <label htmlFor={id}>תשובה ל{parent.userName}</label>
+        <FormatBar target={ref} value={body} onChange={setBody} label={`עיצוב התשובה ל${parent.userName}`} />
         <textarea
           id={id}
+          ref={ref}
           className="textarea"
           rows={2}
           autoFocus
