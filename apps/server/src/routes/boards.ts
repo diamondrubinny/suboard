@@ -5,7 +5,6 @@ import {
   createItemSchema,
   createUpdateSchema,
   duplicateBoardSchema,
-  maintenanceKitSchema,
   createWebhookSchema,
   updateWebhookSchema,
   moveBoardSchema,
@@ -62,11 +61,6 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
   });
   app.get('/webhooks/:id/deliveries', async (req) => ({ deliveries: services.webhooks.deliveries(actorOf(req), param(req, 'id')) }));
   app.post('/webhooks/:id/test', { config: { rateLimit: { max: 20, timeWindow: 15 * 60_000 } } }, async (req) => ({ delivery: await services.webhooks.test(actorOf(req), param(req, 'id')) }));
-
-  /** Three connected boards (equipment, inspections, faults) created together. */
-  app.post('/kits/maintenance', { config: { rateLimit: { max: 10, timeWindow: 15 * 60_000 } } }, async (req, reply) =>
-    reply.code(201).send(services.kits.maintenance(actorOf(req), maintenanceKitSchema.parse(req.body ?? {}), req.ip)),
-  );
 
   // ---- workspaces (organisation of the board list only; access stays per board)
   app.get('/workspaces', async (req) => ({ workspaces: services.workspaces.list(actorOf(req)) }));

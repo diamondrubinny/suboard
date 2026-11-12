@@ -2,14 +2,6 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
-## 1.11.0 — 2026-11-12
-
-### Added
-- Maintenance and inspections kit: one step creates three connected boards — equipment, inspections and faults — in a workspace. Inspections and faults connect to equipment and mirror its location; a failed checklist line on an inspection opens a fault.
-
-### Fixed
-- A switched-off module no longer flashes in the side menu while the page loads.
-
 ## 1.10.0 — 2026-11-12
 
 ### Added

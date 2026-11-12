@@ -923,16 +923,6 @@ export function useWebhookMutations(boardId: string) {
     test: useMutation({ mutationFn: (id: string) => api<{ delivery: WebhookDelivery }>(`/webhooks/${id}/test`, 'POST', {}).then((r) => r.delivery), onSettled: refresh }),
   };
 }
-export function useCreateMaintenanceKit() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { workspaceName?: string }) => api<{ equipment: BoardDetail; inspections: BoardDetail; faults: BoardDetail }>('/kits/maintenance', 'POST', input),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: qk.boards });
-      void qc.invalidateQueries({ queryKey: qk.workspaces });
-    },
-  });
-}
 export const useWorkspaces = () => useQuery({ queryKey: qk.workspaces, queryFn: () => api<{ workspaces: Workspace[] }>('/workspaces').then((r) => r.workspaces), staleTime: 60_000 });
 export function useWorkspaceMutations() {
   const qc = useQueryClient();
