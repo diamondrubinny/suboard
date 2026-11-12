@@ -278,6 +278,8 @@ export const createBoardSchema = z.object({
   customTemplateId: idSchema.optional(),
 });
 
+export const setModulesSchema = z.object({ modules: z.record(z.string().max(40), z.boolean()) });
+
 export const addLinkSchema = z.object({ toItemId: idSchema });
 
 export const duplicateBoardSchema = z.object({

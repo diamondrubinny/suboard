@@ -1,3 +1,4 @@
+import { DateField } from '../../components/DateField';
 import { formatDateHe, todayIso, type Procedure } from '@suboard/shared';
 import { useId, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -338,7 +339,7 @@ function PublishDialog({ procedure, onClose }: { procedure: Procedure; onClose: 
           </div>
           <div className="field">
             <label htmlFor={ids.e}>בתוקף מ-</label>
-            <input id={ids.e} type="date" className="input" value={effectiveOn} onChange={(e) => setEffectiveOn(e.target.value)} />
+            <DateField id={ids.e} value={effectiveOn} onChange={setEffectiveOn} />
           </div>
         </div>
         <div className="field">

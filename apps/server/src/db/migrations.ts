@@ -656,4 +656,17 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE UNIQUE INDEX idx_links_related ON item_links(from_item, to_item) WHERE kind = 'related';
     `,
   },
+  {
+    version: 16,
+    name: 'app_settings',
+    sql: /* sql */ `
+      -- System-wide settings set by an administrator (JSON values; e.g. which optional modules are on).
+      CREATE TABLE app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TEXT NOT NULL
+      );
+    `,
+  },
 ];

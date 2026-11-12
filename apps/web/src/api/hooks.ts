@@ -7,6 +7,7 @@ import type {
   CustomTemplate,
   ActiveSession,
   PasskeyInfo,
+  ModuleState,
   BoardFile,
   FollowState,
   Reaction,
@@ -121,6 +122,7 @@ export const qk = {
   pins: (attachmentId: string) => ['pins', attachmentId] as const,
   sessions: ['sessions'] as const,
   passkeys: ['passkeys'] as const,
+  modules: ['modules'] as const,
   recentBoards: ['recent-boards'] as const,
   follow: (itemId: string) => ['follow', itemId] as const,
   boardFiles: (boardId: string) => ['board-files', boardId] as const,
@@ -857,6 +859,16 @@ export function useSessionMutations() {
     revokeOthers: useMutation({ mutationFn: () => api<{ sessions: ActiveSession[] }>('/auth/sessions/revoke-others', 'POST', {}), onSuccess: refresh }),
   };
 }
+/** Which optional modules are switched on (drives the menu and route guards). */
+export const useModules = (enabled = true) =>
+  useQuery({ queryKey: qk.modules, queryFn: () => api<{ modules: ModuleState }>('/modules').then((r) => r.modules), staleTime: 60_000, enabled });
+export const useSetModules = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (modules: Partial<ModuleState>) => api<{ modules: ModuleState }>('/admin/modules', 'PUT', { modules }).then((r) => r.modules),
+    onSuccess: (m) => qc.setQueryData(qk.modules, m),
+  });
+};
 export const usePasskeys = () => useQuery({ queryKey: qk.passkeys, queryFn: () => api<{ passkeys: PasskeyInfo[] }>('/auth/passkeys').then((r) => r.passkeys) });
 export const useRemovePasskey = () => {
   const qc = useQueryClient();

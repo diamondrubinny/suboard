@@ -1,4 +1,4 @@
-import { createUserSchema, idSchema, updateUserSchema } from '@suboard/shared';
+import { createUserSchema, idSchema, setModulesSchema, updateUserSchema } from '@suboard/shared';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { forbidden, notFound } from '../lib/errors.js';
 import { actorOf } from '../plugins/auth.js';
@@ -43,6 +43,13 @@ export async function userRoutes(app: FastifyInstance, { services }: { services:
     const passkeysRemoved = id === actor.id ? 0 : services.passkeys.removeAllOf(id);
     services.audit.log('sessions_revoked_by_admin', { userId: actor.id, ip: req.ip, meta: { targetUserId: id, passkeysRemoved } });
     return { ok: true, passkeysRemoved };
+  });
+
+  // ---- optional modules: every signed-in user reads the state (to build the menu); admins change it
+  app.get('/modules', async () => ({ modules: services.modules.state() }));
+  app.put('/admin/modules', { config: { rateLimit: { max: 30, timeWindow: 15 * 60_000 } } }, async (req) => {
+    const actor = requireAdmin(req);
+    return { modules: services.modules.set(actor, setModulesSchema.parse(req.body).modules, req.ip) };
   });
 
   app.get('/admin/audit', async (req) => {

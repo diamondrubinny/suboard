@@ -1,3 +1,4 @@
+import { DateField } from '../DateField';
 import { formatDateRangeHe, type StatusOption } from '@suboard/shared';
 import { useEffect, useId, useRef, useState } from 'react';
 import { colorStyle } from '../StatusPill';
@@ -109,9 +110,9 @@ export function DateRangeEditor({
   };
   return (
     <span className="range-cell" role="group" aria-label={label}>
-      <input type="date" className="cell-input" value={from} aria-label={`${label} — מתאריך`} aria-invalid={error} onChange={(e) => (setFrom(e.target.value), commit(e.target.value, to))} />
+      <DateField className="cell-input" value={from} aria-label={`${label} — מתאריך`} onChange={(iso) => (setFrom(iso), commit(iso, to))} />
       <span aria-hidden="true">–</span>
-      <input type="date" className="cell-input" value={to} aria-label={`${label} — עד תאריך`} aria-invalid={error} onChange={(e) => (setTo(e.target.value), commit(from, e.target.value))} />
+      <DateField className="cell-input" value={to} aria-label={`${label} — עד תאריך`} onChange={(iso) => (setTo(iso), commit(from, iso))} />
       {error && (
         <span className="sr-only" role="alert">
           תאריך הסיום לפני תאריך ההתחלה

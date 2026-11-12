@@ -3,7 +3,7 @@ import { BOARD_ROLE_LABELS, findPrimaryStatusColumn, viewConfigSchema, type Save
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../../api/client';
-import { useBoard, useDirectory, useGroupMutations } from '../../api/hooks';
+import { useModules, useBoard, useDirectory, useGroupMutations } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
@@ -56,6 +56,7 @@ export function BoardPage() {
   const [params, setParams] = useSearchParams();
   const { user } = useAuth();
   const board = useBoard(boardId);
+  const modules = useModules();
   const directory = useDirectory();
   const groups = useGroupMutations(boardId);
   const { toast } = useFeedback();
@@ -158,7 +159,7 @@ export function BoardPage() {
             <Icon name="grid" /> מדבקות QR
           </Link>
           <NewFromTemplate board={b} onCreated={openItem} />
-          {b.myRole === 'owner' && (
+          {b.myRole === 'owner' && modules.data?.forms !== false && (
             <Link to={`/boards/${b.id}/forms`} className="btn">
               <Icon name="clipboard" /> טפסים
             </Link>

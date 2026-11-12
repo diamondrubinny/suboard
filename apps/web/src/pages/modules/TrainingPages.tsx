@@ -1,3 +1,4 @@
+import { DateField } from '../../components/DateField';
 import { apiUrl } from '../../api/base';
 import { formatDateHe, todayIso, type Training, type TrainingCell, type TrainingState } from '@suboard/shared';
 import { useId, useState, type FormEvent } from 'react';
@@ -177,7 +178,7 @@ function RecordDialog({ training, userId, userName, cell, onClose }: { training:
         <div className="rule-row">
           <div className="field">
             <label htmlFor={ids.d}>תאריך ההדרכה</label>
-            <input id={ids.d} type="date" className="input" value={date} max={todayIso()} onChange={(e) => setDate(e.target.value)} />
+            <DateField id={ids.d} value={date} max={todayIso()} onChange={setDate} />
           </div>
           <div className="field">
             <label htmlFor={ids.n}>הערה (לא חובה)</label>
@@ -323,7 +324,7 @@ function UsersDialog({ title, users, initial, withDate, saveLabel, onSave, onClo
         {withDate && (
           <div className="field">
             <label htmlFor={ids.d}>תאריך ההדרכה</label>
-            <input id={ids.d} type="date" className="input" value={date} max={todayIso()} onChange={(e) => setDate(e.target.value)} />
+            <DateField id={ids.d} value={date} max={todayIso()} onChange={setDate} />
           </div>
         )}
         <div className="field">

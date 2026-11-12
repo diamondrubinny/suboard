@@ -39,8 +39,10 @@ const ProceduresPage = lazy(() => import('./pages/modules/ProcedurePages').then(
 const ProcedurePage = lazy(() => import('./pages/modules/ProcedurePages').then((m) => ({ default: m.ProcedurePage })));
 const FloorPlansPage = lazy(() => import('./pages/modules/FloorPlanPage').then((m) => ({ default: m.FloorPlansPage })));
 const FloorPlanPage = lazy(() => import('./pages/modules/FloorPlanPage').then((m) => ({ default: m.FloorPlanPage })));
+const AdminModulesPage = lazy(() => import('./pages/AdminModulesPage').then((m) => ({ default: m.AdminModulesPage })));
 const lazyPage = (node: ReactNode) => <Suspense fallback={<LoadingState />}>{node}</Suspense>;
 import { ProfilePage } from './pages/ProfilePage';
+import { ModuleGate } from './modules/ModuleGate';
 
 /** Last-resort error boundary: friendly message, no stack traces shown to users. */
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
@@ -83,27 +85,44 @@ export function App() {
                   <Route path="boards/:boardId/automations" element={lazyPage(<AutomationsPage />)} />
                   <Route path="boards/:boardId/report" element={lazyPage(<ReportPage />)} />
                   <Route path="boards/:boardId/qr" element={lazyPage(<QrSheetPage />)} />
-                  <Route path="boards/:boardId/forms" element={lazyPage(<FormsAdminPage />)} />
+                  <Route element={<ModuleGate module="forms" />}>
+                    <Route path="boards/:boardId/forms" element={lazyPage(<FormsAdminPage />)} />
+                  </Route>
                   <Route path="q/:itemId" element={lazyPage(<QrLandingPage />)} />
-                  <Route path="compliance" element={lazyPage(<CompliancePage />)} />
-                  <Route path="dashboards" element={lazyPage(<DashboardsPage />)} />
-                  <Route path="dashboards/:dashboardId" element={lazyPage(<CustomDashboardPage />)} />
-                  <Route path="workload" element={lazyPage(<WorkloadPage />)} />
-                  <Route path="trainings" element={lazyPage(<TrainingsPage />)} />
-                  <Route path="trainings/me" element={lazyPage(<MyTrainingsPage />)} />
-                  <Route path="procedures" element={lazyPage(<ProceduresPage />)} />
-                  <Route path="procedures/:procedureId" element={lazyPage(<ProcedurePage />)} />
+                  <Route element={<ModuleGate module="compliance" />}>
+                    <Route path="compliance" element={lazyPage(<CompliancePage />)} />
+                  </Route>
+                  <Route element={<ModuleGate module="dashboards" />}>
+                    <Route path="dashboards" element={lazyPage(<DashboardsPage />)} />
+                    <Route path="dashboards/:dashboardId" element={lazyPage(<CustomDashboardPage />)} />
+                  </Route>
+                  <Route element={<ModuleGate module="workload" />}>
+                    <Route path="workload" element={lazyPage(<WorkloadPage />)} />
+                  </Route>
+                  <Route element={<ModuleGate module="trainings" />}>
+                    <Route path="trainings" element={lazyPage(<TrainingsPage />)} />
+                    <Route path="trainings/me" element={lazyPage(<MyTrainingsPage />)} />
+                  </Route>
+                  <Route element={<ModuleGate module="procedures" />}>
+                    <Route path="procedures" element={lazyPage(<ProceduresPage />)} />
+                    <Route path="procedures/:procedureId" element={lazyPage(<ProcedurePage />)} />
+                  </Route>
                   <Route path="boards/:boardId/plans" element={lazyPage(<FloorPlansPage />)} />
                   <Route path="boards/:boardId/files" element={lazyPage(<FilesPage />)} />
                   <Route path="boards/:boardId/plans/:attachmentId" element={lazyPage(<FloorPlanPage />)} />
-                  <Route path="reports/monthly" element={lazyPage(<MonthlyReportPage />)} />
-                  <Route path="forms" element={lazyPage(<FormsPage />)} />
-                  <Route path="forms/new" element={lazyPage(<FormBuilderPage />)} />
-                  <Route path="forms/:formId" element={lazyPage(<FormFillPage />)} />
+                  <Route element={<ModuleGate module="monthly_report" />}>
+                    <Route path="reports/monthly" element={lazyPage(<MonthlyReportPage />)} />
+                  </Route>
+                  <Route element={<ModuleGate module="forms" />}>
+                    <Route path="forms" element={lazyPage(<FormsPage />)} />
+                    <Route path="forms/new" element={lazyPage(<FormBuilderPage />)} />
+                    <Route path="forms/:formId" element={lazyPage(<FormFillPage />)} />
+                  </Route>
                   <Route path="profile" element={<ProfilePage />} />
                   <Route element={<RequireAuth admin />}>
                     <Route path="admin/users" element={<AdminUsersPage />} />
                     <Route path="admin/audit" element={<AuditPage />} />
+                    <Route path="admin/modules" element={lazyPage(<AdminModulesPage />)} />
                   </Route>
                   <Route path="*" element={<NotFoundPage />} />
                 </Route>

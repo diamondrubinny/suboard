@@ -1,3 +1,4 @@
+import { moduleOfApiPath } from '@suboard/shared';
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import helmet from '@fastify/helmet';
@@ -111,6 +112,13 @@ export async function buildApp(config: AppConfig, db: DB, overrides: ServiceOver
   });
   await app.register(csrfPlugin, { allowedOrigins: config.allowedOrigins });
   await app.register(authPlugin, { auth: services.auth, config });
+
+  // Optional modules switched off by an administrator: their whole API answers 404 (after sign-in checks).
+  app.addHook('preHandler', async (req) => {
+    if (!req.url.startsWith('/api/')) return;
+    const key = moduleOfApiPath(req.url.slice(4).split('?')[0]!);
+    if (key && !services.modules.enabled(key)) throw new AppError(404, 'MODULE_DISABLED', 'המודול אינו פעיל במערכת');
+  });
 
   app.addHook('onSend', async (req, reply) => {
     reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');

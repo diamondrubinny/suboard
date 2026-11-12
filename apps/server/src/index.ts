@@ -41,8 +41,9 @@ async function main() {
     ['scheduled automations', () => app.services.automations.runScheduled()],
     ['scheduled reports', () => app.services.reports.runDue()],
     ['effectiveness checks', () => app.services.investigations.runDue()],
-    ['monthly management report', () => app.services.monthly.run()],
-    ['training reminders', () => app.services.trainings.runReminders()],
+    // Jobs of optional modules run only while the module is switched on.
+    ['monthly management report', () => app.services.modules.enabled('monthly_report') && app.services.monthly.run()],
+    ['training reminders', () => app.services.modules.enabled('trainings') && app.services.trainings.runReminders()],
     ['personal reminders', () => app.services.personal.runDueReminders()],
     ['rescan uploads', () => app.services.attachments.rescanPending()],
   ];

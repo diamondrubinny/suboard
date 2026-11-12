@@ -3982,3 +3982,81 @@ kbd {
 .formula-cell {
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- date field (always dd/mm/yyyy) */
+.date-field {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: minmax(7rem, 1fr) auto;
+  align-items: center;
+  gap: 2px;
+  max-inline-size: 100%;
+  vertical-align: middle;
+}
+.date-field > input[type='text'] {
+  min-inline-size: 0;
+  inline-size: 100%;
+  font-variant-numeric: tabular-nums;
+  text-align: start;
+}
+.date-field > .cell-input {
+  padding-inline: var(--space-1);
+}
+.field .date-field {
+  display: grid;
+}
+.date-field-btn {
+  inline-size: 1.9rem;
+  block-size: 1.9rem;
+}
+/* Kept in the page only so its calendar can be opened; never shown, never focused. */
+.date-field-native {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
+  padding: 0;
+}
+.date-field-error {
+  grid-column: 1 / -1;
+  font-size: 0.8125rem;
+}
+
+/* ---- side menu can be hidden on wide screens */
+.menu-toggle {
+  display: inline-flex;
+}
+@media (min-width: 901px) {
+  .app-shell[data-sidebar='hidden'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'header' 'main' 'footer';
+    background: var(--ground);
+  }
+  .app-shell[data-sidebar='hidden'] .sidebar {
+    display: none;
+  }
+}
+
+/* ---- modules (admin) */
+.module-list {
+  display: grid;
+  gap: var(--space-3);
+}
+.module-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+.module-row h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.module-row p {
+  margin: var(--space-1) 0 0;
+}

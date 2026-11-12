@@ -1,7 +1,8 @@
 import { GLOBAL_ROLE_LABELS } from '@suboard/shared';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useBoards } from '../api/hooks';
+import { useBoards, useModules } from '../api/hooks';
+import { pathOf, visibleNav, type NavEntry } from '../modules/registry';
 import { useAuth } from '../auth/AuthContext';
 import { A11yToolbar } from './A11yToolbar';
 import { LoadingState, useFeedback } from './Feedback';
@@ -52,6 +53,8 @@ export function RequireAuth({ admin = false }: { admin?: boolean }) {
   return <Outlet />;
 }
 
+const SIDEBAR_KEY = 'suboard:sidebar-hidden';
+
 export function Layout() {
   const { user, logout } = useAuth();
   const { toast } = useFeedback();
@@ -61,7 +64,35 @@ export function Layout() {
   const favorites = (boards.data ?? []).filter((b) => b.favorite);
   const others = (boards.data ?? []).filter((b) => !b.favorite);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Wide screens: the side menu can be hidden to give the board the full width (remembered per browser).
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const pendingSetup = Boolean(user && (user.mustChangePassword || user.mfaSetupRequired));
+  const modules = useModules(Boolean(user) && !pendingSetup);
+  const toggleMenu = () => {
+    if (window.matchMedia('(max-width: 900px)').matches) return setMenuOpen((o) => !o);
+    setCollapsed((c) => {
+      try {
+        localStorage.setItem(SIDEBAR_KEY, c ? '0' : '1');
+      } catch {
+        /* private mode: the choice lasts for this visit only */
+      }
+      return !c;
+    });
+  };
   const mainRef = useRef<HTMLElement>(null);
+  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 900px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
 
   useEffect(() => {
     setMenuOpen(false);
@@ -71,7 +102,15 @@ export function Layout() {
   }, [location.pathname]);
 
   if (!user) return null;
-  const pending = user.mustChangePassword || user.mfaSetupRequired;
+  const pending = pendingSetup;
+  const nav = visibleNav(user.role, modules.data);
+  const navItem = (e: NavEntry) => (
+    <li key={e.id}>
+      <NavLink to={pathOf(e, user.role)} end={e.end} className="nav-link">
+        <Icon name={e.icon} /> {e.label}
+      </NavLink>
+    </li>
+  );
 
   const onLogout = async () => {
     await logout();
@@ -80,7 +119,7 @@ export function Layout() {
   };
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-sidebar={collapsed ? 'hidden' : 'shown'}>
       <a href="#main" className="skip-link">
         דילוג לתוכן הראשי
       </a>
@@ -89,9 +128,10 @@ export function Layout() {
           type="button"
           className="icon-btn menu-toggle"
           aria-label="תפריט ניווט"
-          aria-expanded={menuOpen}
+          title={collapsed ? 'הצגת התפריט' : 'הסתרת התפריט'}
+          aria-expanded={narrow ? menuOpen : !collapsed}
           aria-controls="sidebar"
-          onClick={() => setMenuOpen((o) => !o)}
+          onClick={toggleMenu}
         >
           <Icon name="menu" />
         </button>
@@ -120,77 +160,8 @@ export function Layout() {
         {!pending && (
           <>
             <ul className="nav-list">
-              <li>
-                <NavLink to="/" end className="nav-link">
-                  <Icon name="home" /> לוח בקרה
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/my-work" className="nav-link">
-                  <Icon name="checks" /> המשימות שלי
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/boards" end className="nav-link">
-                  <Icon name="boards" /> כל הלוחות
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/dashboards" className="nav-link">
-                  <Icon name="chart" /> דשבורדים
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/workload" className="nav-link">
-                  <Icon name="users" /> עומס צוות
-                </NavLink>
-              </li>
-              {user.role !== 'member' && (
-                <li>
-                  <NavLink to="/reports/monthly" className="nav-link">
-                    <Icon name="history" /> מבט מנהל
-                  </NavLink>
-                </li>
-              )}
-              <li>
-                <NavLink to={user.role === 'member' ? '/trainings/me' : '/trainings'} className="nav-link">
-                  <Icon name="school" /> הדרכות
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/procedures" className="nav-link">
-                  <Icon name="clipboard" /> נהלים
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/compliance" className="nav-link">
-                  <Icon name="checks" /> תאימות
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/forms" className="nav-link">
-                  <Icon name="clipboard" /> טפסים ודיווחים
-                </NavLink>
-              </li>
-              <li>
-                <NavLink to="/profile" className="nav-link">
-                  <Icon name="user" /> הפרופיל שלי
-                </NavLink>
-              </li>
-              {user.role === 'admin' && (
-                <>
-                  <li>
-                    <NavLink to="/admin/users" className="nav-link">
-                      <Icon name="users" /> ניהול משתמשים
-                    </NavLink>
-                  </li>
-                  <li>
-                    <NavLink to="/admin/audit" className="nav-link">
-                      <Icon name="shield" /> יומן אבטחה
-                    </NavLink>
-                  </li>
-                </>
-              )}
+              {nav.filter((e) => e.section === 'main').map(navItem)}
+              {nav.filter((e) => e.section === 'admin').map(navItem)}
             </ul>
             {favorites.length > 0 && (
               <>

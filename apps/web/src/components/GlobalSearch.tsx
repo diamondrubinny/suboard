@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { errorMessage } from '../api/client';
-import { useBoards, useRecentBoards, useSearch } from '../api/hooks';
+import { useBoards, useModules, useRecentBoards, useSearch } from '../api/hooks';
+import { pathOf, visibleNav } from '../modules/registry';
 import { useAuth } from '../auth/AuthContext';
 import { Dialog } from './Dialog';
 import { Icon, type IconName } from './Icon';
@@ -16,26 +17,6 @@ interface Entry {
 }
 
 const GROUP_LABEL: Record<Entry['group'], string> = { recent: 'נפתחו לאחרונה', pages: 'עמודים', boards: 'לוחות', items: 'פריטים ועדכונים' };
-
-/** App pages reachable from the palette, filtered by the user's role (the server still enforces access). */
-function pagesFor(role: string | undefined): { label: string; to: string; icon: IconName; keywords?: string }[] {
-  const pages: { label: string; to: string; icon: IconName; keywords?: string; roles?: string[] }[] = [
-    { label: 'לוח בקרה', to: '/', icon: 'home', keywords: 'בית ראשי' },
-    { label: 'המשימות שלי', to: '/my-work', icon: 'checks', keywords: 'משימות שלי action items תת-פריטים' },
-    { label: 'כל הלוחות', to: '/boards', icon: 'boards' },
-    { label: 'דשבורדים', to: '/dashboards', icon: 'chart', keywords: 'גרפים' },
-    { label: 'עומס צוות', to: '/workload', icon: 'users' },
-    { label: 'מבט מנהל', to: '/reports/monthly', icon: 'history', keywords: 'דוח חודשי', roles: ['admin', 'manager'] },
-    { label: 'הדרכות', to: role === 'member' ? '/trainings/me' : '/trainings', icon: 'school' },
-    { label: 'נהלים', to: '/procedures', icon: 'clipboard' },
-    { label: 'תאימות', to: '/compliance', icon: 'checks' },
-    { label: 'טפסים ודיווחים', to: '/forms', icon: 'clipboard' },
-    { label: 'הפרופיל שלי', to: '/profile', icon: 'user', keywords: 'סיסמה אימות דו-שלבי חיבורים מכשירים מפתח גישה passkey' },
-    { label: 'ניהול משתמשים', to: '/admin/users', icon: 'users', roles: ['admin'] },
-    { label: 'יומן אבטחה', to: '/admin/audit', icon: 'shield', roles: ['admin'] },
-  ];
-  return pages.filter((p) => !p.roles || (role && p.roles.includes(role)));
-}
 
 const isTyping = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 
@@ -55,6 +36,7 @@ export function GlobalSearch() {
   const res = useSearch(q);
   const boards = useBoards();
   const recent = useRecentBoards(open);
+  const modules = useModules();
 
   useEffect(() => {
     const t = window.setTimeout(() => setQ(text.trim()), 250);
@@ -83,7 +65,7 @@ export function GlobalSearch() {
     if (!needle) {
       for (const b of recent.data ?? []) out.push({ key: `r-${b.id}`, group: 'recent', label: b.name, icon: b.favorite ? 'star' : 'table', to: `/boards/${b.id}` });
     }
-    for (const p of pagesFor(user?.role)) if (match(p.label, p.keywords)) out.push({ key: `p-${p.to}`, group: 'pages', label: p.label, icon: p.icon, to: p.to });
+    for (const p of visibleNav(user?.role, modules.data)) if (match(p.label, p.keywords)) out.push({ key: `p-${p.id}`, group: 'pages', label: p.label, icon: p.icon, to: pathOf(p, user!.role) });
     if (needle) {
       const list = [...(boards.data ?? [])].sort((x, y) => Number(y.favorite) - Number(x.favorite));
       for (const b of list) if (match(b.name, b.description)) out.push({ key: `b-${b.id}`, group: 'boards', label: b.name, sub: b.favorite ? 'מועדף' : undefined, icon: b.favorite ? 'star' : 'table', to: `/boards/${b.id}` });
@@ -100,7 +82,7 @@ export function GlobalSearch() {
         );
     }
     return out;
-  }, [text, q, recent.data, boards.data, res.data, user?.role]);
+  }, [text, q, recent.data, boards.data, res.data, user?.role, modules.data]);
 
   useEffect(() => setActive(0), [text, entries.length]);
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { DateField } from '../DateField';
 import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser, type LinkStat } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { colorStyle, StatusPill } from '../StatusPill';
@@ -222,14 +223,7 @@ export function CellEditor(props: CellEditorProps) {
         );
       return (
         <span style={{ display: 'block' }}>
-          <input
-            id={inputId}
-            type="date"
-            className={overdue ? 'cell-input overdue' : 'cell-input'}
-            value={v}
-            aria-label={overdue ? `${label} (באיחור)` : label}
-            onChange={(e) => onChange(e.target.value || null)}
-          />
+          <DateField id={inputId} className={overdue ? 'cell-input overdue' : 'cell-input'} value={v} aria-label={overdue ? `${label} (באיחור)` : label} onChange={(iso) => onChange(iso || null)} />
         </span>
       );
     }

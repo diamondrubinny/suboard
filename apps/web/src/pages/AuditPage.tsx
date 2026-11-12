@@ -37,6 +37,8 @@ const EVENTS: Record<string, string> = {
   session_revoked: 'ניתוק מכשיר',
   sessions_revoked_others: 'ניתוק כל המכשירים האחרים',
   sessions_revoked_by_admin: 'ניתוק מכשירים ע"י מנהל',
+  modules_changed: 'הפעלה / כיבוי של מודולים',
+  board_duplicated: 'שכפול לוח',
   passkey_added: 'מפתח גישה נוסף',
   passkey_add_failed: 'הוספת מפתח גישה נכשלה',
   passkey_removed: 'מפתח גישה הוסר',

@@ -1,3 +1,4 @@
+import { DateField } from '../../components/DateField';
 import type { BoardDetail, Item } from '@suboard/shared';
 import { useEffect, useState, type FormEvent } from 'react';
 import { errorMessage } from '../../api/client';
@@ -8,6 +9,8 @@ import { Icon } from '../../components/Icon';
 import { formatDateTime } from './activityText';
 
 /** Local "YYYY-MM-DDTHH:mm" for a datetime-local input. */
+/** 24-hour clock in half-hour steps (the native time control follows the browser's language). */
+const HALF_HOURS = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
 const toLocalInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
 /** "For my eyes only" on an item: reminders and a private note. */
@@ -91,7 +94,17 @@ export function PersonalSection({ itemId }: { itemId: string }) {
         <form onSubmit={submit} className="reminder-form">
           <div className="field">
             <label htmlFor="rem-when">מועד אחר</label>
-            <input id="rem-when" className="input" type="datetime-local" value={when} min={toLocalInput(new Date())} onChange={(e) => setWhen(e.target.value)} />
+            <DateField id="rem-when" value={when.slice(0, 10)} min={toLocalInput(new Date()).slice(0, 10)} onChange={(iso) => setWhen(iso ? `${iso}T${when.slice(11, 16) || '08:00'}` : '')} />
+          </div>
+          <div className="field">
+            <label htmlFor="rem-time">שעה</label>
+            <select id="rem-time" className="select" value={when.slice(11, 16) || '08:00'} onChange={(e) => setWhen(when ? `${when.slice(0, 10)}T${e.target.value}` : when)} disabled={!when}>
+              {HALF_HOURS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="field grow">
             <label htmlFor="rem-note">על מה להזכיר (לא חובה)</label>

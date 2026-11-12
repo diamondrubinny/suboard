@@ -1,3 +1,4 @@
+import { DateField } from '../../components/DateField';
 import { CAUSE_CATEGORIES, CAUSE_LABELS, formatDateHe, LIMITS, type BoardDetail, type CauseCategory, type Investigation } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -125,7 +126,7 @@ export function InvestigationPanel({ board, itemId }: { board: BoardDetail; item
         <div className="rule-row">
           <div className="field">
             <label htmlFor={ids.due}>מועד בדיקה</label>
-            <input id={ids.due} type="date" className="input" value={draft.effectivenessDue ?? ''} onChange={(e) => setDraft({ ...draft, effectivenessDue: e.target.value || null })} />
+            <DateField id={ids.due} value={draft.effectivenessDue ?? ''} onChange={(iso) => setDraft({ ...draft, effectivenessDue: iso || null })} />
           </div>
           <div className="field">
             <label htmlFor={ids.result}>תוצאה</label>

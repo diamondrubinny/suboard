@@ -15,7 +15,7 @@ import {
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../api/client';
-import { useArchiveBoard, useDuplicateBoard, useBoard, useColumnMutations, useDirectory, useGroupMutations, useMemberMutations, useTemplateMutations, useTemplates, useUpdateBoard } from '../../api/hooks';
+import { useArchiveBoard, useDuplicateBoard, useModules, useBoard, useColumnMutations, useDirectory, useGroupMutations, useMemberMutations, useTemplateMutations, useTemplates, useUpdateBoard } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
@@ -27,6 +27,7 @@ import { FormulaEditor } from './FormulaEditor';
 export function BoardSettingsPage() {
   const { boardId = '' } = useParams();
   const board = useBoard(boardId);
+  const modules = useModules();
   usePageTitle(`הגדרות — ${board.data?.name ?? 'לוח'}`);
   if (board.isPending) return <LoadingState />;
   if (board.isError) return <ErrorState message={errorMessage(board.error)} onRetry={() => board.refetch()} />;
@@ -46,6 +47,7 @@ export function BoardSettingsPage() {
         <GeneralSection board={b} />
         <ColumnsSection board={b} />
         <ComplianceSection board={b} />
+        {modules.data?.forms !== false && (
         <section className="card" aria-labelledby="forms-h">
           <h2 id="forms-h">טפסים</h2>
           <p className="muted">טפסי דיווח שיוצרים פריטים בלוח — לחברי הלוח או לכל המשתמשים המחוברים (למשל דיווח כמעט-אירוע).</p>
@@ -53,6 +55,7 @@ export function BoardSettingsPage() {
             ניהול טפסים
           </Link>
         </section>
+        )}
         <GroupsSection board={b} />
         <MembersSection board={b} />
         <TemplateSection board={b} />

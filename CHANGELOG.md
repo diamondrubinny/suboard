@@ -2,6 +2,16 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.1.0 — 2026-11-12
+
+### Added
+- Optional modules: a system administrator switches forms, dashboards, workload, the monthly report, trainings, procedures and compliance on or off. A switched-off module leaves the menu, its pages explain why, its API answers 404 and its scheduled jobs stop; its data is kept.
+- The side menu can be hidden on wide screens (remembered per browser).
+
+### Changed
+- Dates are always shown and typed as dd/mm/yyyy, whatever the browser's language (own date field with a calendar button; the native control followed the browser and showed mm/dd/yyyy in English browsers).
+- Navigation, command palette and route guards are built from one registry (`apps/web/src/modules/registry.ts`).
+
 ## 1.0.1 — 2026-11-12
 
 ### Fixed

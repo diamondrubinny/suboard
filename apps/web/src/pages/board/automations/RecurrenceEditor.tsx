@@ -1,3 +1,4 @@
+import { DateField } from '../../../components/DateField';
 import {
   createRecurrenceSchema,
   findDueColumn,
@@ -201,11 +202,11 @@ export function RecurrenceEditor({ board, rec, open, onClose }: { board: BoardDe
           <div className="rule-row">
             <div className="field">
               <label htmlFor={ids.start}>{schedule.frequency === 'yearly' ? 'תאריך (חוזר כל שנה)' : 'החל מתאריך'}</label>
-              <input id={ids.start} type="date" className="input" value={schedule.startDate} onChange={(e) => e.target.value && set({ startDate: e.target.value })} />
+              <DateField id={ids.start} value={schedule.startDate} onChange={(iso) => iso && set({ startDate: iso })} />
             </div>
             <div className="field">
               <label htmlFor={ids.end}>עד תאריך (לא חובה)</label>
-              <input id={ids.end} type="date" className="input" value={schedule.endDate ?? ''} onChange={(e) => set({ endDate: e.target.value || null })} />
+              <DateField id={ids.end} value={schedule.endDate ?? ''} onChange={(iso) => set({ endDate: iso || null })} />
             </div>
           </div>
         </fieldset>
