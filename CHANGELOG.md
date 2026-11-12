@@ -2,6 +2,14 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.10.1 — 2026-11-12
+
+### Fixed
+- A switched-off module no longer flashes in the side menu while the page loads.
+
+### Removed
+- The maintenance-and-inspections kit (built for 1.11.0, never released) was withdrawn: inspections, work permits and the unit's other projects are separate systems. SUBoard is a general work-management platform.
+
 ## 1.10.0 — 2026-11-12
 
 ### Added
