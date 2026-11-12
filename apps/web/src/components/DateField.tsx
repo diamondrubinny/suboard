@@ -105,8 +105,15 @@ export function DateField({ value, onChange, id, className = 'input', min, max, 
           // Digits typed in a row get their slashes: 21112026 → 21/11/2026.
           const raw = e.target.value;
           const grew = raw.length > text.length;
-          setText(grew && /^\d{2}$/.test(raw) ? `${raw}/` : grew && /^\d{2}\/\d{2}$/.test(raw) ? `${raw}/` : raw);
+          const next = grew && /^\d{2}$/.test(raw) ? `${raw}/` : grew && /^\d{2}\/\d{2}$/.test(raw) ? `${raw}/` : raw;
+          setText(next);
           setInvalid(null);
+          // A complete date is committed as it is typed (like the native control), so nothing changes —
+          // and nothing on the page moves — when the field is left by clicking a button.
+          if (/^\d{2}\/\d{2}\/\d{4}$|^\d{4}-\d{2}-\d{2}$/.test(next)) {
+            const iso = parseDisplayDate(next);
+            if (iso && iso !== value && !(min && iso < min) && !(max && iso > max)) onChange(iso);
+          }
         }}
         onBlur={commit}
         onKeyDown={onKeyDown}
