@@ -95,6 +95,26 @@ sudo systemctl enable --now clamav-freshclam clamav-daemon
 
 **נבדק** מול ספק OIDC מדומה (HTTPS, חתימת RS256, PKCE) ומול צורת הבקשות של Entra ל-SCIM (PATCH עם `Replace` ו-`"False"`). **לא נבדק מול Entra ID אמיתי** — יש לבצע בדיקת קבלה בסביבת הארגון.
 
+## 1ז. התקנת פרודקשן בסקריפט אחד (כתובת ייעודית או תיקייה)
+
+הענף `main` הוא הגרסה היציבה; גרסאות מתויגות (`v1.0.0`…). הסקריפט `deploy/install.sh` מתאים לשרת Ubuntu 22.04/24.04 או Debian 12:
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/diamondrubinny/suboard/main/deploy/install.sh
+```
+
+```bash
+sudo bash install.sh https://suboard.example.org admin@example.org
+```
+
+- **כתובת ייעודית** (מומלץ לפרודקשן — תת-מתחם משלו): `https://suboard.example.org`. אם כבר קיים ב-nginx בלוק HTTPS למתחם, נוספת לו שורת `include` אחת. אם אין אתר למתחם, נוצר אתר nginx משלו ב-HTTP, והסקריפט מדפיס את פקודת `certbot` להנפקת תעודה (או מריץ אותה עם `SUBOARD_CERTBOT=1`; כתובת הדוא"ל של המנהל נשלחת אז ל-Let's Encrypt). **בלי HTTPS אי אפשר להתחבר.**
+- **תיקייה של אתר קיים**: `https://www.example.org/safety` (כמו סעיף 1ו).
+- **גרסה מסוימת**: `SUBOARD_REF=v1.0.0`. **פורט אחר**: `SUBOARD_PORT=3100`. **בלי נגיעה בשרת הווב**: `SUBOARD_WIRE=0`.
+- **עדכון**: הרצה חוזרת של אותה פקודה. לפני העדכון נשמר גיבוי של מסד הנתונים; אם הגיבוי נכשל — העדכון נעצר ושום דבר אינו משתנה.
+- **גיבוי יומי** מותקן אוטומטית (`/etc/cron.d/suboard-backup`, 02:17, 14 עותקים ב-`/var/lib/suboard/backups`). זה גיבוי **מקומי**: יש להעתיק אותו, מוצפן, אל מחוץ לשרת, ולגבות בנפרד את `MFA_ENCRYPTION_KEY` מתוך `/opt/suboard/.env` ואת תיקיית `uploads`.
+- **אחרי ההתקנה**: להשלים `SMTP_*` ב-`/opt/suboard/.env` (התראות ו"שכחתי סיסמה") ולהריץ `systemctl restart suboard`; לעבור על `docs/PRODUCTION_CHECKLIST.md`.
+- `deploy/install-subfolder.sh` נשאר כעטיפה תואמת לאחור שמורידה ומריצה את `install.sh`.
+
 ## 1ו. התקנה בתיקייה של אתר קיים (למשל `https://dreadlist.com/test`)
 
 המערכת יכולה לרוץ תחת תיקייה של דומיין קיים, לצד האתר שכבר רץ בו. הכתובת נקבעת ב-`PUBLIC_URL` (כולל התיקייה), והממשק נבנה עם `VITE_BASE_PATH` זהה. עוגיית החיבור מוגבלת לתיקייה, כך שהאתר הקיים לא מקבל אותה.
@@ -102,14 +122,14 @@ sudo systemctl enable --now clamav-freshclam clamav-daemon
 **שרת Linux (Ubuntu 22.04/24.04, Debian 12) עם nginx או Apache — סקריפט אחד:**
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/diamondrubinny/suboard/claude/nifty-ptolemy-dn445c/deploy/install-subfolder.sh
+curl -fsSLO https://raw.githubusercontent.com/diamondrubinny/suboard/main/deploy/install.sh
 ```
 
 ```bash
-sudo bash install-subfolder.sh https://dreadlist.com/test admin@dreadlist.com
+sudo bash install.sh https://dreadlist.com/test admin@dreadlist.com
 ```
 
-(אם המאגר פרטי — העתיקו את הקובץ `deploy/install-subfolder.sh` לשרת בדרך אחרת, והגדירו גישת קריאה ל-git, למשל deploy key.)
+(אם המאגר פרטי — העתיקו את הקובץ `deploy/install.sh` לשרת בדרך אחרת, והגדירו גישת קריאה ל-git, למשל deploy key.)
 
 הסקריפט: מתקין Node.js 22, ClamAV ו-git; יוצר משתמש מערכת `suboard`; מוריד ובונה את הקוד ל-`/opt/suboard` עבור התיקייה; כותב `.env` עם סודות שנוצרים בשרת (פעם אחת, לא נדרס); יוצר שירות systemd שמאזין ל-`127.0.0.1:3000` בלבד; יוצר מנהל מערכת עם סיסמה חד-פעמית שמודפסת פעם אחת. כותב קטע מוכן ל-nginx (`/etc/suboard/nginx-location.conf`, עם `location ^~` כדי שכללי regex קיימים באתר לא "יחטפו" את `/test/`) ול-Apache (`/etc/suboard/apache-location.conf`), ו**מוסיף שורת `include` אחת** לבלוק ה-HTTPS של הדומיין — עם גיבוי ב-`/etc/suboard/backups`, בדיקת `nginx -t` / `apachectl configtest`, ושחזור אוטומטי אם הבדיקה נכשלה. בסוף הוא בודק שהכתובת עונה מ-SUBoard. `SUBOARD_WIRE=0` — לחיבור ידני. פורט תפוס ע"י אפליקציה אחרת — הסקריפט עוצר ומציע `SUBOARD_PORT=3100`. עדכון גרסה: הרצה חוזרת של אותו סקריפט.
 

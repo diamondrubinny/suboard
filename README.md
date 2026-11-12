@@ -104,6 +104,14 @@ npm run typecheck
 
 ## Build ופרודקשן
 
+**גרסה יציבה:** ענף `main` (גרסה נוכחית: 1.0.0, ראו `CHANGELOG.md`). התקנה או עדכון בשרת Ubuntu / Debian בפקודה אחת — כתובת ייעודית או תיקייה של אתר קיים:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/diamondrubinny/suboard/main/deploy/install.sh | sudo bash -s https://suboard.example.org admin@example.org
+```
+
+פירוט, אפשרויות וגיבויים: `docs/DEPLOYMENT.md` §1ז. לפני עלייה לאוויר: `docs/PRODUCTION_CHECKLIST.md`.
+
 ```bash
 npm run build
 ```
