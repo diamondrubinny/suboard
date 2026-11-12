@@ -8,6 +8,7 @@ import type {
   ActiveSession,
   PasskeyInfo,
   ModuleState,
+  Workspace,
   BoardFile,
   FollowState,
   Reaction,
@@ -123,6 +124,7 @@ export const qk = {
   sessions: ['sessions'] as const,
   passkeys: ['passkeys'] as const,
   modules: ['modules'] as const,
+  workspaces: ['workspaces'] as const,
   recentBoards: ['recent-boards'] as const,
   follow: (itemId: string) => ['follow', itemId] as const,
   boardFiles: (boardId: string) => ['board-files', boardId] as const,
@@ -229,7 +231,7 @@ function useBoardCache(boardId: string) {
 export function useCreateBoard() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { name: string; description?: string; templateKey: string; customTemplateId?: string }) => api<{ board: BoardDetail }>('/boards', 'POST', input).then((r) => r.board),
+    mutationFn: (input: { name: string; description?: string; templateKey: string; customTemplateId?: string; workspaceId?: string }) => api<{ board: BoardDetail }>('/boards', 'POST', input).then((r) => r.board),
     onSuccess: (board) => {
       qc.setQueryData(qk.board(board.id), board);
       void qc.invalidateQueries({ queryKey: qk.boards });
@@ -878,6 +880,27 @@ export function useSessionMutations() {
     revokeOthers: useMutation({ mutationFn: () => api<{ sessions: ActiveSession[] }>('/auth/sessions/revoke-others', 'POST', {}), onSuccess: refresh }),
   };
 }
+export const useWorkspaces = () => useQuery({ queryKey: qk.workspaces, queryFn: () => api<{ workspaces: Workspace[] }>('/workspaces').then((r) => r.workspaces), staleTime: 60_000 });
+export function useWorkspaceMutations() {
+  const qc = useQueryClient();
+  const refresh = () => {
+    void qc.invalidateQueries({ queryKey: qk.workspaces });
+    void qc.invalidateQueries({ queryKey: qk.boards });
+  };
+  return {
+    create: useMutation({ mutationFn: (name: string) => api<{ workspace: Workspace }>('/workspaces', 'POST', { name }).then((r) => r.workspace), onSuccess: refresh }),
+    rename: useMutation({ mutationFn: ({ id, name }: { id: string; name: string }) => api(`/workspaces/${id}`, 'PATCH', { name }), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/workspaces/${id}`, 'DELETE'), onSuccess: refresh }),
+    moveBoard: useMutation({
+      mutationFn: ({ boardId, workspaceId }: { boardId: string; workspaceId: string | null }) => api(`/boards/${boardId}/workspace`, 'PUT', { workspaceId }),
+      onSuccess: (_r, v) => {
+        refresh();
+        void qc.invalidateQueries({ queryKey: qk.board(v.boardId) });
+      },
+    }),
+  };
+}
+
 /** Which optional modules are switched on (drives the menu and route guards). */
 export const useModules = (enabled = true) =>
   useQuery({ queryKey: qk.modules, queryFn: () => api<{ modules: ModuleState }>('/modules').then((r) => r.modules), staleTime: 60_000, enabled });

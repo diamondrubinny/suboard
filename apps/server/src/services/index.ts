@@ -33,6 +33,7 @@ import { PasswordResetService } from './passwordReset.js';
 import { PersonalService } from './personal.js';
 import { PasskeyService } from './passkeys.js';
 import { ModuleService } from './modules.js';
+import { WorkspaceService } from './workspaces.js';
 import { ScimService } from './scim.js';
 import { DashboardService as CustomDashboardService, DependencyService, MonthlyReportJob } from './planning.js';
 import { ClamdScanner, UnsafeNoopScanner, type Scanner } from '../lib/clamav.js';
@@ -77,6 +78,7 @@ export interface Services {
   personal: PersonalService;
   passkeys: PasskeyService;
   modules: ModuleService;
+  workspaces: WorkspaceService;
 }
 
 /** Infrastructure that tests (or alternative deployments) can substitute. */
@@ -131,9 +133,10 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const passwordReset = new PasswordResetService(db, config, audit, auth, mailer);
   const passkeys = new PasskeyService(db, config, audit, auth);
   const modules = new ModuleService(db, audit);
+  const workspaces = new WorkspaceService(db, access, audit);
   const personal = new PersonalService(db, access, boards, items, activity, notifications);
   return {
     audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
-    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset, personal, passkeys, modules,
+    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset, personal, passkeys, modules, workspaces,
   };
 }

@@ -39,9 +39,17 @@ export interface AdminUser {
   authSource: 'local' | 'sso' | 'scim';
 }
 
+export interface Workspace {
+  id: string;
+  name: string;
+  position: number;
+}
+
 export interface BoardSummary {
   id: string;
   name: string;
+  /** The workspace the board is filed under, if any. */
+  workspaceId: string | null;
   description: string;
   templateKey: string;
   myRole: BoardRole;
@@ -110,6 +118,7 @@ export interface BoardDetail {
   myRole: BoardRole;
   /** What a row is called on this board; empty = "פריט". */
   itemTerm: string;
+  workspaceId: string | null;
   groups: Group[];
   columns: Column[];
   items: Item[];

@@ -2,7 +2,7 @@ import { BOARD_ROLE_LABELS, createBoardSchema } from '@suboard/shared';
 import { useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { errorMessage } from '../api/client';
-import { useBoards, useCreateBoard, useTemplates } from '../api/hooks';
+import { useBoards, useCreateBoard, useTemplates, useWorkspaceMutations, useWorkspaces } from '../api/hooks';
 import { useAuth } from '../auth/AuthContext';
 import { Dialog } from '../components/Dialog';
 import { EmptyState, ErrorState, LoadingState, useFeedback } from '../components/Feedback';
@@ -20,6 +20,8 @@ function CreateBoardDialog({ open, onClose }: { open: boolean; onClose: () => vo
   const [customId, setCustomId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [workspaceId, setWorkspaceId] = useState('');
+  const workspaces = useWorkspaces();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const nameRef = useRef<HTMLInputElement>(null);
 
@@ -34,7 +36,7 @@ function CreateBoardDialog({ open, onClose }: { open: boolean; onClose: () => vo
       return;
     }
     try {
-      const board = await create.mutateAsync({ ...parsed.data, ...(customId ? { customTemplateId: customId } : {}) });
+      const board = await create.mutateAsync({ ...parsed.data, ...(customId ? { customTemplateId: customId } : {}), ...(workspaceId ? { workspaceId } : {}) });
       toast(`הלוח "${board.name}" נוצר`);
       onClose();
       navigate(`/boards/${board.id}`);
@@ -129,6 +131,19 @@ function CreateBoardDialog({ open, onClose }: { open: boolean; onClose: () => vo
             ))}
           </div>
         </fieldset>
+        {(workspaces.data ?? []).length > 0 && (
+          <div className="field">
+            <label htmlFor="board-ws">סביבת עבודה</label>
+            <select id="board-ws" className="select" value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)}>
+              <option value="">ללא</option>
+              {workspaces.data!.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="field">
           <label htmlFor="board-desc">תיאור (אופציונלי)</label>
           <textarea id="board-desc" className="textarea" value={description} maxLength={1000} onChange={(e) => setDescription(e.target.value)} />
@@ -144,6 +159,13 @@ export function BoardsPage() {
   const boards = useBoards();
   const [creating, setCreating] = useState(false);
   const canCreate = user?.role === 'admin' || user?.role === 'manager';
+  const workspaces = useWorkspaces();
+  const sorted = [...(boards.data ?? [])].sort((x, y) => Number(y.favorite) - Number(x.favorite));
+  const known = new Set((workspaces.data ?? []).map((w) => w.id));
+  const sections = [
+    ...(workspaces.data ?? []).map((w) => ({ id: w.id, name: w.name, boards: sorted.filter((b) => b.workspaceId === w.id) })),
+    { id: 'none', name: known.size ? 'ללא סביבת עבודה' : 'כל הלוחות', boards: sorted.filter((b) => !b.workspaceId || !known.has(b.workspaceId)) },
+  ].filter((sec) => sec.boards.length > 0);
 
   return (
     <>
@@ -166,24 +188,108 @@ export function BoardsPage() {
           </EmptyState>
         </div>
       )}
-      {boards.data && boards.data.length > 0 && (
-        <ul className="list-plain grid grid-cards">
-          {[...boards.data].sort((x, y) => Number(y.favorite) - Number(x.favorite)).map((b) => (
-            <li key={b.id} className="board-card-wrap">
-              <FavoriteButton boardId={b.id} boardName={b.name} favorite={b.favorite} className="icon-btn board-card-fav" />
-              <Link to={`/boards/${b.id}`} className="card board-card">
-                <h2>{b.name}</h2>
-                {b.description && <span className="muted">{b.description}</span>}
-                <span style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                  <span className="badge">{b.itemCount} פריטים</span>
-                  <span className="badge">{BOARD_ROLE_LABELS[b.myRole]}</span>
-                </span>
-              </Link>
+      {canCreate && <WorkspaceManager />}
+      {boards.data &&
+        boards.data.length > 0 &&
+        sections.map((sec) => (
+          <section key={sec.id} aria-labelledby={`ws-${sec.id}`} className="workspace-section">
+            {sections.length > 1 || sec.id !== 'none' ? (
+              <h2 id={`ws-${sec.id}`} className="workspace-title">
+                {sec.name} <span className="muted">({sec.boards.length})</span>
+              </h2>
+            ) : (
+              <h2 id={`ws-${sec.id}`} className="sr-only">
+                {sec.name}
+              </h2>
+            )}
+            <ul className="list-plain grid grid-cards">
+              {sec.boards.map((b) => (
+                <li key={b.id} className="board-card-wrap">
+                  <FavoriteButton boardId={b.id} boardName={b.name} favorite={b.favorite} className="icon-btn board-card-fav" />
+                  <Link to={`/boards/${b.id}`} className="card board-card">
+                    <h3>{b.name}</h3>
+                    {b.description && <span className="muted">{b.description}</span>}
+                    <span style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                      <span className="badge">{b.itemCount} פריטים</span>
+                      <span className="badge">{BOARD_ROLE_LABELS[b.myRole]}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      {canCreate && <CreateBoardDialog open={creating} onClose={() => setCreating(false)} />}
+    </>
+  );
+}
+
+/** Managers: create, rename and delete workspaces. Deleting one never deletes its boards. */
+function WorkspaceManager() {
+  const q = useWorkspaces();
+  const { create, rename, remove } = useWorkspaceMutations();
+  const { toast, confirm } = useFeedback();
+  const [name, setName] = useState('');
+  const onErr = (e: unknown) => toast(errorMessage(e), 'error');
+  const add = (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return toast('יש להזין שם לסביבת העבודה', 'error');
+    create.mutate(name.trim(), { onSuccess: (w) => (setName(''), toast(`סביבת העבודה "${w.name}" נוצרה`)), onError: onErr });
+  };
+  return (
+    <details className="card workspace-manager">
+      <summary>סביבות עבודה{q.data ? ` (${q.data.length})` : ''}</summary>
+      <p className="muted">סביבת עבודה מסדרת את רשימת הלוחות (למשל "תחזוקת גזים"). היא אינה נותנת הרשאות: מי רואה לוח נקבע רק לפי חברי הלוח. שיוך לוח נעשה בהגדרות הלוח.</p>
+      {q.data && q.data.length > 0 && (
+        <ul className="list-plain item-list">
+          {q.data.map((w) => (
+            <li key={w.id}>
+              <WorkspaceName name={w.name} onSave={(n) => rename.mutate({ id: w.id, name: n }, { onSuccess: () => toast('השם עודכן'), onError: onErr })} />
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ marginInlineStart: 'auto' }}
+                aria-label={`מחיקה: סביבת העבודה ${w.name}`}
+                onClick={async () => {
+                  if (await confirm({ title: 'מחיקת סביבת עבודה', message: `למחוק את "${w.name}"? הלוחות שבה לא יימחקו — הם יעברו ל"ללא סביבת עבודה".`, confirmLabel: 'מחיקה', danger: true }))
+                    remove.mutate(w.id, { onSuccess: () => toast('סביבת העבודה נמחקה'), onError: onErr });
+                }}
+              >
+                מחיקה
+              </button>
             </li>
           ))}
         </ul>
       )}
-      {canCreate && <CreateBoardDialog open={creating} onClose={() => setCreating(false)} />}
-    </>
+      <form onSubmit={add} className="toolbar">
+        <label htmlFor="new-ws" className="sr-only">
+          שם סביבת עבודה חדשה
+        </label>
+        <input id="new-ws" className="input" placeholder="שם סביבת עבודה חדשה" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+        <button type="submit" className="btn" disabled={create.isPending}>
+          <Icon name="plus" /> הוספה
+        </button>
+      </form>
+    </details>
+  );
+}
+
+function WorkspaceName({ name, onSave }: { name: string; onSave: (n: string) => void }) {
+  const [draft, setDraft] = useState(name);
+  return (
+    <input
+      className="cell-input"
+      style={{ maxInlineSize: '18rem', fontWeight: 600 }}
+      value={draft}
+      maxLength={60}
+      aria-label={`שם סביבת העבודה ${name}`}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        const t = draft.trim();
+        if (!t) return setDraft(name);
+        if (t !== name) onSave(t);
+      }}
+      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+    />
   );
 }

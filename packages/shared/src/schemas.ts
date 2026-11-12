@@ -291,7 +291,12 @@ export const createBoardSchema = z.object({
   templateKey: z.string().regex(/^[a-z_]{1,40}$/).default('blank'),
   /** Create from an organisation template (structure saved from another board) instead. */
   customTemplateId: idSchema.optional(),
+  /** File the new board under a workspace. */
+  workspaceId: idSchema.optional(),
 });
+
+export const workspaceSchema = z.object({ name: line(60) });
+export const moveBoardSchema = z.object({ workspaceId: idSchema.nullable() });
 
 export const setModulesSchema = z.object({ modules: z.record(z.string().max(40), z.boolean()) });
 

@@ -5,6 +5,8 @@ import {
   createItemSchema,
   createUpdateSchema,
   duplicateBoardSchema,
+  moveBoardSchema,
+  workspaceSchema,
   idSchema,
   reactionSchema,
   saveTemplateSchema,
@@ -45,6 +47,21 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
     return reply.code(201).send({ board });
   });
 
+  // ---- workspaces (organisation of the board list only; access stays per board)
+  app.get('/workspaces', async (req) => ({ workspaces: services.workspaces.list(actorOf(req)) }));
+  app.post('/workspaces', { config: { rateLimit: { max: 30, timeWindow: 15 * 60_000 } } }, async (req, reply) =>
+    reply.code(201).send({ workspace: services.workspaces.create(actorOf(req), workspaceSchema.parse(req.body).name) }),
+  );
+  app.patch('/workspaces/:id', async (req) => ({ workspace: services.workspaces.rename(actorOf(req), param(req, 'id'), workspaceSchema.parse(req.body).name) }));
+  app.delete('/workspaces/:id', async (req) => {
+    services.workspaces.remove(actorOf(req), param(req, 'id'));
+    return { ok: true };
+  });
+  app.put('/boards/:id/workspace', async (req) => {
+    services.workspaces.moveBoard(actorOf(req), param(req, 'id'), moveBoardSchema.parse(req.body).workspaceId);
+    return { ok: true };
+  });
+
   /** A new board with the same groups and columns (and optionally the items). Members, automations, forms, updates and files stay behind. */
   app.post('/boards/:id/duplicate', { config: { rateLimit: { max: 20, timeWindow: 15 * 60_000 } } }, async (req, reply) => {
     const actor = actorOf(req);
@@ -53,7 +70,7 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
     services.access.requireBoard(actor, sourceId, 'owner');
     if (input.withItems && services.items.countLive(sourceId) > MAX_BULK_COPY) throw badRequest(`אפשר לשכפל עם פריטים לוח של עד ${MAX_BULK_COPY} פריטים`);
     const structure = services.boardTemplates.structureOfBoard(sourceId);
-    const board = boards.create(actor, { name: input.name, templateKey: structure.baseKey, customTemplateId: sourceId }, () => structure);
+    const board = boards.create(actor, { name: input.name, templateKey: structure.baseKey, customTemplateId: sourceId, workspaceId: boards.get(actor, sourceId).workspaceId ?? undefined }, () => structure);
     const items = input.withItems ? services.items.copyBoardItems(actor, sourceId, board.id) : 0;
     services.audit.log('board_duplicated', { userId: actor.id, ip: req.ip, meta: { fromBoardId: sourceId, boardId: board.id, items } });
     return reply.code(201).send({ board: boards.get(actor, board.id), items });

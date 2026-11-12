@@ -20,6 +20,7 @@ export type AuditEvent =
   | 'board_created'
   | 'board_duplicated'
   | 'modules_changed'
+  | 'workspace_changed'
   | 'template_created'
   | 'template_deleted'
   | 'board_archived'

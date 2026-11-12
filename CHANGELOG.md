@@ -2,6 +2,12 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.6.0 — 2026-11-12
+
+### Added
+- Workspaces: named containers that organise boards in the side menu and on the boards page. They grant no access — a board is still visible only to its members. Managers create, rename and delete them; deleting one keeps its boards.
+- Upgrade-path tests: every older database schema migrates to the latest with its data.
+
 ## 1.5.0 — 2026-11-12
 
 ### Added

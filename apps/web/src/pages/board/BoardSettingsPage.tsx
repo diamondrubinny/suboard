@@ -15,7 +15,7 @@ import {
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../api/client';
-import { useArchiveBoard, useDuplicateBoard, useModules, useBoard, useColumnMutations, useDirectory, useGroupMutations, useMemberMutations, useTemplateMutations, useTemplates, useUpdateBoard } from '../../api/hooks';
+import { useArchiveBoard, useDuplicateBoard, useModules, useWorkspaceMutations, useWorkspaces, useBoard, useColumnMutations, useDirectory, useGroupMutations, useMemberMutations, useTemplateMutations, useTemplates, useUpdateBoard } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
@@ -73,6 +73,8 @@ function GeneralSection({ board }: { board: BoardDetail }) {
   const [name, setName] = useState(board.name);
   const [description, setDescription] = useState(board.description);
   const [itemTerm, setItemTerm] = useState(board.itemTerm ?? '');
+  const workspaces = useWorkspaces();
+  const { moveBoard } = useWorkspaceMutations();
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return toast('שם הלוח הוא שדה חובה', 'error');
@@ -90,6 +92,25 @@ function GeneralSection({ board }: { board: BoardDetail }) {
           <label htmlFor="s-desc">תיאור</label>
           <textarea id="s-desc" className="textarea" value={description} maxLength={LIMITS.boardDescription} onChange={(e) => setDescription(e.target.value)} />
         </div>
+        {(workspaces.data ?? []).length > 0 && (
+          <div className="field">
+            <label htmlFor="s-ws">סביבת עבודה</label>
+            <select
+              id="s-ws"
+              className="select"
+              value={board.workspaceId ?? ''}
+              disabled={moveBoard.isPending}
+              onChange={(e) => moveBoard.mutate({ boardId: board.id, workspaceId: e.target.value || null }, { onSuccess: () => toast('הלוח שויך'), onError: (err) => toast(errorMessage(err), 'error') })}
+            >
+              <option value="">ללא</option>
+              {workspaces.data!.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="field">
           <label htmlFor="s-term">איך נקראת שורה בלוח הזה? (לא חובה)</label>
           <input id="s-term" className="input" value={itemTerm} maxLength={30} placeholder="פריט" onChange={(e) => setItemTerm(e.target.value)} aria-describedby="s-term-hint" />

@@ -688,4 +688,20 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       ALTER TABLE boards ADD COLUMN item_term TEXT NOT NULL DEFAULT '';
     `,
   },
+  {
+    version: 19,
+    name: 'workspaces',
+    sql: /* sql */ `
+      -- Workspaces only organise the list of boards; access stays with each board's members.
+      CREATE TABLE workspaces (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        position REAL NOT NULL,
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+      ALTER TABLE boards ADD COLUMN workspace_id TEXT REFERENCES workspaces(id) ON DELETE SET NULL;
+      CREATE INDEX idx_boards_workspace ON boards(workspace_id);
+    `,
+  },
 ];

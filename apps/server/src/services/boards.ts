@@ -30,6 +30,7 @@ interface BoardRow {
   description: string;
   template_key: string;
   item_term: string;
+  workspace_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -69,6 +70,7 @@ export class BoardService {
       id: r.id,
       name: r.name,
       description: r.description,
+      workspaceId: r.workspace_id ?? null,
       templateKey: r.template_key,
       // Admins have owner-level rights on every board regardless of membership row.
       myRole: actor.role === 'admin' ? 'owner' : r.my_role,
@@ -84,7 +86,7 @@ export class BoardService {
    */
   create(
     actor: Actor,
-    input: { name: string; description?: string; templateKey: string; customTemplateId?: string },
+    input: { name: string; description?: string; templateKey: string; customTemplateId?: string; workspaceId?: string },
     resolveCustom?: (id: string) => TemplateStructure,
   ): BoardDetail {
     if (actor.role === 'member') throw forbidden('רק מנהלים יכולים ליצור לוחות');
@@ -93,12 +95,14 @@ export class BoardService {
     if (!builtIn) throw badRequest('תבנית לא קיימת', { templateKey: 'תבנית לא קיימת' });
     const template = custom ? { key: builtIn.key, groups: custom.groups, columns: custom.columns } : builtIn;
 
+    // An unknown workspace is ignored rather than failing the creation.
+    const workspaceId = input.workspaceId && this.db.prepare('SELECT 1 FROM workspaces WHERE id = ?').get(input.workspaceId) ? input.workspaceId : null;
     const id = newId();
     const ts = nowIso();
     this.db.transaction(() => {
       this.db
-        .prepare('INSERT INTO boards (id, name, description, template_key, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(id, input.name, input.description ?? '', template.key, actor.id, ts, ts);
+        .prepare('INSERT INTO boards (id, name, description, template_key, created_by, created_at, updated_at, workspace_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(id, input.name, input.description ?? '', template.key, actor.id, ts, ts, workspaceId);
       this.db.prepare("INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, 'owner')").run(id, actor.id);
       template.groups.forEach((g, i) => {
         this.db.prepare('INSERT INTO board_groups (id, board_id, name, color, position) VALUES (?, ?, ?, ?, ?)').run(newId(), id, g.name, g.color, i);
@@ -133,6 +137,7 @@ export class BoardService {
       templateKey: b.template_key,
       myRole,
       itemTerm: b.item_term ?? '',
+      workspaceId: b.workspace_id ?? null,
       groups: this.groups(boardId),
       columns: this.columns(boardId),
       items: (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL ORDER BY position, created_at').all(boardId) as ItemRow[]).map(toItem),

@@ -4183,3 +4183,23 @@ kbd {
   font-weight: 700;
   margin: 0;
 }
+
+/* ---- workspaces */
+.workspace-section + .workspace-section {
+  margin-block-start: var(--space-5);
+}
+.workspace-title {
+  font-size: 1.1rem;
+  margin: 0 0 var(--space-3);
+}
+.workspace-manager {
+  margin-block-end: var(--space-4);
+}
+.workspace-manager > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.board-card h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
