@@ -43,7 +43,12 @@ export const NAV: readonly NavEntry[] = [
 
 export const pathOf = (e: NavEntry, role: GlobalRole): string => (typeof e.to === 'function' ? e.to(role) : e.to);
 
-/** Entries a user sees: by role and by the modules that are switched on. */
-export function visibleNav(role: GlobalRole | undefined, modules: Partial<Record<ModuleKey, boolean>> | undefined): NavEntry[] {
-  return NAV.filter((e) => (!e.roles || (role !== undefined && e.roles.includes(role))) && (!e.module || modules?.[e.module] !== false));
+/**
+ * Entries a user sees: by role and by the modules that are switched on. While the module state is
+ * still loading (`modules === undefined` and `pending`), module entries are held back so a
+ * switched-off module never flashes in the menu; if the state cannot be loaded they are shown, and
+ * the server still refuses what is off.
+ */
+export function visibleNav(role: GlobalRole | undefined, modules: Partial<Record<ModuleKey, boolean>> | undefined, pending = false): NavEntry[] {
+  return NAV.filter((e) => (!e.roles || (role !== undefined && e.roles.includes(role))) && (!e.module || (modules ? modules[e.module] !== false : !pending)));
 }
