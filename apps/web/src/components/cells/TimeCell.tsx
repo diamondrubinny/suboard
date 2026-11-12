@@ -66,7 +66,8 @@ export function TimeCell({ boardId, itemId, total, canLog, label, mode, id }: Pr
 
 function TimeDialog({ boardId, itemId, canLog, label, onClose }: { boardId: string; itemId: string; canLog: boolean; label: string; onClose: () => void }) {
   const q = useItemTime(itemId);
-  const { addManual, remove } = useTimeMutations(boardId, itemId);
+  const { addManual, update, remove } = useTimeMutations(boardId, itemId);
+  const [editing, setEditing] = useState<string | null>(null);
   const { toast } = useFeedback();
   const [hours, setHours] = useState('');
   const [minutes, setMinutes] = useState('');
@@ -81,10 +82,21 @@ function TimeDialog({ boardId, itemId, canLog, label, onClose }: { boardId: stri
     if (total > 720) return setError('עד 12 שעות ברישום אחד');
     if (!date) return setError('יש לבחור תאריך');
     setError(null);
-    addManual.mutate(
-      { minutes: total, date, note: note.trim() || undefined },
-      { onSuccess: () => (setHours(''), setMinutes(''), setNote(''), toast('הזמן נרשם')), onError: (err) => setError(errorMessage(err)) },
-    );
+    const input = { minutes: total, date, note: note.trim() || undefined };
+    const done = (msg: string) => () => (reset(), toast(msg));
+    if (editing) update.mutate({ id: editing, ...input }, { onSuccess: done('הרישום עודכן'), onError: (err) => setError(errorMessage(err)) });
+    else addManual.mutate(input, { onSuccess: done('הזמן נרשם'), onError: (err) => setError(errorMessage(err)) });
+  };
+  const reset = () => (setEditing(null), setHours(''), setMinutes(''), setNote(''), setDate(todayIso()), setError(null));
+  const startEdit = (en: { id: string; seconds: number; startedAt: string; note: string }) => {
+    const m = Math.max(1, Math.round(en.seconds / 60));
+    setEditing(en.id);
+    setHours(String(Math.floor(m / 60)));
+    setMinutes(String(m % 60));
+    setDate(en.startedAt.slice(0, 10));
+    setNote(en.note);
+    setError(null);
+    document.getElementById('tm-h')?.focus();
   };
 
   return (
@@ -127,6 +139,11 @@ function TimeDialog({ boardId, itemId, canLog, label, onClose }: { boardId: stri
                     <td className="num">{en.endedAt ? formatDuration(en.seconds) : `${formatDuration(en.seconds)} (פועל)`}</td>
                     <td>{en.note}</td>
                     <td>
+                      {en.endedAt && en.mine && canLog && (
+                        <button type="button" className="btn btn-sm" aria-pressed={editing === en.id} aria-label={`עריכה: רישום של ${formatDuration(en.seconds)} מ-${formatDateTime(en.startedAt)}`} onClick={() => startEdit(en)}>
+                          עריכה
+                        </button>
+                      )}{' '}
                       {en.endedAt && (en.mine || q.data.detailed) && (
                         <button type="button" className="btn btn-sm" disabled={remove.isPending} aria-label={`מחיקה: רישום של ${formatDuration(en.seconds)} מ-${formatDateTime(en.startedAt)}`} onClick={() => remove.mutate(en.id, { onSuccess: () => toast('הרישום נמחק'), onError: (e) => toast(errorMessage(e), 'error') })}>
                           מחיקה
@@ -140,7 +157,7 @@ function TimeDialog({ boardId, itemId, canLog, label, onClose }: { boardId: stri
           )}
           {canLog && (
             <form onSubmit={submit} noValidate className="time-manual">
-              <h3>רישום זמן ידני</h3>
+              <h3>{editing ? 'עריכת רישום זמן' : 'רישום זמן ידני'}</h3>
               {error && (
                 <div className="form-error" role="alert">
                   {error}
@@ -164,9 +181,14 @@ function TimeDialog({ boardId, itemId, canLog, label, onClose }: { boardId: stri
                 <label htmlFor="tm-n">הערה (לא חובה)</label>
                 <input id="tm-n" className="input" maxLength={200} value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
-              <button type="submit" className="btn btn-primary" disabled={addManual.isPending}>
-                רישום
-              </button>
+              <button type="submit" className="btn btn-primary" disabled={addManual.isPending || update.isPending}>
+                {editing ? 'שמירת השינוי' : 'רישום'}
+              </button>{' '}
+              {editing && (
+                <button type="button" className="btn" onClick={reset}>
+                  ביטול העריכה
+                </button>
+              )}
             </form>
           )}
         </>

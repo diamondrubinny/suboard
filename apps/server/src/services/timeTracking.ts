@@ -132,6 +132,26 @@ export class TimeTrackingService {
     return this.item(actor, itemId);
   }
 
+  /** A person corrects their own finished entry (length, day, note). Nobody edits someone else's time. */
+  update(actor: Actor, entryId: string, input: { minutes: number; date: string; note?: string }): ItemTime {
+    const r = this.db.prepare('SELECT * FROM time_entries WHERE id = ?').get(entryId) as Row | undefined;
+    const role = r ? this.access.boardRole(actor, r.board_id) : null;
+    if (!r || !role) throw notFound('הרישום לא נמצא');
+    if (r.user_id !== actor.id) throw forbidden('אפשר לערוך רק רישומי זמן שלך');
+    if (role === 'viewer') throw forbidden('אין הרשאת עריכה בלוח');
+    if (!r.ended_at) throw badRequest('יש לעצור את השעון לפני עריכת הרישום');
+    // Keep the original time of day when only the length or the note changes.
+    const sameDay = r.started_at.slice(0, 10) === input.date;
+    const start = new Date(sameDay ? r.started_at : `${input.date}T09:00:00.000Z`);
+    if (Number.isNaN(start.getTime()) || start.getTime() > Date.now() + 86_400_000) throw badRequest('תאריך לא תקין', { date: 'תאריך לא תקין' });
+    const seconds = input.minutes * 60;
+    this.db
+      .prepare('UPDATE time_entries SET started_at = ?, ended_at = ?, seconds = ?, note = ? WHERE id = ?')
+      .run(start.toISOString(), new Date(start.getTime() + seconds * 1000).toISOString(), seconds, input.note ?? '', entryId);
+    this.boards.touch(r.board_id);
+    return this.item(actor, r.item_id);
+  }
+
   /** A person deletes their own entry; a board owner may delete any entry on the board. */
   remove(actor: Actor, entryId: string): void {
     const r = this.db.prepare('SELECT * FROM time_entries WHERE id = ?').get(entryId) as Row | undefined;

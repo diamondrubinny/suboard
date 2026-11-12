@@ -148,6 +148,7 @@ describe('webhooks', () => {
     await admin.put('/api/admin/modules', { modules: { webhooks: true } });
     const b = (await admin.post('/api/boards', { name: 'x', templateKey: 'blank' })).json().board as BoardDetail;
     const { webhook } = (await admin.post(`/api/boards/${b.id}/webhooks`, { url: r.url, events: ['item_created'] })).json() as { webhook: { id: string } };
+    ctx.app.services.webhooks.retryDelaysMs = []; // no retries here: every failure counts at once
     const redirected = (await admin.post(`/api/webhooks/${webhook.id}/test`)).json().delivery;
     expect(redirected).toMatchObject({ ok: false, status: 302 });
     expect(r.got).toHaveLength(1); // the redirect target was never contacted
@@ -163,5 +164,42 @@ describe('webhooks', () => {
     expect(r.got).toHaveLength(10);
     // switching it back on clears the count
     expect((await admin.patch(`/api/webhooks/${webhook.id}`, { active: true })).json().webhook).toMatchObject({ active: true, failures: 0 });
+  });
+  it('tries a failed message again with the same delivery id, and counts only the last failure', async () => {
+    const state: { status: number; location?: string } = { status: 500 };
+    const r = await receiver(state);
+    ctx = await setup({ WEBHOOK_ALLOW_INSECURE_TARGETS: 'true' });
+    const { client: admin } = await loggedIn(ctx, 'root@x.org', 'admin');
+    await admin.put('/api/admin/modules', { modules: { webhooks: true } });
+    const b = (await admin.post('/api/boards', { name: 'x', templateKey: 'blank' })).json().board as BoardDetail;
+    const { webhook } = (await admin.post(`/api/boards/${b.id}/webhooks`, { url: r.url, events: ['item_created'] })).json() as { webhook: { id: string } };
+    const hooks = ctx.app.services.webhooks;
+    hooks.retryDelaysMs = [0, 0];
+    // all three attempts fail → one failure on the webhook, three rows in the log
+    await admin.post(`/api/boards/${b.id}/items`, { groupId: b.groups[0]!.id, name: 'נכשל' });
+    await hooks.idle(true);
+    expect(r.got).toHaveLength(3);
+    expect(new Set(r.got.map((g) => g.headers['x-suboard-delivery'])).size).toBe(1);
+    let hook = (await admin.get(`/api/boards/${b.id}/webhooks`)).json().webhooks[0];
+    expect(hook).toMatchObject({ active: true, failures: 1 });
+    const log = (await admin.get(`/api/webhooks/${webhook.id}/deliveries`)).json().deliveries as { ok: boolean; error: string }[];
+    expect(log).toHaveLength(3);
+    expect(log.map((d) => d.error).sort().join('|')).toMatch(/ניסיון 1 מתוך 3.*ניסיון 2 מתוך 3.*ניסיון 3 מתוך 3/);
+    // the receiver recovers before the second attempt → success, the count is cleared
+    r.got.length = 0;
+    hooks.retryDelaysMs = [40, 0];
+    await admin.post(`/api/boards/${b.id}/items`, { groupId: b.groups[0]!.id, name: 'מתאושש' });
+    await hooks.idle();
+    state.status = 200;
+    await hooks.idle(true);
+    expect(r.got).toHaveLength(2);
+    hook = (await admin.get(`/api/boards/${b.id}/webhooks`)).json().webhooks[0];
+    expect(hook).toMatchObject({ active: true, failures: 0, last: { ok: true } });
+    // a test ping is never retried
+    state.status = 500;
+    r.got.length = 0;
+    await admin.post(`/api/webhooks/${webhook.id}/test`);
+    await hooks.idle(true);
+    expect(r.got).toHaveLength(1);
   });
 });

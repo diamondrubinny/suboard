@@ -903,6 +903,7 @@ export function useTimeMutations(boardId: string, itemId: string) {
     start: useMutation({ mutationFn: () => api(`/items/${itemId}/time/start`, 'POST', {}), onSuccess: refresh }),
     stop: useMutation({ mutationFn: () => api(`/items/${itemId}/time/stop`, 'POST', {}), onSuccess: refresh }),
     addManual: useMutation({ mutationFn: (input: { minutes: number; date: string; note?: string }) => api(`/items/${itemId}/time`, 'POST', input), onSuccess: refresh }),
+    update: useMutation({ mutationFn: ({ id, ...input }: { id: string; minutes: number; date: string; note?: string }) => api(`/time/${id}`, 'PATCH', input), onSuccess: refresh }),
     remove: useMutation({ mutationFn: (id: string) => api(`/time/${id}`, 'DELETE'), onSuccess: refresh }),
   };
 }

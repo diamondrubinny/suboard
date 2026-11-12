@@ -2,6 +2,12 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.13.0 — 2026-11-12
+
+### Added
+- Time tracking: a person can correct their own finished entry (length, day, note). Nobody, including board owners, edits someone else's time.
+- Webhooks: a failed message is sent again after 30 seconds and after 5 minutes, with the same delivery id. Only the last failure counts towards switching the webhook off. Retries do not survive a server restart; test pings are not retried.
+
 ## 1.12.0 — 2026-11-12
 
 ### Added

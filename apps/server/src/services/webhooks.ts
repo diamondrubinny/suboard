@@ -16,6 +16,8 @@ import type { ModuleService } from './modules.js';
 export const MAX_WEBHOOKS_PER_BOARD = 5;
 const DISABLE_AFTER_FAILURES = 10;
 const KEEP_DELIVERIES = 30;
+/** A failed message is tried again after these waits; only the last failure counts against the webhook. */
+const RETRY_DELAYS_MS = [30_000, 5 * 60_000];
 
 interface Row {
   id: string;
@@ -36,6 +38,9 @@ interface Row {
  */
 export class WebhookService {
   private queue: Promise<void> = Promise.resolve();
+  private pendingRetries = 0;
+  /** Waits between attempts; tests shorten them. */
+  retryDelaysMs: number[] = RETRY_DELAYS_MS;
 
   constructor(
     private readonly db: DB,
@@ -176,23 +181,42 @@ export class WebhookService {
   }
 
   /** Deliveries run one after another, off the request path; a slow receiver never blocks a user. */
-  private enqueue(hook: Row, event: string, payload: unknown): void {
-    this.queue = this.queue.then(() => this.deliver(hook, event, payload)).catch(() => undefined);
+  private enqueue(hook: Row, event: string, payload: unknown, attempt = 1, deliveryId = newId()): void {
+    this.queue = this.queue.then(() => this.deliver(hook, event, payload, attempt, deliveryId)).catch(() => undefined);
   }
 
-  /** Resolves when everything queued so far has been attempted (tests, shutdown). */
-  idle(): Promise<void> {
-    return this.queue;
+  /**
+   * Resolves when everything queued so far has been attempted (shutdown). With `withRetries` it
+   * also waits for retries that are still waiting for their turn (tests).
+   */
+  async idle(withRetries = false): Promise<void> {
+    await this.queue;
+    while (withRetries && this.pendingRetries > 0) {
+      await new Promise((r) => setTimeout(r, 5));
+      await this.queue;
+    }
   }
 
-  private async deliver(hook: Row, event: string, payload: unknown): Promise<void> {
+  /** The same message (same delivery id, so the receiver can drop a duplicate) after a wait. Retries do not survive a restart. */
+  private scheduleRetry(hook: Row, event: string, payload: unknown, attempt: number, deliveryId: string): boolean {
+    const wait = this.retryDelaysMs[attempt - 1];
+    if (wait === undefined || event === 'ping') return false;
+    this.pendingRetries++;
+    setTimeout(() => {
+      this.pendingRetries--;
+      const current = this.db.prepare('SELECT * FROM webhooks WHERE id = ? AND active = 1').get(hook.id) as Row | undefined;
+      if (current) this.enqueue(current, event, payload, attempt + 1, deliveryId);
+    }, wait).unref();
+    return true;
+  }
+
+  private async deliver(hook: Row, event: string, payload: unknown, attempt = 1, deliveryId = newId()): Promise<void> {
     const body = JSON.stringify(payload);
-    const deliveryId = newId();
     let secret: string;
     try {
       secret = open(this.config.mfaKey, hook.secret_enc, `webhook:${hook.id}`);
     } catch {
-      this.record(hook, deliveryId, event, { ok: false, status: null, error: 'לא ניתן לפענח את סוד החתימה' });
+      this.record(hook, event, { ok: false, status: null, error: 'לא ניתן לפענח את סוד החתימה' });
       return;
     }
     const timestamp = String(Math.floor(Date.now() / 1000));
@@ -203,19 +227,22 @@ export class WebhookService {
       { 'X-SUBoard-Event': event, 'X-SUBoard-Delivery': deliveryId, 'X-SUBoard-Timestamp': timestamp, 'X-SUBoard-Signature': `sha256=${signature}` },
       { allowInsecureTargets: this.insecure },
     );
-    this.record(hook, deliveryId, event, result);
+    const willRetry = !result.ok && this.scheduleRetry(hook, event, payload, attempt, deliveryId);
+    const total = this.retryDelaysMs.length + 1;
+    const note = attempt > 1 || willRetry ? ` (ניסיון ${attempt} מתוך ${total})` : '';
+    this.record(hook, event, result.ok ? result : { ...result, error: `${result.error ?? 'נכשל'}${note}` }, willRetry);
   }
 
-  private record(hook: Row, deliveryId: string, event: string, r: { ok: boolean; status: number | null; error: string | null }): void {
+  private record(hook: Row, event: string, r: { ok: boolean; status: number | null; error: string | null }, willRetry = false): void {
     // The webhook may have been deleted while the message was on its way.
     if (!this.db.prepare('SELECT 1 FROM webhooks WHERE id = ?').get(hook.id)) return;
     this.db.transaction(() => {
-      this.db.prepare('INSERT INTO webhook_deliveries (id, webhook_id, event, ok, http_status, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(deliveryId, hook.id, event, r.ok ? 1 : 0, r.status, r.error, nowIso());
+      this.db.prepare('INSERT INTO webhook_deliveries (id, webhook_id, event, ok, http_status, error, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(newId(), hook.id, event, r.ok ? 1 : 0, r.status, r.error, nowIso());
       this.db
         .prepare('DELETE FROM webhook_deliveries WHERE webhook_id = ? AND id NOT IN (SELECT id FROM webhook_deliveries WHERE webhook_id = ? ORDER BY created_at DESC LIMIT ?)')
         .run(hook.id, hook.id, KEEP_DELIVERIES);
       if (r.ok) this.db.prepare('UPDATE webhooks SET failures = 0 WHERE id = ?').run(hook.id);
-      else {
+      else if (!willRetry) {
         this.db.prepare('UPDATE webhooks SET failures = failures + 1 WHERE id = ?').run(hook.id);
         // A receiver that keeps failing is switched off instead of being retried forever.
         this.db.prepare('UPDATE webhooks SET active = 0 WHERE id = ? AND failures >= ?').run(hook.id, DISABLE_AFTER_FAILURES);

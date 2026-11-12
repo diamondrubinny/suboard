@@ -80,6 +80,15 @@ describe('time tracking', () => {
     // delete: own entry yes, someone else's no (unless owner); strangers 404
     const bossEntry = all.entries.find((e) => e.userName === 'boss')!.id;
     const noaEntry = mine.entries[0]!.id;
+    // edit: only one's own finished entry — not even the owner edits someone else's time
+    const fix = { minutes: 45, date: '2026-01-05', note: 'תוקן' };
+    expect((await n.patch(`/api/time/${bossEntry}`, fix)).statusCode).toBe(403);
+    expect((await boss.patch(`/api/time/${noaEntry}`, fix)).statusCode).toBe(403);
+    expect((await n.patch(`/api/time/${noaEntry}`, { ...fix, minutes: 0 })).statusCode).toBe(400);
+    expect((await n.patch(`/api/time/${noaEntry}`, { ...fix, date: '2999-01-01' })).statusCode).toBe(400);
+    const fixed = (await n.patch(`/api/time/${noaEntry}`, fix)).json().time as ItemTime;
+    expect(fixed.entries.find((e) => e.id === noaEntry)).toMatchObject({ seconds: 2700, note: 'תוקן' });
+    expect(fixed.entries.find((e) => e.id === noaEntry)!.startedAt.slice(0, 10)).toBe('2026-01-05');
     expect((await n.del(`/api/time/${bossEntry}`)).statusCode).toBe(403);
     expect((await n.del(`/api/time/${noaEntry}`)).statusCode).toBe(200);
     expect((await boss.del(`/api/time/${mine.entries[1]!.id}`)).statusCode).toBe(200);
