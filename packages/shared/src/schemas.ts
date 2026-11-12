@@ -169,7 +169,19 @@ export const columnSettingsSchema = z
     unit: z.string().trim().max(8).regex(/^[^<>\n]*$/, 'תווים לא מותרים').optional(),
     decimals: z.number().int().min(0).max(4).nullable().optional(),
     /** button: what the button is called and which status it sets on the item when pressed. */
-    button: z.object({ label: line(30), columnId: idSchema, optionId: z.string().min(1).max(40) }).optional(),
+    button: z
+      .object({
+        label: line(30),
+        /** What pressing does. Without `action` (older buttons): set a status label. */
+        action: z.enum(['set_status', 'set_today', 'assign_me', 'check', 'move_group']).optional(),
+        /** The column the action writes (every action except `move_group`). */
+        columnId: idSchema.optional(),
+        /** `set_status`: the label to set. */
+        optionId: z.string().min(1).max(40).optional(),
+        /** `move_group`: the group the item moves to. */
+        groupId: idSchema.optional(),
+      })
+      .optional(),
     /** formula: the expression, with columns referenced by id — `{<column id>}` (or `{#n}` inside a template). */
     formula: z.string().trim().min(1, 'יש להזין נוסחה').max(500).optional(),
     /** relation: the board whose items this column connects to. */

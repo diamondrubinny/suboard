@@ -1,4 +1,4 @@
-import { mapFormulaRefs, validateFormula, type Item, findPrimaryStatusColumn, isItemDone, type LinkStat,
+import { mapFormulaRefs, validateFormula, BUTTON_ACTIONS, type ButtonAction, type Item, findPrimaryStatusColumn, isItemDone, type LinkStat,
   COLOR_KEYS,
   LIMITS,
   type BoardDetail,
@@ -448,12 +448,20 @@ export class BoardService {
     }
     if (settings?.button) {
       if (type !== 'button') throw badRequest('הגדרות כפתור מותרות רק בעמודת כפתור');
-      // The button sets a label of a status column of the same board.
-      const target = boardId ? this.columns(boardId).find((c) => c.id === settings.button!.columnId) : undefined;
-      if (boardId && (!target || target.type !== 'status' || !target.settings.options?.some((o) => o.id === settings.button!.optionId))) {
-        throw badRequest('יש לבחור עמודת סטטוס ותווית קיימות', { button: 'יעד לא תקין' });
+      // Every action points at something of this same board: a column of the right type, or a group.
+      const b = settings.button;
+      const action: ButtonAction = b.action ?? 'set_status';
+      const need = BUTTON_ACTIONS[action].columnType;
+      if (boardId) {
+        if (need) {
+          const target = this.columns(boardId).find((c) => c.id === b.columnId);
+          if (!target || target.type !== need) throw badRequest('יש לבחור עמודה מתאימה לפעולה', { button: 'עמודה לא תקינה' });
+          if (action === 'set_status' && !target.settings.options?.some((o) => o.id === b.optionId)) throw badRequest('יש לבחור עמודת סטטוס ותווית קיימות', { button: 'יעד לא תקין' });
+        } else if (!this.groups(boardId).some((g) => g.id === b.groupId)) {
+          throw badRequest('יש לבחור קבוצה של הלוח', { button: 'קבוצה לא תקינה' });
+        }
       }
-      s.button = settings.button;
+      s.button = { label: b.label, action, ...(need ? { columnId: b.columnId } : { groupId: b.groupId }), ...(action === 'set_status' ? { optionId: b.optionId } : {}) };
     }
     return s;
   }

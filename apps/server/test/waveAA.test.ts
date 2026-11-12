@@ -84,7 +84,19 @@ describe('more column types and column options', () => {
     expect((await c.post(`/api/boards/${b.id}/columns`, { title: 'סיום', type: 'button', settings: { button: { label: 'סיימתי', columnId: status.id, optionId: 'nope' } } })).statusCode).toBe(400);
     const btn = (await c.post(`/api/boards/${b.id}/columns`, { title: 'סיום', type: 'button' })).json().column; // configured later
     expect(btn.settings.button).toBeUndefined();
-    expect((await c.patch(`/api/columns/${btn.id}`, { settings: { button: { label: 'סיימתי', columnId: status.id, optionId: done.id } } })).json().column.settings.button).toEqual({ label: 'סיימתי', columnId: status.id, optionId: done.id });
+    expect((await c.patch(`/api/columns/${btn.id}`, { settings: { button: { label: 'סיימתי', columnId: status.id, optionId: done.id } } })).json().column.settings.button).toEqual({ label: 'סיימתי', action: 'set_status', columnId: status.id, optionId: done.id });
+    // other actions: each needs a column of the right type (or a group) of this board
+    const due = b.columns.find((x) => x.type === 'date')!;
+    const who = b.columns.find((x) => x.type === 'person')!;
+    const bad = (button: unknown) => c.patch(`/api/columns/${btn.id}`, { settings: { button } });
+    expect((await bad({ label: 'היום', action: 'set_today', columnId: status.id })).statusCode).toBe(400);
+    expect((await bad({ label: 'אני', action: 'assign_me', columnId: due.id })).statusCode).toBe(400);
+    expect((await bad({ label: 'העבר', action: 'move_group', groupId: '00000000-0000-4000-8000-000000000000' })).statusCode).toBe(400);
+    expect((await bad({ label: 'x', action: 'explode', columnId: due.id })).statusCode).toBe(400);
+    expect((await bad({ label: 'היום', action: 'set_today', columnId: due.id })).json().column.settings.button).toEqual({ label: 'היום', action: 'set_today', columnId: due.id });
+    expect((await bad({ label: 'אני', action: 'assign_me', columnId: who.id })).json().column.settings.button).toEqual({ label: 'אני', action: 'assign_me', columnId: who.id });
+    expect((await bad({ label: 'העבר', action: 'move_group', groupId: b.groups[1]!.id })).json().column.settings.button).toEqual({ label: 'העבר', action: 'move_group', groupId: b.groups[1]!.id });
+    await bad({ label: 'סיימתי', action: 'set_status', columnId: status.id, optionId: done.id });
     // the button column itself holds no value; pressing it is an ordinary, logged status change
     expect((await c.patch(`/api/items/${item.id}`, { values: { [btn.id]: 'x' } })).statusCode).toBe(400);
     expect((await c.patch(`/api/items/${item.id}`, { values: { [status.id]: done.id } })).statusCode).toBe(200);

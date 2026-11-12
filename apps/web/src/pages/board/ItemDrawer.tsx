@@ -203,6 +203,7 @@ function DetailsPanel({
               updatedAt={item.updatedAt}
               createdAt={item.createdAt}
               onSetValue={(cid, v) => undo.setValue(item, cid, v)}
+              onMoveGroup={item.parentId ? undefined : (groupId) => update.mutate({ itemId: item.id, patch: { groupId } })}
               columns={board.columns}
               values={item.values}
               linkStat={board.linkStats?.[item.id]}

@@ -1,4 +1,4 @@
-import { COLOR_KEYS, PALETTE, formatWeekHe, weekStartIso, type ColorKey, type Column } from '@suboard/shared';
+import { BUTTON_ACTIONS, COLOR_KEYS, PALETTE, formatWeekHe, todayIso, weekStartIso, type ButtonAction, type CellValue, type ColorKey, type Column } from '@suboard/shared';
 import { useEffect, useState } from 'react';
 import { errorMessage } from '../../api/client';
 import { useToggleVote } from '../../api/hooks';
@@ -111,19 +111,61 @@ export function VoteCell({ boardId, itemId, column, votes, canVote, label, id }:
   );
 }
 
-/** Action button: sets the configured status on the item (an ordinary edit — history, undo, automations). */
-export function ButtonCell({ column, columns, disabled, onPress, label, id }: { column: Column; columns: Column[]; disabled: boolean; onPress: (columnId: string, optionId: string) => void; label: string; id?: string }) {
+/**
+ * Action button: one press does one ordinary edit on the item — set a status, stamp today's date,
+ * assign me, tick a checkbox, or move it to a group. History, undo, permissions and automations apply.
+ */
+export function ButtonCell({
+  column,
+  columns,
+  values,
+  disabled,
+  onSetValue,
+  onMoveGroup,
+  label,
+  id,
+}: {
+  column: Column;
+  columns: Column[];
+  values: Record<string, CellValue>;
+  disabled: boolean;
+  onSetValue?: (columnId: string, value: CellValue) => void;
+  onMoveGroup?: (groupId: string) => void;
+  label: string;
+  id?: string;
+}) {
+  const { user } = useAuth();
   const cfg = column.settings.button;
-  const target = cfg ? columns.find((c) => c.id === cfg.columnId) : undefined;
+  const action: ButtonAction = cfg?.action ?? 'set_status';
+  const target = cfg?.columnId ? columns.find((c) => c.id === cfg.columnId) : undefined;
   const option = target?.settings.options?.find((o) => o.id === cfg?.optionId);
-  if (!cfg || !target || !option)
+  const ready = cfg && (action === 'move_group' ? Boolean(cfg.groupId) : Boolean(target) && target!.type === BUTTON_ACTIONS[action].columnType && (action !== 'set_status' || Boolean(option)));
+  if (!cfg || !ready)
     return (
       <span className="cell-readonly muted" id={id}>
         לא הוגדר
       </span>
     );
+  const what =
+    action === 'set_status'
+      ? `קובע ${target!.title} ל"${option!.label}"`
+      : action === 'set_today'
+        ? `רושם את התאריך של היום ב-${target!.title}`
+        : action === 'assign_me'
+          ? `משייך אותך ב-${target!.title}`
+          : action === 'check'
+            ? `מסמן את ${target!.title}`
+            : 'מעביר את הפריט לקבוצה שהוגדרה';
+  const press = () => {
+    if (action === 'move_group') return onMoveGroup?.(cfg.groupId!);
+    if (action === 'set_status') return onSetValue?.(target!.id, option!.id);
+    if (action === 'set_today') return onSetValue?.(target!.id, todayIso());
+    if (action === 'check') return onSetValue?.(target!.id, true);
+    const current = Array.isArray(values[target!.id]) ? (values[target!.id] as string[]) : [];
+    if (user) onSetValue?.(target!.id, current.includes(user.id) ? current : [...current, user.id]);
+  };
   return (
-    <button type="button" id={id} className="btn btn-sm" disabled={disabled} aria-label={`${cfg.label} — ${label}: קובע ${target.title} ל"${option.label}"`} title={`קובע ${target.title} ל"${option.label}"`} onClick={() => onPress(target.id, option.id)}>
+    <button type="button" id={id} className="btn btn-sm" disabled={disabled || (action === 'move_group' ? !onMoveGroup : !onSetValue)} aria-label={`${cfg.label} — ${label}: ${what}`} title={what} onClick={press}>
       {cfg.label}
     </button>
   );

@@ -335,7 +335,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
   const hidden = new Set(config.hidden ?? []);
   const columns = board.columns.filter((c) => !hidden.has(c.id));
   // Sub-items of every parent, from the full board (a parent shows its children even when only it matched a filter).
-  const childrenOf = (id: string) => sortItems(board.items.filter((i) => i.parentId === id), board.columns, config.sort, users);
+  const childrenOf = (id: string) => sortItems(board.items.filter((i) => i.parentId === id), board.columns, config.sort, users, board);
   const matchingIds = new Set(items.map((i) => i.id));
 
   const { setValue, rename } = useUndoableUpdate(board);
@@ -428,6 +428,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
               updatedAt={item.updatedAt}
               createdAt={item.createdAt}
               onSetValue={(cid, v) => setValue(item, cid, v)}
+              onMoveGroup={item.parentId ? undefined : (groupId) => updateItem.mutate({ itemId: item.id, patch: { groupId } }, { onSuccess: () => toast('הפריט הועבר לקבוצה'), onError: (e) => toast(errorMessage(e), 'error') })}
               columns={board.columns}
               values={item.values}
               linkStat={board.linkStats?.[item.id]}
@@ -508,6 +509,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
           board.columns,
           config.sort,
           users,
+          board,
         );
         const isCollapsed = collapsed[group.id] ?? false;
         const color = PALETTE[group.color]?.bg ?? '#9AA0B4';

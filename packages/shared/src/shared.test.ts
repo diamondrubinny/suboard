@@ -337,3 +337,43 @@ describe('advanced board filter', () => {
     expect(filterOpsFor('date')).toContain('overdue');
   });
 });
+
+describe('filters and formulas on the newer column types', () => {
+  const c = (id: string, type: XCol['type'], settings: XCol['settings'] = {}): XCol => ({ id, boardId: 'b', title: id, type, settings, position: 0 });
+  const cols = [c('h', 'hour'), c('w', 'week'), c('col', 'color'), c('v', 'vote'), c('born', 'created_at'), c('rel', 'relation'), c('mir', 'mirror'), c('f', 'files'), c('calc', 'formula', { formula: '{v} * 10 + {h}' }), c('age', 'formula', { formula: 'TODAY() - {born}' })];
+  const item = (values: Record<string, unknown>): XItem => ({ id: 'i1', boardId: 'b', groupId: 'g', parentId: null, name: 'x', values: values as XItem['values'], position: 0, seq: 1, createdBy: null, createdAt: '2026-11-02T08:00:00.000Z', updatedAt: '' });
+  const extras = { relations: { i1: { rel: [{ name: 'מנדף 3' }] } }, mirrors: { i1: { mir: ['tech@x.org'] } }, fileCounts: { i1: 2 } };
+  const pass = (columnId: string, op: BoardFilter['rules'][number]['op'], value: BoardFilter['rules'][number]['value'], values: Record<string, unknown> = {}) =>
+    matchesBoardFilter({ match: 'all', rules: [{ columnId, op, value }] }, item(values), cols, '2026-11-12', extras);
+
+  it('filters by hour, week, colour, votes, creation date, connected items, mirrored values and file count', () => {
+    expect(pass('h', 'gt', '08:00', { h: '08:30' })).toBe(true);
+    expect(pass('h', 'lt', '08:00', { h: '08:30' })).toBe(false);
+    expect(pass('h', 'eq', '8:30', { h: '08:30' })).toBe(true);
+    expect(pass('h', 'empty', undefined, {})).toBe(true);
+    expect(pass('h', 'gt', 'abc', { h: '08:30' })).toBe(true); // unfinished rule
+    expect(pass('w', 'on', '2026-11-12', { w: '2026-11-08' })).toBe(true); // any day of that week
+    expect(pass('w', 'on', '2026-11-15', { w: '2026-11-08' })).toBe(false);
+    expect(pass('w', 'overdue', undefined, { w: '2026-11-01' })).toBe(true);
+    expect(pass('col', 'any_of', ['teal'], { col: 'teal' })).toBe(true);
+    expect(pass('col', 'none_of', ['teal'], { col: 'teal' })).toBe(false);
+    expect(pass('v', 'gt', 1, { v: ['a', 'b'] })).toBe(true);
+    expect(pass('v', 'eq', 0, {})).toBe(true);
+    expect(pass('born', 'last_days', 14, {})).toBe(true);
+    expect(pass('born', 'before', '2026-11-01', {})).toBe(false);
+    expect(pass('rel', 'contains', 'מנדף', {})).toBe(true);
+    expect(pass('rel', 'empty', undefined, {})).toBe(false);
+    expect(pass('mir', 'contains', 'tech@', {})).toBe(true);
+    expect(pass('mir', 'not_contains', 'tech@', {})).toBe(false);
+    expect(pass('f', 'gt', 1, {})).toBe(true);
+    expect(pass('f', 'eq', 2, {})).toBe(true);
+  });
+
+  it('formulas read votes, hours (as minutes) and the creation date', () => {
+    const run = (id: string, values: Record<string, unknown>) => evaluateFormula(cols.find((x) => x.id === id)!, item(values), cols, '2026-11-12');
+    expect(run('calc', { v: ['a', 'b'], h: '01:30' })).toBe(110); // 2 votes * 10 + 90 minutes
+    expect(run('age', {})).toBe(10); // days since it was created
+    expect(validateFormula('{v} + {h} + {born}', cols)).toBeNull();
+    expect(validateFormula('{rel}', cols)).toBeTruthy(); // connected items are not a value
+  });
+});

@@ -49,6 +49,8 @@ export interface CellEditorProps {
   canLogTime?: boolean;
   /** For `button` columns: set another column of the same item. */
   onSetValue?: (columnId: string, value: CellValue) => void;
+  /** For `button` columns: move the item to another group. */
+  onMoveGroup?: (groupId: string) => void;
 }
 
 /** Text-like input that commits on blur / Enter and reverts on Escape. */
@@ -119,7 +121,7 @@ function checklistLabel(label: string, column: Column, value: unknown): string {
 }
 
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, createdAt, columns, values, linkStat, itemId, boardId, related, mirrored, fileCount, timeTotal, canLogTime, onSetValue } = props;
+  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, createdAt, columns, values, linkStat, itemId, boardId, related, mirrored, fileCount, timeTotal, canLogTime, onSetValue, onMoveGroup } = props;
   const options = column.settings.options ?? [];
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -173,7 +175,7 @@ export function CellEditor(props: CellEditorProps) {
       );
 
     case 'button':
-      return <ButtonCell id={inputId} column={column} columns={columns ?? []} disabled={readOnly || !onSetValue} label={label} onPress={(cid, oid) => onSetValue?.(cid, oid)} />;
+      return <ButtonCell id={inputId} column={column} columns={columns ?? []} values={values ?? {}} disabled={readOnly} label={label} onSetValue={onSetValue} onMoveGroup={onMoveGroup} />;
 
     case 'time':
       if (!itemId || !boardId) return <span className="cell-readonly" id={inputId}>—</span>;

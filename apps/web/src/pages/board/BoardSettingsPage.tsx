@@ -258,7 +258,7 @@ function ColumnsSection({ board }: { board: BoardDetail }) {
               <span className="badge">{COLUMN_TYPE_LABELS[c.type]}</span>
               {c.settings.role === 'due' && <span className="badge success">תאריך יעד</span>}
               {c.settings.editBy === 'owners' && <span className="badge">נעולה: בעלים בלבד</span>}
-              <span style={{ marginInlineStart: 'auto', display: 'flex', gap: '0.25rem' }}>
+              <span style={{ marginInlineStart: 'auto', display: 'flex', gap: '0.25rem', flexWrap: 'wrap', justifyContent: 'flex-end', minInlineSize: 0 }}>
                 <button type="button" className="icon-btn" aria-label={`הזזת ${c.title} למעלה`} disabled={idx === 0}
                   onClick={() => update.mutate({ columnId: c.id, patch: { position: (board.columns[idx - 1]!.position ?? 0) - 0.5 } }, { onError: onErr })}>
                   ▲

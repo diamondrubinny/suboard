@@ -1,3 +1,4 @@
+import { PALETTE } from './constants.js';
 import type { Column, CellValue, Item } from './types.js';
 
 /**
@@ -260,10 +261,13 @@ export function dayNumber(iso: string): number | null {
 }
 
 /** Column types a formula may read. Formula columns cannot read other formula columns (no cycles). */
-export const FORMULA_SOURCE_TYPES = ['number', 'progress', 'rating', 'date', 'date_range', 'checkbox', 'status', 'tags', 'text', 'long_text', 'link', 'email', 'phone', 'risk', 'auto_id'] as const;
+export const FORMULA_SOURCE_TYPES = ['number', 'progress', 'rating', 'date', 'date_range', 'checkbox', 'status', 'tags', 'text', 'long_text', 'link', 'email', 'phone', 'risk', 'auto_id', 'hour', 'week', 'vote', 'color', 'created_at'] as const;
 
-function cellAsFormulaValue(c: Column, v: CellValue | undefined, item: Pick<Item, 'seq'>): FormulaValue {
+function cellAsFormulaValue(c: Column, v: CellValue | undefined, item: Pick<Item, 'seq'> & { createdAt?: string }): FormulaValue {
   if (c.type === 'auto_id') return item.seq;
+  // A creation date is a day number like every other date; votes count as a number.
+  if (c.type === 'created_at') return item.createdAt ? dayNumber(item.createdAt.slice(0, 10)) : null;
+  if (c.type === 'vote') return Array.isArray(v) ? v.length : 0;
   if (v === undefined || v === null) return null;
   switch (c.type) {
     case 'number':
@@ -273,7 +277,15 @@ function cellAsFormulaValue(c: Column, v: CellValue | undefined, item: Pick<Item
     case 'checkbox':
       return v === true;
     case 'date':
+    case 'week':
       return typeof v === 'string' ? dayNumber(v) : null;
+    case 'hour': {
+      // Minutes since midnight, so two hours can be subtracted.
+      const m = /^(\d{2}):(\d{2})$/.exec(String(v));
+      return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+    }
+    case 'color':
+      return typeof v === 'string' ? (PALETTE[v as keyof typeof PALETTE]?.label ?? null) : null;
     case 'date_range':
       return typeof v === 'object' && !Array.isArray(v) && typeof (v as { from?: unknown }).from === 'string' ? dayNumber((v as { from: string }).from) : null;
     case 'status':
@@ -325,7 +337,7 @@ function compiled(stored: string): Node | null {
 }
 
 /** The value of a formula column for one item. Never throws: a broken formula gives a blank. */
-export function evaluateFormula(column: Column, item: Pick<Item, 'values' | 'seq'>, columns: Column[], todayIsoDate: string): FormulaValue {
+export function evaluateFormula(column: Column, item: Pick<Item, 'values' | 'seq'> & { createdAt?: string }, columns: Column[], todayIsoDate: string): FormulaValue {
   const tree = column.settings.formula ? compiled(column.settings.formula) : null;
   if (!tree) return null;
   const v = evalNode(

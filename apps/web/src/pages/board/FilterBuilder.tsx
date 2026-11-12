@@ -1,4 +1,6 @@
 import {
+  COLOR_KEYS,
+  PALETTE,
   FILTER_OP_LABELS,
   MAX_FILTER_RULES,
   filterOpNeedsValue,
@@ -128,7 +130,11 @@ function RuleValue({ index, target, rule, users, board, onChange }: { index: num
     const column = target as Column;
     const memberIds = new Set(board.members.map((m) => m.userId));
     const choices =
-      column.type === 'person' ? users.filter((u) => memberIds.has(u.id)).map((u) => ({ id: u.id, label: u.name })) : (column.settings.options ?? []).map((o) => ({ id: o.id, label: o.label }));
+      column.type === 'person'
+        ? users.filter((u) => memberIds.has(u.id)).map((u) => ({ id: u.id, label: u.name }))
+        : column.type === 'color'
+          ? COLOR_KEYS.map((k) => ({ id: k as string, label: PALETTE[k].label }))
+          : (column.settings.options ?? []).map((o) => ({ id: o.id, label: o.label }));
     const picked = Array.isArray(rule.value) ? rule.value : [];
     return (
       <fieldset className="filter-choices">
@@ -144,6 +150,9 @@ function RuleValue({ index, target, rule, users, board, onChange }: { index: num
   }
   if (rule.op === 'before' || rule.op === 'after' || rule.op === 'on') {
     return <DateField aria-label={label} value={typeof rule.value === 'string' ? rule.value : ''} onChange={(iso) => onChange(iso || undefined)} />;
+  }
+  if (target.type === 'hour') {
+    return <input className="input filter-number" dir="ltr" inputMode="numeric" placeholder="hh:mm" maxLength={5} aria-label={`שעה לתנאי ${index + 1}`} value={typeof rule.value === 'string' ? rule.value : ''} onChange={(e) => onChange(e.target.value || undefined)} />;
   }
   if (rule.op === 'next_days' || rule.op === 'last_days' || rule.op === 'eq' || rule.op === 'gt' || rule.op === 'lt') {
     const days = rule.op === 'next_days' || rule.op === 'last_days';

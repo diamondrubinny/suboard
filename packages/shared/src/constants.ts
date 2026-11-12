@@ -118,6 +118,16 @@ export const COLUMN_TYPE_LABELS: Record<ColumnType, string> = {
   button: 'כפתור פעולה',
 };
 
+/** What an action button can do, and the column type it needs (null = none: it moves the item). */
+export const BUTTON_ACTIONS = {
+  set_status: { label: 'לקבוע סטטוס', columnType: 'status' },
+  set_today: { label: 'לרשום את התאריך של היום', columnType: 'date' },
+  assign_me: { label: 'לשייך אליי', columnType: 'person' },
+  check: { label: 'לסמן תיבת סימון', columnType: 'checkbox' },
+  move_group: { label: 'להעביר לקבוצה', columnType: null },
+} as const;
+export type ButtonAction = keyof typeof BUTTON_ACTIONS;
+
 export const LIMITS = {
   boardName: 120,
   boardDescription: 1000,

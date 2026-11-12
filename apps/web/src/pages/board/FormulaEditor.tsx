@@ -1,5 +1,5 @@
 import { FORMULA_FUNCTIONS, FORMULA_MAX_LENGTH, FORMULA_SOURCE_TYPES, formulaToDisplay, formulaToStored, validateFormula, type Column } from '@suboard/shared';
-import { useId, useRef, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 
 const EXAMPLES: [string, string][] = [
   ['{עלות} * {כמות}', 'מכפלה של שתי עמודות מספר'],
@@ -27,6 +27,12 @@ export function FormulaEditor({ column, columns, saving, onSave }: { column?: Co
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const id = useId();
+  const caret = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (caret.current === null) return;
+    ref.current?.setSelectionRange(caret.current, caret.current);
+    caret.current = null;
+  }, [text]);
   const sources = columns.filter((c) => (FORMULA_SOURCE_TYPES as readonly string[]).includes(c.type) && c.id !== column?.id);
 
   const insert = (snippet: string) => {
@@ -34,10 +40,10 @@ export function FormulaEditor({ column, columns, saving, onSave }: { column?: Co
     const at = el?.selectionStart ?? text.length;
     const end = el?.selectionEnd ?? text.length;
     setText(text.slice(0, at) + snippet + text.slice(end));
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(at + snippet.length, at + snippet.length);
-    });
+    // Focus goes back to the field at once (typing can continue immediately); the caret is placed
+    // after the inserted reference once the new text is in the field.
+    caret.current = at + snippet.length;
+    el?.focus();
   };
   const save = () => {
     const res = compileFormula(text, columns);

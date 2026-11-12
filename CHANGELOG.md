@@ -2,6 +2,18 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.12.0 — 2026-11-12
+
+### Added
+- Action button: besides setting a status it can stamp today's date, assign the person who pressed it, tick a checkbox, or move the item to a group.
+- Advanced filter on time of day, week, colour, votes, creation date, connected items, mirrored values and number of files.
+- Sorting by connected items, mirrored values, files, tracked time, linked items and colour.
+- Formulas can read time of day (as minutes), week, votes, colour and the creation date.
+
+### Fixed
+- Board settings no longer scroll sideways on a phone when a column has many action buttons.
+- Inserting a column or a function in the formula editor keeps the cursor in place reliably.
+
 ## 1.11.0 — 2026-11-12
 
 ### Added
