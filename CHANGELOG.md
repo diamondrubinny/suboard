@@ -2,6 +2,13 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.5.0 — 2026-11-12
+
+### Added
+- Group the table by a status or people column instead of the board's own groups (saved with the view).
+- A board can name its rows ("equipment item", "inspection"); used in the add field.
+- Labels can be retired: they stay on the items that have them but are no longer offered.
+
 ## 1.4.0 — 2026-11-12
 
 ### Added

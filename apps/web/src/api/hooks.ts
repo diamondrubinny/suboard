@@ -240,7 +240,7 @@ export function useCreateBoard() {
 export function useUpdateBoard(boardId: string) {
   const { qc, refresh } = useBoardCache(boardId);
   return useMutation({
-    mutationFn: (input: { name?: string; description?: string }) => api<{ board: BoardDetail }>(`/boards/${boardId}`, 'PATCH', input).then((r) => r.board),
+    mutationFn: (input: { name?: string; description?: string; itemTerm?: string }) => api<{ board: BoardDetail }>(`/boards/${boardId}`, 'PATCH', input).then((r) => r.board),
     onSuccess: (board) => {
       qc.setQueryData(qk.board(boardId), board);
       refresh();

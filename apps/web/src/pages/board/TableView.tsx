@@ -1,4 +1,4 @@
-import { COLUMN_WIDTH, PALETTE, todayIso, isOverdue, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Group, type Item, type ViewConfig, evaluateFormula } from '@suboard/shared';
+import { COLUMN_WIDTH, PALETTE, todayIso, isOverdue, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Group, type Item, type ViewConfig, evaluateFormula, COLOR_KEYS } from '@suboard/shared';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { errorMessage } from '../../api/client';
 import { useCreateItem, useGroupMutations, useUpdateItem } from '../../api/hooks';
@@ -61,6 +61,7 @@ function AddRow({
   sub,
   depth = 1,
   focus = 0,
+  term,
 }: {
   boardId: string;
   groupId: string;
@@ -68,6 +69,8 @@ function AddRow({
   colSpan: number;
   label: string;
   sub?: boolean;
+  /** The board's own word for a row ("ביקורת"); empty for the generic wording. */
+  term?: string;
   /** Nesting level of the rows this input adds (for the indent). */
   depth?: number;
   /** Changes each time the parent's "+ sub-item" button is pressed: the input takes focus. */
@@ -94,7 +97,7 @@ function AddRow({
       <td className="col-name">
         <input
           className="cell-input"
-          placeholder={sub ? '+ תת-פריט (Enter לשמירה)' : '+ פריט חדש (Enter לשמירה)'}
+          placeholder={sub ? '+ תת-פריט (Enter לשמירה)' : term ? `+ הוספת ${term} (Enter לשמירה)` : '+ פריט חדש (Enter לשמירה)'}
           aria-label={label}
           value={name}
           maxLength={300}
@@ -460,6 +463,26 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
     ];
   };
 
+  // Sections of the table: the board's own groups, or — with "group by" — one per label / person.
+  const groupCol = config.groupBy ? board.columns.find((c) => c.id === config.groupBy && (c.type === 'status' || c.type === 'person')) : undefined;
+  type Section = { group: Group; virtual: boolean; match: (i: Item) => boolean };
+  const virtualGroup = (id: string, name: string, color: Group['color'], position: number): Group => ({ id: `by-${id}`, boardId: board.id, name, color, position });
+  const sections: Section[] = !groupCol
+    ? board.groups.map((group) => ({ group, virtual: false, match: (i: Item) => i.groupId === group.id }))
+    : groupCol.type === 'status'
+      ? [
+          ...(groupCol.settings.options ?? []).map((o, n) => ({ group: virtualGroup(o.id, o.label, o.color, n), virtual: true, match: (i: Item) => i.values[groupCol.id] === o.id })),
+          { group: virtualGroup('none', `ללא ${groupCol.title}`, 'gray', 999), virtual: true, match: (i: Item) => !(groupCol.settings.options ?? []).some((o) => o.id === i.values[groupCol.id]) },
+        ]
+      : [
+          ...board.members.map((m, n) => ({
+            group: virtualGroup(m.userId, m.name, COLOR_KEYS[n % COLOR_KEYS.length]!, n),
+            virtual: true,
+            match: (i: Item) => Array.isArray(i.values[groupCol.id]) && (i.values[groupCol.id] as string[]).includes(m.userId),
+          })),
+          { group: virtualGroup('none', `ללא ${groupCol.title}`, 'gray', 999), virtual: true, match: (i: Item) => !Array.isArray(i.values[groupCol.id]) || (i.values[groupCol.id] as string[]).length === 0 },
+        ];
+
   return (
     <>
       {withKids.length > 0 && (
@@ -469,11 +492,11 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
           </button>
         </div>
       )}
-      {board.groups.map((group) => {
+      {sections.map(({ group, virtual, match }) => {
         // Top-level rows: parents that match, plus parents of matching sub-items (to keep context).
         const parentIds = new Set(items.filter((i) => i.parentId).map((i) => topOf(i)));
         const tops = sortItems(
-          board.items.filter((i) => !i.parentId && i.groupId === group.id && (matchingIds.has(i.id) || parentIds.has(i.id))),
+          board.items.filter((i) => !i.parentId && match(i) && (matchingIds.has(i.id) || parentIds.has(i.id))),
           board.columns,
           config.sort,
           users,
@@ -481,7 +504,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
         const isCollapsed = collapsed[group.id] ?? false;
         const color = PALETTE[group.color]?.bg ?? '#9AA0B4';
         const tableId = `group-table-${group.id}`;
-        if (filtered && tops.length === 0) return null;
+        if ((filtered || virtual) && tops.length === 0) return null;
         // Rows currently on screen, at any depth (for "select all in the group").
         const shownIds = (id: string): string[] => [id, ...(expanded[id] ? childrenOf(id).flatMap((c) => shownIds(c.id)) : [])];
         const groupIds = tops.flatMap((t) => shownIds(t.id));
@@ -502,7 +525,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                   <Icon name="chevronDown" />
                 </span>
               </button>
-              <GroupNameInput key={group.name} group={group} boardId={board.id} canEdit={canEdit} />
+              {virtual ? <h2 className="group-title-static">{group.name}</h2> : <GroupNameInput key={group.name} group={group} boardId={board.id} canEdit={canEdit} />}
               <span className="badge">{tops.length}</span>
             </div>
             {!isCollapsed && (
@@ -525,7 +548,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                     </tr>
                   </thead>
                   <tbody>
-                    {tops.map((item) => renderTree(item, color, group.id, 0))}
+                    {tops.map((item) => renderTree(item, color, item.groupId, 0))}
                     {tops.length === 0 && (
                       <tr>
                         <td colSpan={columns.length + 2} className="muted" style={{ padding: 'var(--space-3)' }}>
@@ -533,7 +556,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
                         </td>
                       </tr>
                     )}
-                    {canEdit && <AddRow boardId={board.id} groupId={group.id} colSpan={columns.length} label={`פריט חדש בקבוצה ${group.name}`} />}
+                    {canEdit && !virtual && <AddRow boardId={board.id} groupId={group.id} colSpan={columns.length} label={`פריט חדש בקבוצה ${group.name}`} term={board.itemTerm} />}
                   </tbody>
                   <GroupSummary columns={columns} allColumns={board.columns} items={tops} groupName={group.name} />
                 </table>

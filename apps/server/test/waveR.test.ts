@@ -84,3 +84,30 @@ describe('wave S — files column', () => {
     expect(csv[2]!.trim().split(',')).toContain('0');
   });
 });
+
+describe('wave T — row term, retired labels, group-by in a view', () => {
+  it('stores what a row is called, keeps retired labels on items, and saves group-by in a view', async () => {
+    ctx = await setup();
+    const { client: c } = await loggedIn(ctx, 'boss@x.org', 'manager');
+    const b = (await c.post('/api/boards', { name: 'ביקורות', templateKey: 'capa' })).json().board as BoardDetail;
+    expect(b.itemTerm).toBe('');
+    expect((await c.patch(`/api/boards/${b.id}`, { itemTerm: '<b>x</b>' })).statusCode).toBe(400);
+    expect((await c.patch(`/api/boards/${b.id}`, { itemTerm: 'x'.repeat(31) })).statusCode).toBe(400);
+    expect((await c.patch(`/api/boards/${b.id}`, { itemTerm: ' ביקורת ' })).json().board.itemTerm).toBe('ביקורת');
+    expect((await c.get(`/api/boards/${b.id}`)).json().board.itemTerm).toBe('ביקורת');
+
+    const st = b.columns.find((x) => x.type === 'status')!;
+    const first = st.settings.options![0]!;
+    const item = (await c.post(`/api/boards/${b.id}/items`, { groupId: b.groups[0]!.id, name: 'א', values: { [st.id]: first.id } })).json().item as { id: string };
+    const options = st.settings.options!.map((o) => (o.id === first.id ? { ...o, inactive: true } : o));
+    // retiring a label is not a removal: no decision needed, the value stays
+    expect((await c.patch(`/api/columns/${st.id}`, { settings: { options } })).statusCode).toBe(200);
+    const after = (await c.get(`/api/boards/${b.id}`)).json().board as BoardDetail;
+    expect(after.columns.find((x) => x.id === st.id)!.settings.options![0]!.inactive).toBe(true);
+    expect(after.items.find((i) => i.id === item.id)!.values[st.id]).toBe(first.id);
+
+    const view = await c.post(`/api/boards/${b.id}/views`, { name: 'לפי סטטוס', config: { view: 'table', groupBy: st.id } });
+    expect(view.json().view.config.groupBy).toBe(st.id);
+    expect((await c.post(`/api/boards/${b.id}/views`, { name: 'x', config: { view: 'table', groupBy: 'not-an-id' } })).statusCode).toBe(400);
+  });
+});

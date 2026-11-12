@@ -324,11 +324,14 @@ function StatusSelect({ id, options, value, label, onChange }: { id: string; opt
       onChange={(e) => (setLocal(e.target.value), onChange(e.target.value))}
     >
       <option value="">—</option>
-      {options.map((o) => (
-        <option key={o.id} value={o.id}>
-          {o.label}
-        </option>
-      ))}
+      {options
+        .filter((o) => !o.inactive || o.id === local)
+        .map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.label}
+            {o.inactive ? ' (לא בשימוש)' : ''}
+          </option>
+        ))}
     </select>
   );
 }

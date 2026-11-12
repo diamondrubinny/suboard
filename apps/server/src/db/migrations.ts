@@ -680,4 +680,12 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE INDEX idx_links_column ON item_links(column_id);
     `,
   },
+  {
+    version: 18,
+    name: 'board_item_term',
+    sql: /* sql */ `
+      -- What a row of this board is called ("פריט ציוד", "ביקורת"); empty = the generic "פריט".
+      ALTER TABLE boards ADD COLUMN item_term TEXT NOT NULL DEFAULT '';
+    `,
+  },
 ];

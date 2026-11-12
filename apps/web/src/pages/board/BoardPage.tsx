@@ -236,6 +236,23 @@ export function BoardPage() {
           רק פריטים שלי
         </label>
         <FilterBuilder board={b} users={users} value={config.filter} onChange={(filter) => patch({ filter })} />
+        {config.view === 'table' && b.columns.some((c) => c.type === 'status' || c.type === 'person') && (
+          <>
+            <label htmlFor="group-by" className="sr-only">
+              קיבוץ השורות לפי
+            </label>
+            <select id="group-by" className="select" style={{ inlineSize: 'auto' }} value={config.groupBy ?? ''} onChange={(e) => patch({ groupBy: e.target.value || undefined })}>
+              <option value="">קיבוץ: קבוצות הלוח</option>
+              {b.columns
+                .filter((c) => c.type === 'status' || c.type === 'person')
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    קיבוץ לפי {c.title}
+                  </option>
+                ))}
+            </select>
+          </>
+        )}
         {config.view === 'table' && <ColumnsMenu board={b} hidden={config.hidden ?? []} onChange={(hidden) => patch({ hidden })} />}
         {config.sort && config.view === 'table' && (
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => patch({ sort: undefined })}>

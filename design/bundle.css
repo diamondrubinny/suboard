@@ -4177,3 +4177,9 @@ kbd {
 .rich-text {
   white-space: normal;
 }
+
+.group-title-static {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+}

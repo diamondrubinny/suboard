@@ -152,6 +152,8 @@ export const statusOptionSchema = z.object({
   label: line(LIMITS.statusLabel),
   color: colorKeySchema,
   done: z.boolean().optional(),
+  /** Retired label: stays on the items that have it, but is no longer offered for selection. */
+  inactive: z.boolean().optional(),
 });
 export type StatusOption = z.infer<typeof statusOptionSchema>;
 
@@ -312,6 +314,8 @@ export const updateBoardSchema = z
   .object({
     name: line(LIMITS.boardName).optional(),
     description: multiline(LIMITS.boardDescription).optional(),
+    /** What a row of the board is called ("פריט ציוד"); empty for the generic "פריט". */
+    itemTerm: z.string().trim().max(30).regex(/^[^<>\n]*$/, 'תווים לא מותרים').optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
 
@@ -385,6 +389,8 @@ export const viewConfigSchema = z.object({
     })
     .optional(),
   sort: sortSchema.optional(),
+  /** Table: show the rows grouped by this status / people column instead of the board's own groups. */
+  groupBy: idSchema.optional(),
   hidden: z.array(idSchema).max(LIMITS.columnsPerBoard).optional(),
   kanbanColumnId: idSchema.optional(),
   calendarColumnId: idSchema.optional(),

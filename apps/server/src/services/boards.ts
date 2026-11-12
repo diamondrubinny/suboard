@@ -29,6 +29,7 @@ interface BoardRow {
   name: string;
   description: string;
   template_key: string;
+  item_term: string;
   created_at: string;
   updated_at: string;
 }
@@ -131,6 +132,7 @@ export class BoardService {
       description: b.description,
       templateKey: b.template_key,
       myRole,
+      itemTerm: b.item_term ?? '',
       groups: this.groups(boardId),
       columns: this.columns(boardId),
       items: (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL ORDER BY position, created_at').all(boardId) as ItemRow[]).map(toItem),
@@ -229,7 +231,7 @@ export class BoardService {
     return out;
   }
 
-  update(actor: Actor, boardId: string, input: { name?: string; description?: string }): BoardDetail {
+  update(actor: Actor, boardId: string, input: { name?: string; description?: string; itemTerm?: string }): BoardDetail {
     this.access.requireBoard(actor, boardId, 'owner');
     const sets: string[] = [];
     const params: unknown[] = [];
@@ -240,6 +242,10 @@ export class BoardService {
     if (input.description !== undefined) {
       sets.push('description = ?');
       params.push(input.description);
+    }
+    if (input.itemTerm !== undefined) {
+      sets.push('item_term = ?');
+      params.push(input.itemTerm);
     }
     sets.push('updated_at = ?');
     params.push(nowIso());

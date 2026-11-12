@@ -108,6 +108,8 @@ export interface BoardDetail {
   description: string;
   templateKey: string;
   myRole: BoardRole;
+  /** What a row is called on this board; empty = "פריט". */
+  itemTerm: string;
   groups: Group[];
   columns: Column[];
   items: Item[];

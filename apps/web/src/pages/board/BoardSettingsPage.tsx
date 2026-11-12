@@ -72,10 +72,11 @@ function GeneralSection({ board }: { board: BoardDetail }) {
   const { toast } = useFeedback();
   const [name, setName] = useState(board.name);
   const [description, setDescription] = useState(board.description);
+  const [itemTerm, setItemTerm] = useState(board.itemTerm ?? '');
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return toast('שם הלוח הוא שדה חובה', 'error');
-    update.mutate({ name: name.trim(), description }, { onSuccess: () => toast('הפרטים נשמרו'), onError: (err) => toast(errorMessage(err), 'error') });
+    update.mutate({ name: name.trim(), description, itemTerm: itemTerm.trim() }, { onSuccess: () => toast('הפרטים נשמרו'), onError: (err) => toast(errorMessage(err), 'error') });
   };
   return (
     <section className="card" aria-labelledby="gen-h">
@@ -88,6 +89,13 @@ function GeneralSection({ board }: { board: BoardDetail }) {
         <div className="field">
           <label htmlFor="s-desc">תיאור</label>
           <textarea id="s-desc" className="textarea" value={description} maxLength={LIMITS.boardDescription} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+        <div className="field">
+          <label htmlFor="s-term">איך נקראת שורה בלוח הזה? (לא חובה)</label>
+          <input id="s-term" className="input" value={itemTerm} maxLength={30} placeholder="פריט" onChange={(e) => setItemTerm(e.target.value)} aria-describedby="s-term-hint" />
+          <span id="s-term-hint" className="hint">
+            למשל "פריט ציוד", "ביקורת" או "תקלה". יופיע בשדה ההוספה ובמונה הפריטים של הלוח.
+          </span>
         </div>
         <button type="submit" className="btn btn-primary" disabled={update.isPending}>
           שמירה
@@ -117,6 +125,7 @@ function StatusOptionsEditor({ column, usage, onSave, saving }: { column: Column
             <th scope="col">תווית</th>
             <th scope="col">צבע</th>
             {column.type === 'status' && <th scope="col">נחשב "סגור"</th>}
+            <th scope="col">לא לבחירה</th>
             <th scope="col">
               <span className="sr-only">פעולות</span>
             </th>
@@ -143,6 +152,9 @@ function StatusOptionsEditor({ column, usage, onSave, saving }: { column: Column
               </td>
               )}
               <td>
+                <input type="checkbox" checked={Boolean(o.inactive)} aria-label={`התווית ${o.label} אינה מוצעת עוד לבחירה`} onChange={(e) => set(idx, { inactive: e.target.checked || undefined })} />
+              </td>
+              <td>
                 <button type="button" className="icon-btn" aria-label={`הסרת התווית ${o.label}`} onClick={() => setOptions((x) => x.filter((_, i) => i !== idx))} disabled={column.type === 'status' && options.length <= 1}>
                   <Icon name="trash" size={16} />
                 </button>
@@ -168,7 +180,7 @@ function StatusOptionsEditor({ column, usage, onSave, saving }: { column: Column
         </div>
       ))}
       <p className="hint muted" style={{ fontSize: '0.85rem' }}>
-        תווית שנמצאת בשימוש אינה נמחקת בשקט: בוחרים לאיזו תווית להעביר את הפריטים, או לרוקן אותם. בעמודת הסטטוס הראשית, תוויות "סגור" קובעות אילו פריטים אינם נחשבים פתוחים או באיחור.
+        "לא לבחירה": התווית נשארת בפריטים שכבר מסומנים בה, אבל אינה מוצעת עוד. תווית שנמצאת בשימוש אינה נמחקת בשקט: בוחרים לאיזו תווית להעביר את הפריטים, או לרוקן אותם. בעמודת הסטטוס הראשית, תוויות "סגור" קובעות אילו פריטים אינם נחשבים פתוחים או באיחור.
       </p>
       <div className="toolbar">
         <button type="button" className="btn btn-sm" onClick={add} disabled={options.length >= LIMITS.statusOptions}>

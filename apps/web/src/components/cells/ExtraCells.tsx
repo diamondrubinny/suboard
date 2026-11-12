@@ -63,7 +63,7 @@ export function TagsPicker({ value, options, label, onChange }: { value: string[
         <div className="popover" id={popId}>
           <fieldset>
             <legend>{label}</legend>
-            {options.map((o) => (
+            {options.filter((o) => !o.inactive || local.includes(o.id)).map((o) => (
               <label key={o.id}>
                 <input type="checkbox" checked={local.includes(o.id)} onChange={() => toggle(o.id)} />
                 <span className="tag" style={colorStyle(o.color)}>
