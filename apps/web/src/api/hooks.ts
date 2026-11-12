@@ -942,8 +942,11 @@ export function useWorkspaceMutations() {
     create: useMutation({ mutationFn: (name: string) => api<{ workspace: Workspace }>('/workspaces', 'POST', { name }).then((r) => r.workspace), onSuccess: refresh }),
     rename: useMutation({ mutationFn: ({ id, name }: { id: string; name: string }) => api(`/workspaces/${id}`, 'PATCH', { name }), onSuccess: refresh }),
     remove: useMutation({ mutationFn: (id: string) => api(`/workspaces/${id}`, 'DELETE'), onSuccess: refresh }),
+    addFolder: useMutation({ mutationFn: ({ workspaceId, name }: { workspaceId: string; name: string }) => api<{ folder: { id: string; name: string } }>(`/workspaces/${workspaceId}/folders`, 'POST', { name }).then((r) => r.folder), onSuccess: refresh }),
+    renameFolder: useMutation({ mutationFn: ({ id, name }: { id: string; name: string }) => api(`/folders/${id}`, 'PATCH', { name }), onSuccess: refresh }),
+    removeFolder: useMutation({ mutationFn: (id: string) => api(`/folders/${id}`, 'DELETE'), onSuccess: refresh }),
     moveBoard: useMutation({
-      mutationFn: ({ boardId, workspaceId }: { boardId: string; workspaceId: string | null }) => api(`/boards/${boardId}/workspace`, 'PUT', { workspaceId }),
+      mutationFn: ({ boardId, workspaceId, folderId = null }: { boardId: string; workspaceId: string | null; folderId?: string | null }) => api(`/boards/${boardId}/workspace`, 'PUT', { workspaceId, folderId }),
       onSuccess: (_r, v) => {
         refresh();
         void qc.invalidateQueries({ queryKey: qk.board(v.boardId) });

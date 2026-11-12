@@ -773,4 +773,21 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       CREATE UNIQUE INDEX idx_time_running ON time_entries(user_id) WHERE ended_at IS NULL;
     `,
   },
+  {
+    version: 23,
+    name: 'board_folders',
+    sql: /* sql */ `
+      -- Folders inside a workspace. Organisation only, like the workspace itself.
+      CREATE TABLE board_folders (
+        id TEXT PRIMARY KEY,
+        workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+        name TEXT NOT NULL COLLATE NOCASE,
+        position REAL NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE (workspace_id, name)
+      );
+      ALTER TABLE boards ADD COLUMN folder_id TEXT REFERENCES board_folders(id) ON DELETE SET NULL;
+      CREATE INDEX idx_boards_folder ON boards(folder_id);
+    `,
+  },
 ];

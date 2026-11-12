@@ -100,10 +100,17 @@ export interface Webhook {
   last: { ok: boolean; status: number | null; error: string | null; at: string } | null;
 }
 
+export interface BoardFolder {
+  id: string;
+  name: string;
+}
+
 export interface Workspace {
   id: string;
   name: string;
   position: number;
+  /** Folders inside the workspace, in order. Organisation only. */
+  folders: BoardFolder[];
 }
 
 export interface BoardSummary {
@@ -111,6 +118,7 @@ export interface BoardSummary {
   name: string;
   /** The workspace the board is filed under, if any. */
   workspaceId: string | null;
+  folderId: string | null;
   description: string;
   templateKey: string;
   myRole: BoardRole;
@@ -180,6 +188,7 @@ export interface BoardDetail {
   /** What a row is called on this board; empty = "פריט". */
   itemTerm: string;
   workspaceId: string | null;
+  folderId: string | null;
   groups: Group[];
   columns: Column[];
   items: Item[];

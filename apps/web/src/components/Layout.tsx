@@ -2,6 +2,7 @@ import { GLOBAL_ROLE_LABELS } from '@suboard/shared';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useBoards, useModules, useWorkspaces } from '../api/hooks';
+import { boardSections as sectionsOf } from '../modules/boardSections';
 import { pathOf, visibleNav, type NavEntry } from '../modules/registry';
 import { useAuth } from '../auth/AuthContext';
 import { A11yToolbar } from './A11yToolbar';
@@ -65,10 +66,7 @@ export function Layout() {
   const others = (boards.data ?? []).filter((b) => !b.favorite);
   const workspaces = useWorkspaces();
   // Boards that are not favourites, under their workspace; boards without one come last.
-  const boardSections = [
-    ...(workspaces.data ?? []).map((w) => ({ id: w.id, name: w.name, boards: others.filter((b) => b.workspaceId === w.id) })),
-    { id: 'none', name: (workspaces.data ?? []).length ? 'לוחות נוספים' : favorites.length > 0 ? 'שאר הלוחות' : 'הלוחות שלי', boards: others.filter((b) => !b.workspaceId || !(workspaces.data ?? []).some((w) => w.id === b.workspaceId)) },
-  ].filter((sec) => sec.boards.length > 0);
+  const boardSections = sectionsOf(others, workspaces.data ?? [], (workspaces.data ?? []).length ? 'לוחות נוספים' : favorites.length > 0 ? 'שאר הלוחות' : 'הלוחות שלי');
   const [menuOpen, setMenuOpen] = useState(false);
   // Wide screens: the side menu can be hidden to give the board the full width (remembered per browser).
   const [collapsed, setCollapsed] = useState(() => {

@@ -31,6 +31,7 @@ interface BoardRow {
   template_key: string;
   item_term: string;
   workspace_id: string | null;
+  folder_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,6 +78,7 @@ export class BoardService {
       name: r.name,
       description: r.description,
       workspaceId: r.workspace_id ?? null,
+      folderId: r.workspace_id ? (r.folder_id ?? null) : null,
       templateKey: r.template_key,
       // Admins have owner-level rights on every board regardless of membership row.
       myRole: actor.role === 'admin' ? 'owner' : r.my_role,
@@ -144,6 +146,7 @@ export class BoardService {
       myRole,
       itemTerm: b.item_term ?? '',
       workspaceId: b.workspace_id ?? null,
+      folderId: b.workspace_id ? (b.folder_id ?? null) : null,
       groups: this.groups(boardId),
       columns: this.columns(boardId),
       items: (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL ORDER BY position, created_at').all(boardId) as ItemRow[]).map(toItem),

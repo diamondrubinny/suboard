@@ -72,8 +72,17 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
     services.workspaces.remove(actorOf(req), param(req, 'id'));
     return { ok: true };
   });
+  app.post('/workspaces/:id/folders', { config: { rateLimit: { max: 60, timeWindow: 15 * 60_000 } } }, async (req, reply) =>
+    reply.code(201).send({ folder: services.workspaces.createFolder(actorOf(req), param(req, 'id'), workspaceSchema.parse(req.body).name) }),
+  );
+  app.patch('/folders/:id', async (req) => ({ folder: services.workspaces.renameFolder(actorOf(req), param(req, 'id'), workspaceSchema.parse(req.body).name) }));
+  app.delete('/folders/:id', async (req) => {
+    services.workspaces.removeFolder(actorOf(req), param(req, 'id'));
+    return { ok: true };
+  });
   app.put('/boards/:id/workspace', async (req) => {
-    services.workspaces.moveBoard(actorOf(req), param(req, 'id'), moveBoardSchema.parse(req.body).workspaceId);
+    const move = moveBoardSchema.parse(req.body);
+    services.workspaces.moveBoard(actorOf(req), param(req, 'id'), move.workspaceId, move.folderId ?? null);
     return { ok: true };
   });
 

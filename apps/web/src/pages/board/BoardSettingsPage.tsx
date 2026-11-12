@@ -79,6 +79,7 @@ function GeneralSection({ board }: { board: BoardDetail }) {
   const [itemTerm, setItemTerm] = useState(board.itemTerm ?? '');
   const workspaces = useWorkspaces();
   const { moveBoard } = useWorkspaceMutations();
+  const folders = (workspaces.data ?? []).find((w) => w.id === board.workspaceId)?.folders ?? [];
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return toast('שם הלוח הוא שדה חובה', 'error');
@@ -110,6 +111,25 @@ function GeneralSection({ board }: { board: BoardDetail }) {
               {workspaces.data!.map((w) => (
                 <option key={w.id} value={w.id}>
                   {w.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        {folders.length > 0 && (
+          <div className="field">
+            <label htmlFor="s-folder">תיקייה בסביבת העבודה</label>
+            <select
+              id="s-folder"
+              className="select"
+              value={folders.some((f) => f.id === board.folderId) ? board.folderId! : ''}
+              disabled={moveBoard.isPending}
+              onChange={(e) => moveBoard.mutate({ boardId: board.id, workspaceId: board.workspaceId, folderId: e.target.value || null }, { onSuccess: () => toast('הלוח שויך'), onError: (err) => toast(errorMessage(err), 'error') })}
+            >
+              <option value="">ללא תיקייה</option>
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
                 </option>
               ))}
             </select>

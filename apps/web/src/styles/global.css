@@ -4266,3 +4266,19 @@ kbd {
   align-items: center;
   gap: var(--space-1);
 }
+
+/* Folders of a workspace, nested under it in the workspace manager. */
+.item-list .folder-list {
+  flex-basis: 100%;
+  margin: 0;
+  padding-inline-start: var(--space-5);
+}
+.item-list .folder-list li {
+  padding: var(--space-2) 0;
+  border-bottom: 0;
+}
+.item-list .folder-list .toolbar {
+  flex: 1;
+  flex-wrap: wrap;
+  margin: 0;
+}

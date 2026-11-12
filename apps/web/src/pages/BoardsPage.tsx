@@ -2,6 +2,7 @@ import { BOARD_ROLE_LABELS, createBoardSchema } from '@suboard/shared';
 import { useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { errorMessage } from '../api/client';
+import { boardSections } from '../modules/boardSections';
 import { useBoards, useCreateBoard, useTemplates, useWorkspaceMutations, useWorkspaces } from '../api/hooks';
 import { useAuth } from '../auth/AuthContext';
 import { Dialog } from '../components/Dialog';
@@ -161,11 +162,7 @@ export function BoardsPage() {
   const canCreate = user?.role === 'admin' || user?.role === 'manager';
   const workspaces = useWorkspaces();
   const sorted = [...(boards.data ?? [])].sort((x, y) => Number(y.favorite) - Number(x.favorite));
-  const known = new Set((workspaces.data ?? []).map((w) => w.id));
-  const sections = [
-    ...(workspaces.data ?? []).map((w) => ({ id: w.id, name: w.name, boards: sorted.filter((b) => b.workspaceId === w.id) })),
-    { id: 'none', name: known.size ? 'ללא סביבת עבודה' : 'כל הלוחות', boards: sorted.filter((b) => !b.workspaceId || !known.has(b.workspaceId)) },
-  ].filter((sec) => sec.boards.length > 0);
+  const sections = boardSections(sorted, workspaces.data ?? [], (workspaces.data ?? []).length ? 'ללא סביבת עבודה' : 'כל הלוחות');
 
   return (
     <>
@@ -227,7 +224,7 @@ export function BoardsPage() {
 /** Managers: create, rename and delete workspaces. Deleting one never deletes its boards. */
 function WorkspaceManager() {
   const q = useWorkspaces();
-  const { create, rename, remove } = useWorkspaceMutations();
+  const { create, rename, remove, addFolder, renameFolder, removeFolder } = useWorkspaceMutations();
   const { toast, confirm } = useFeedback();
   const [name, setName] = useState('');
   const onErr = (e: unknown) => toast(errorMessage(e), 'error');
@@ -239,7 +236,7 @@ function WorkspaceManager() {
   return (
     <details className="card workspace-manager">
       <summary>סביבות עבודה{q.data ? ` (${q.data.length})` : ''}</summary>
-      <p className="muted">סביבת עבודה מסדרת את רשימת הלוחות (למשל "תחזוקת גזים"). היא אינה נותנת הרשאות: מי רואה לוח נקבע רק לפי חברי הלוח. שיוך לוח נעשה בהגדרות הלוח.</p>
+      <p className="muted">סביבת עבודה מסדרת את רשימת הלוחות (למשל "תחזוקת גזים"). אפשר לחלק אותה לתיקיות. סביבה ותיקייה אינן נותנות הרשאות: מי רואה לוח נקבע רק לפי חברי הלוח. שיוך לוח לסביבה ולתיקייה נעשה בהגדרות הלוח.</p>
       {q.data && q.data.length > 0 && (
         <ul className="list-plain item-list">
           {q.data.map((w) => (
@@ -257,6 +254,31 @@ function WorkspaceManager() {
               >
                 מחיקה
               </button>
+              <ul className="list-plain folder-list" aria-label={`תיקיות בסביבת העבודה ${w.name}`}>
+                {w.folders.map((f) => (
+                  <li key={f.id}>
+                    <span className="muted" aria-hidden="true">
+                      תיקייה
+                    </span>
+                    <WorkspaceName kind="התיקייה" name={f.name} onSave={(n) => renameFolder.mutate({ id: f.id, name: n }, { onSuccess: () => toast('השם עודכן'), onError: onErr })} />
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ marginInlineStart: 'auto' }}
+                      aria-label={`מחיקה: התיקייה ${f.name} שבסביבת העבודה ${w.name}`}
+                      onClick={async () => {
+                        if (await confirm({ title: 'מחיקת תיקייה', message: `למחוק את התיקייה "${f.name}"? הלוחות שבה לא יימחקו — הם יישארו בסביבת העבודה "${w.name}".`, confirmLabel: 'מחיקה', danger: true }))
+                          removeFolder.mutate(f.id, { onSuccess: () => toast('התיקייה נמחקה'), onError: onErr });
+                      }}
+                    >
+                      מחיקה
+                    </button>
+                  </li>
+                ))}
+                <li>
+                  <NewFolder workspaceName={w.name} busy={addFolder.isPending} onAdd={(n, done) => addFolder.mutate({ workspaceId: w.id, name: n }, { onSuccess: (f) => (done(), toast(`התיקייה "${f.name}" נוצרה`)), onError: onErr })} />
+                </li>
+              </ul>
             </li>
           ))}
         </ul>
@@ -274,7 +296,25 @@ function WorkspaceManager() {
   );
 }
 
-function WorkspaceName({ name, onSave }: { name: string; onSave: (n: string) => void }) {
+function NewFolder({ workspaceName, busy, onAdd }: { workspaceName: string; busy: boolean; onAdd: (name: string, done: () => void) => void }) {
+  const [name, setName] = useState('');
+  return (
+    <form
+      className="toolbar"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (name.trim()) onAdd(name.trim(), () => setName(''));
+      }}
+    >
+      <input className="input" placeholder="תיקייה חדשה" value={name} maxLength={60} aria-label={`שם תיקייה חדשה בסביבת העבודה ${workspaceName}`} onChange={(e) => setName(e.target.value)} />
+      <button type="submit" className="btn btn-sm" disabled={busy || !name.trim()}>
+        הוספת תיקייה ל{workspaceName}
+      </button>
+    </form>
+  );
+}
+
+function WorkspaceName({ name, onSave, kind = 'סביבת העבודה' }: { name: string; onSave: (n: string) => void; kind?: string }) {
   const [draft, setDraft] = useState(name);
   return (
     <input
@@ -282,7 +322,7 @@ function WorkspaceName({ name, onSave }: { name: string; onSave: (n: string) => 
       style={{ maxInlineSize: '18rem', fontWeight: 600 }}
       value={draft}
       maxLength={60}
-      aria-label={`שם סביבת העבודה ${name}`}
+      aria-label={`שם ${kind} ${name}`}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => {
         const t = draft.trim();

@@ -345,7 +345,7 @@ export const createApiTokenSchema = z.object({
 });
 
 export const workspaceSchema = z.object({ name: line(60) });
-export const moveBoardSchema = z.object({ workspaceId: idSchema.nullable() });
+export const moveBoardSchema = z.object({ workspaceId: idSchema.nullable(), folderId: idSchema.nullable().optional() });
 
 export const setModulesSchema = z.object({ modules: z.record(z.string().max(40), z.boolean()) });
 

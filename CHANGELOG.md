@@ -2,6 +2,12 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.15.0 — 2026-11-12
+
+### Added
+- Folders inside a workspace. Managers create, rename and delete them; a board's owner files the board in a folder from the board settings. The boards page and the side menu group boards as "workspace › folder".
+- Like workspaces, folders only organise: they grant no access, deleting one never deletes boards, and a folder's name is shown only to people who can see a board in it.
+
 ## 1.14.0 — 2026-11-12
 
 ### Added
