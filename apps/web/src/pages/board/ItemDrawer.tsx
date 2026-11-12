@@ -13,6 +13,7 @@ import { childrenOf, depthOf, descendantsOf, doneToggle, MAX_DEPTH, subtaskProgr
 import { PersonalSection, SaveItemTemplateButton } from './PersonalPanel';
 import { appLink } from '../../api/base';
 import { AttachmentsPanel } from './AttachmentsPanel';
+import { FormatBar, RichText } from '../../components/RichText';
 import { LinksSection } from './LinksSection';
 import { DependenciesSection } from './DependenciesSection';
 
@@ -207,6 +208,7 @@ function DetailsPanel({
               boardId={board.id}
               related={board.relations?.[item.id]?.[c.id]}
               mirrored={board.mirrors?.[item.id]?.[c.id]}
+              fileCount={board.fileCounts?.[item.id]}
               overdue={overdue && c.settings.role === 'due'}
               onChange={(v) => undo.setValue(item, c.id, v)}
             />
@@ -606,6 +608,7 @@ function UpdatesPanel({ board, itemId }: { board: BoardDetail; itemId: string })
         <form onSubmit={submit} noValidate style={{ marginBottom: '1.25rem' }}>
           <div className="field">
             <label htmlFor="update-body">עדכון חדש</label>
+            <FormatBar target={bodyRef} value={body} onChange={setBody} label="עיצוב העדכון" />
             <textarea
               id="update-body"
               ref={bodyRef}
@@ -617,7 +620,7 @@ function UpdatesPanel({ board, itemId }: { board: BoardDetail; itemId: string })
               aria-describedby={`update-hint${error ? ' update-error' : ''}`}
             />
             <span id="update-hint" className="hint">
-              אין להזין מידע רפואי או פרטים מזהים רגישים של נפגעים או עובדים.
+              אפשר לעצב: **מודגש**, *נטוי*, שורה שמתחילה ב-"- " לרשימה; כתובת https הופכת לקישור. אין להזין מידע רפואי או פרטים מזהים רגישים של נפגעים או עובדים.
             </span>
             {error && (
               <span id="update-error" className="error" role="alert">
@@ -723,7 +726,7 @@ function UpdateCard({
           </button>
         )}
       </header>
-      <div className="body">{u.body}</div>
+      <RichText className="body" text={u.body} />
       <Reactions itemId={itemId} update={u} canEdit={canEdit} />
     </article>
   );

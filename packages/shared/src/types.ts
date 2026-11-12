@@ -116,6 +116,8 @@ export interface BoardDetail {
   updatedAt: string;
   /** Present when the board has a `linked` column: per item, linked items the viewer may see and how many are done. */
   linkStats?: Record<string, LinkStat>;
+  /** Present when the board has a `files` column: item id → number of attached files (not counting blocked ones). */
+  fileCounts?: Record<string, number>;
   /** Relation columns: item id → column id → connected items the viewer may see. */
   relations?: Record<string, Record<string, RelatedItem[]>>;
   /** Mirror columns: item id → column id → the mirrored values as text (one per connected item). */

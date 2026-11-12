@@ -4141,3 +4141,39 @@ kbd {
 .status-battery-none {
   background: var(--surface-sunken);
 }
+
+/* ---- formatted updates */
+.rich-text > :first-child {
+  margin-block-start: 0;
+}
+.rich-text > :last-child {
+  margin-block-end: 0;
+}
+.rich-text p,
+.rich-text ul,
+.rich-text ol {
+  margin-block: 0 var(--space-2);
+}
+.rich-text ul,
+.rich-text ol {
+  padding-inline-start: 1.4rem;
+}
+.rich-text code {
+  background: var(--surface-sunken);
+  border-radius: 4px;
+  padding: 0 4px;
+  unicode-bidi: isolate;
+}
+.rich-text a {
+  overflow-wrap: anywhere;
+}
+.format-bar {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  margin-block-end: var(--space-1);
+}
+
+.rich-text {
+  white-space: normal;
+}

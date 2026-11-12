@@ -59,3 +59,28 @@ describe('wave R — removing a label in use, saved advanced filters', () => {
     expect((await c.post(`/api/boards/${b.id}/views`, { name: 'x', config: { view: 'table', filter: { match: 'all', rules: many } } })).statusCode).toBe(400);
   });
 });
+
+describe('wave S — files column', () => {
+  it('counts the files of each item, without infected ones, and is read-only', async () => {
+    ctx = await setup();
+    const { client: c } = await loggedIn(ctx, 'boss@x.org', 'manager');
+    const b = (await c.post('/api/boards', { name: 'ביקורות', templateKey: 'blank' })).json().board as BoardDetail;
+    const mk = async (name: string) => (await c.post(`/api/boards/${b.id}/items`, { groupId: b.groups[0]!.id, name })).json().item as { id: string };
+    const one = await mk('א');
+    const two = await mk('ב');
+    expect((await c.get(`/api/boards/${b.id}`)).json().board.fileCounts).toBeUndefined();
+    const col = (await c.post(`/api/boards/${b.id}/columns`, { title: 'תמונות', type: 'files' })).json().column;
+    const add = (itemId: string, status: string) =>
+      ctx.db
+        .prepare("INSERT INTO attachments (id, item_id, board_id, original_name, mime, size, sha256, status, created_at) VALUES (?, ?, ?, 'a.png', 'image/png', 10, 'x', ?, ?)")
+        .run(`${itemId}-${status}-${Math.random()}`, itemId, b.id, status, new Date().toISOString());
+    add(one.id, 'clean');
+    add(one.id, 'pending');
+    add(one.id, 'infected');
+    expect((await c.get(`/api/boards/${b.id}`)).json().board.fileCounts).toEqual({ [one.id]: 2 });
+    expect((await c.patch(`/api/items/${two.id}`, { values: { [col.id]: 3 } })).statusCode).toBe(400);
+    const csv = (await c.get(`/api/boards/${b.id}/export.csv`)).body.split('\n');
+    expect(csv[1]!.trim().split(',')).toContain('2');
+    expect(csv[2]!.trim().split(',')).toContain('0');
+  });
+});

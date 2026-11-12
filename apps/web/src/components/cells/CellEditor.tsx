@@ -38,6 +38,8 @@ export interface CellEditorProps {
   boardId?: string;
   related?: RelatedItem[];
   mirrored?: string[];
+  /** For `files` columns: how many files the item has. */
+  fileCount?: number;
 }
 
 /** Text-like input that commits on blur / Enter and reverts on Escape. */
@@ -108,7 +110,7 @@ function checklistLabel(label: string, column: Column, value: unknown): string {
 }
 
 export function CellEditor(props: CellEditorProps) {
-  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, columns, values, linkStat, itemId, boardId, related, mirrored } = props;
+  const { column, value, onChange, readOnly, users, assignable, label, overdue, mode = 'table', onOpenItem, id, seq, createdBy, updatedAt, columns, values, linkStat, itemId, boardId, related, mirrored, fileCount } = props;
   const options = column.settings.options ?? [];
   const autoId = useId();
   const inputId = id ?? autoId;
@@ -120,6 +122,20 @@ export function CellEditor(props: CellEditorProps) {
           {seq ? formatAutoId(seq, column.settings.prefix) : '—'}
         </span>
       );
+
+    case 'files': {
+      const n = fileCount ?? 0;
+      const text = n === 0 ? 'אין קבצים' : n === 1 ? 'קובץ אחד' : `${n} קבצים`;
+      return mode === 'table' && onOpenItem ? (
+        <button type="button" className="long-text-btn" id={inputId} onClick={onOpenItem} aria-label={`${text} — ${label}: פתיחת הפריט`}>
+          {n === 0 ? '—' : text}
+        </button>
+      ) : (
+        <span className="cell-readonly" id={inputId}>
+          {text} <span className="muted">(בלשונית "קבצים")</span>
+        </span>
+      );
+    }
 
     case 'relation':
       if (!itemId || !boardId) return <span className="cell-readonly" id={inputId}>—</span>;

@@ -266,6 +266,7 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
     case 'linked':
     case 'relation':
     case 'mirror':
+    case 'files':
       // Computed from the item; any client value is rejected.
       return z.never();
     case 'risk':

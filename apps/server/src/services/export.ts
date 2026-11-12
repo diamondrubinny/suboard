@@ -19,7 +19,8 @@ export function csvField(value: string): string {
 }
 
 /** Human-readable text for a cell (labels instead of ids, Israeli dates, names instead of user ids). */
-export function formatCell(c: Column, v: CellValue | undefined, item: Item, users: Map<string, string>, allColumns: Column[] = [], linkStats?: Record<string, { total: number; done: number }>, related?: Pick<BoardDetail, 'relations' | 'mirrors'>): string {
+export function formatCell(c: Column, v: CellValue | undefined, item: Item, users: Map<string, string>, allColumns: Column[] = [], linkStats?: Record<string, { total: number; done: number }>, related?: Pick<BoardDetail, 'relations' | 'mirrors' | 'fileCounts'>): string {
+  if (c.type === 'files') return String(related?.fileCounts?.[item.id] ?? 0);
   if (c.type === 'relation') return (related?.relations?.[item.id]?.[c.id] ?? []).map((r) => r.name).join('; ');
   if (c.type === 'mirror') return (related?.mirrors?.[item.id]?.[c.id] ?? []).join('; ');
   if (c.type === 'auto_id') return formatAutoId(item.seq, c.settings.prefix);

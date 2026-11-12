@@ -2,6 +2,12 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.4.0 — 2026-11-12
+
+### Added
+- Formatting in updates: bold, italic, code, bullet and numbered lists, automatic links for http(s) addresses, with a small toolbar. Stored as plain text and rendered without HTML.
+- Files column: the number of files attached to each item; opens the item.
+
 ## 1.3.0 — 2026-11-12
 
 ### Added

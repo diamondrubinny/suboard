@@ -33,12 +33,13 @@ export const COLUMN_TYPES = [
   'linked',
   'relation',
   'mirror',
+  'files',
 ] as const;
 
 /** Column types that hold a list of label options in their settings. */
 export const OPTION_COLUMN_TYPES = ['status', 'tags'] as const;
 /** Column types computed by the server (not editable by users). */
-export const READONLY_COLUMN_TYPES = ['auto_id', 'created_by', 'updated_at', 'formula', 'linked', 'relation', 'mirror'] as const;
+export const READONLY_COLUMN_TYPES = ['auto_id', 'created_by', 'updated_at', 'formula', 'linked', 'relation', 'mirror', 'files'] as const;
 export type ColumnType = (typeof COLUMN_TYPES)[number];
 /** Computed from the item itself (running number, creator, last update): no stored value, never edited. */
 export function isReadonlyColumnType(type: ColumnType): boolean {
@@ -100,6 +101,7 @@ export const COLUMN_TYPE_LABELS: Record<ColumnType, string> = {
   linked: 'פריטים מקושרים (התקדמות)',
   relation: 'חיבור ללוח אחר',
   mirror: 'מראה (ערך מהפריט המחובר)',
+  files: 'קבצים (מספר הקבצים בפריט)',
 };
 
 export const LIMITS = {

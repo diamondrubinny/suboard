@@ -139,8 +139,17 @@ export class BoardService {
       updatedAt: b.updated_at,
       ...(this.columns(boardId).some((c) => c.type === 'linked') ? { linkStats: this.linkStats(actor, boardId) } : {}),
       ...this.relationData(actor, boardId),
+      ...(this.columns(boardId).some((c) => c.type === 'files') ? { fileCounts: this.fileCounts(boardId) } : {}),
       favorite: this.db.prepare('SELECT 1 FROM board_favorites WHERE user_id = ? AND board_id = ?').get(actor.id, boardId) !== undefined,
     };
+  }
+
+  /** Attached files per item (files found infected are not counted). */
+  fileCounts(boardId: string): Record<string, number> {
+    const rows = this.db
+      .prepare("SELECT a.item_id, COUNT(*) AS n FROM attachments a JOIN items i ON i.id = a.item_id AND i.deleted_at IS NULL WHERE a.board_id = ? AND a.status <> 'infected' GROUP BY a.item_id")
+      .all(boardId) as { item_id: string; n: number }[];
+    return Object.fromEntries(rows.map((r) => [r.item_id, r.n]));
   }
 
   /**
