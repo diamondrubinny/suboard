@@ -2,6 +2,11 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.22.1 — 2026-11-13
+
+### Fixed
+- On a phone, the view switcher of a board with many views (timeline, risk map, chart) wraps to a second row instead of making the page scroll sideways.
+
 ## 1.22.0 — 2026-11-13
 
 ### Added
