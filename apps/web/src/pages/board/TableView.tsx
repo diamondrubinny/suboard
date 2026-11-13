@@ -1,7 +1,8 @@
 import { COLUMN_WIDTH, PALETTE, todayIso, isOverdue, type BoardDetail, type CellValue, type Column, type DirectoryUser, type Group, type Item, type ViewConfig, evaluateFormula, COLOR_KEYS, canEditColumn } from '@suboard/shared';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { errorMessage } from '../../api/client';
-import { useCreateItem, useGroupMutations, useUpdateItem } from '../../api/hooks';
+import { useCreateItem, useGroupMutations, useTeams, useUpdateItem } from '../../api/hooks';
+import { useAuth } from '../../auth/AuthContext';
 import { CellEditor } from '../../components/cells/CellEditor';
 import { useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
@@ -339,7 +340,11 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
   const hidden = new Set(config.hidden ?? []);
   const columns = board.columns.filter((c) => !hidden.has(c.id));
   // Sub-items of every parent, from the full board (a parent shows its children even when only it matched a filter).
-  const childrenOf = (id: string) => sortItems(board.items.filter((i) => i.parentId === id), board.columns, config.sort, users, board);
+  // Names for sorting: people, plus teams when the board has a team column (guests cannot read teams).
+  const { user: me } = useAuth();
+  const teams = useTeams(Boolean(me) && !me!.guest && board.columns.some((c) => c.type === 'team'));
+  const sortNames = teams.data?.length ? [...users, ...teams.data.map((t) => ({ id: t.id, name: t.name }))] : users;
+  const childrenOf = (id: string) => sortItems(board.items.filter((i) => i.parentId === id), board.columns, config.sort, sortNames, board);
   const matchingIds = new Set(items.map((i) => i.id));
 
   const { setValue, rename } = useUndoableUpdate(board);
@@ -512,7 +517,7 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
           board.items.filter((i) => !i.parentId && match(i) && (matchingIds.has(i.id) || parentIds.has(i.id))),
           board.columns,
           config.sort,
-          users,
+          sortNames,
           board,
         );
         const isCollapsed = collapsed[group.id] ?? false;

@@ -1,5 +1,6 @@
 import { PALETTE, type ColorKey, type ColumnType } from './constants.js';
 import { evaluateFormula } from './formula.js';
+import type { FilterRule } from './filters.js';
 import type { Column, Group, Item } from './types.js';
 
 /** Column types a board chart can split the items by (besides the board's own groups). */
@@ -31,6 +32,8 @@ export interface ChartInput {
 }
 
 const NONE = '__none__';
+/** Key of the bar that holds items without a value. */
+export const CHART_NONE_KEY = NONE;
 
 /**
  * Splits items into the bars of a chart. Order: the natural order of the split (groups, status
@@ -106,3 +109,16 @@ export function chartBuckets({ items, columns, groups, by, valueColumnId, names,
   const rank = (b: ChartBucket): number => (b.key === NONE ? Number.MAX_SAFE_INTEGER : order ? (order.indexOf(b.key) < 0 ? Number.MAX_SAFE_INTEGER - 1 : order.indexOf(b.key)) : 0);
   return list.sort((a, b) => rank(a) - rank(b) || (order ? 0 : b.value - a.value) || a.label.localeCompare(b.label, 'he'));
 }
+
+/**
+ * The filter rule that shows exactly the items of one bar, or null when the split cannot be
+ * expressed as a rule (the board's groups).
+ */
+export function chartBucketRule(column: Column | undefined, key: string): FilterRule | null {
+  if (!column || !CHART_BY_TYPES.includes(column.type)) return null;
+  if (column.type === 'checkbox') return { columnId: column.id, op: key === 'yes' ? 'checked' : 'unchecked' };
+  if (key === NONE) return { columnId: column.id, op: 'empty' };
+  if (column.type === 'rating') return { columnId: column.id, op: 'eq', value: Number(key) };
+  return { columnId: column.id, op: 'any_of', value: [key] };
+}
+

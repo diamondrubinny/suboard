@@ -1,4 +1,4 @@
-import { CHART_BY_TYPES, CHART_VALUE_TYPES, chartBuckets, todayIso, type BoardDetail, type DirectoryUser, type Item } from '@suboard/shared';
+import { CHART_BY_TYPES, CHART_VALUE_TYPES, chartBucketRule, chartBuckets, todayIso, type BoardDetail, type DirectoryUser, type FilterRule, type Item } from '@suboard/shared';
 import { useMemo } from 'react';
 import { useTeams } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
@@ -13,6 +13,8 @@ interface Props {
   by?: string;
   valueColumnId?: string;
   onChange: (patch: { chartBy?: string; chartValueColumnId?: string | undefined }) => void;
+  /** Show the items of one bar in the table (adds a filter rule). Omitted when it cannot be combined with the current filter. */
+  onDrill?: (rule: FilterRule, label: string) => void;
 }
 
 const fmt = (n: number) => new Intl.NumberFormat('he-IL', { maximumFractionDigits: 1 }).format(n);
@@ -22,7 +24,7 @@ const fmt = (n: number) => new Intl.NumberFormat('he-IL', { maximumFractionDigit
  * number of items or the sum of a number column. A list with numbers, not a picture — the bars are
  * decoration, every value is readable as text.
  */
-export function ChartView({ board, items, users, by, valueColumnId, onChange }: Props) {
+export function ChartView({ board, items, users, by, valueColumnId, onChange, onDrill }: Props) {
   const { user } = useAuth();
   const teams = useTeams(Boolean(user) && !user!.guest && board.columns.some((c) => c.type === 'team'));
   const byColumns = board.columns.filter((c) => CHART_BY_TYPES.includes(c.type));
@@ -37,6 +39,7 @@ export function ChartView({ board, items, users, by, valueColumnId, onChange }: 
   const max = Math.max(1, ...buckets.map((b) => Math.abs(b.value)));
   const total = buckets.reduce((a, b) => a + b.value, 0);
   const byTitle = effectiveBy === 'group' ? 'קבוצה' : (byColumns.find((c) => c.id === effectiveBy)?.title ?? '');
+  const byColumn = byColumns.find((c) => c.id === effectiveBy);
   const unit = valueCol?.settings.unit ?? '';
   const show = (n: number) => `${fmt(n)}${unit ? ` ${unit}` : ''}`;
   const multi = effectiveBy !== 'group' && ['tags', 'person', 'team'].includes(byColumns.find((c) => c.id === effectiveBy)?.type ?? '');
@@ -79,7 +82,18 @@ export function ChartView({ board, items, users, by, valueColumnId, onChange }: 
           <ul className="list-plain status-bars chart-bars" aria-label={`${valueCol ? `סכום ${valueCol.title}` : 'מספר הפריטים'} לפי ${byTitle}`}>
             {buckets.map((b) => (
               <li key={b.key}>
-                <span className="status-bar-label">{b.label}</span>
+                <span className="status-bar-label">
+                  {(() => {
+                    const rule = onDrill ? chartBucketRule(byColumn, b.key) : null;
+                    return rule ? (
+                      <button type="button" className="link-btn" onClick={() => onDrill!(rule, b.label)} aria-label={`${b.label} — הצגת הפריטים בטבלה`} title="הצגת הפריטים בטבלה">
+                        {b.label}
+                      </button>
+                    ) : (
+                      b.label
+                    );
+                  })()}
+                </span>
                 <span className="status-bar-track" aria-hidden="true">
                   <span className="status-bar-fill" style={{ ...(b.color ? colorStyle(b.color) : {}), inlineSize: `${(Math.abs(b.value) / max) * 100}%` }} />
                 </span>
@@ -99,7 +113,7 @@ export function ChartView({ board, items, users, by, valueColumnId, onChange }: 
                 {valueCol && <> ב-{items.length} פריטים</>}.
               </>
             )}{' '}
-            התרשים מציג את הפריטים שהלוח מציג כרגע (אחרי חיפוש וסינון), בלי תת-פריטים.
+            התרשים מציג את הפריטים שהלוח מציג כרגע (אחרי חיפוש וסינון), בלי תת-פריטים.{onDrill && byColumn ? ' לחיצה על שם של עמודה בתרשים מציגה את הפריטים שלה בטבלה.' : ''}
           </p>
         </>
       )}

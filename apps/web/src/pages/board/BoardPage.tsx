@@ -1,6 +1,6 @@
 import { FilterBuilder } from './FilterBuilder';
 import { apiUrl } from '../../api/base';
-import { BOARD_ROLE_LABELS, findPrimaryStatusColumn, viewConfigSchema, type SavedView, type ViewConfig } from '@suboard/shared';
+import { BOARD_ROLE_LABELS, findPrimaryStatusColumn, viewConfigSchema, type SavedView, type ViewConfig, MAX_FILTER_RULES } from '@suboard/shared';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ApiError, errorMessage } from '../../api/client';
@@ -321,7 +321,19 @@ export function BoardPage() {
         <GanttView board={b} items={filteredItems.filter((i) => !i.parentId)} onOpenItem={openItem} scale={config.ganttScale ?? 'week'} onScaleChange={(ganttScale) => patch({ ganttScale })} />
       )}
       {config.view === 'chart' && (
-        <ChartView board={b} items={filteredItems.filter((i) => !i.parentId)} users={users} by={config.chartBy} valueColumnId={config.chartValueColumnId} onChange={(p) => patch(p)} />
+        <ChartView board={b} items={filteredItems.filter((i) => !i.parentId)} users={users} by={config.chartBy}
+          valueColumnId={config.chartValueColumnId}
+          onChange={(p) => patch(p)}
+          // A bar becomes one more "and" condition; with an "any of" filter that would change its meaning, so no drill-down then.
+          onDrill={
+            config.filter?.rules.length && (config.filter.match === 'any' || config.filter.rules.length >= MAX_FILTER_RULES)
+              ? undefined
+              : (rule, label) => {
+                  patch({ view: 'table', filter: { match: 'all', rules: [...(config.filter?.rules ?? []), rule] } });
+                  toast(`מוצגים הפריטים של "${label}". אפשר להסיר את התנאי ב"סינון מתקדם".`);
+                }
+          }
+        />
       )}
       {config.view === 'risk' && (
         <RiskMatrixView board={b} items={filteredItems.filter((i) => !i.parentId)} onOpenItem={openItem} columnId={config.riskColumnId} onColumnChange={(id) => patch({ riskColumnId: id })} />

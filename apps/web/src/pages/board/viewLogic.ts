@@ -45,6 +45,7 @@ function sortKey(c: Column | undefined, v: CellValue | undefined, item: Item, us
     case 'tags':
       return Array.isArray(v) ? (c.settings.options?.find((o) => o.id === v[0])?.label ?? null) : null;
     case 'person':
+    case 'team': // the caller adds the teams to `users` (ids never collide)
       return Array.isArray(v) ? (users.find((u) => u.id === v[0])?.name ?? null) : null;
     case 'date_range':
       return isDateRange(v) ? v.from : null;

@@ -280,7 +280,7 @@ describe('formula columns', () => {
 // ---------------------------------------------------------------- advanced filter
 import { filterOpsFor, matchesBoardFilter, type BoardFilter } from './filters.js';
 import { renderRuleMessage } from './logic.js';
-import { chartBuckets } from './chart.js';
+import { chartBucketRule, chartBuckets, CHART_NONE_KEY } from './chart.js';
 import type { Column as XCol, Item as XItem } from './types.js';
 
 describe('advanced board filter', () => {
@@ -434,6 +434,23 @@ describe('board chart buckets', () => {
     expect(run('txt')).toEqual(run('group')); // not a chartable column → groups
     expect(run('nope')).toEqual(run('group'));
     expect(chartBuckets({ items: [], columns: cols, groups: groups as never, by: 'st', names, today: '2026-11-13' })).toEqual([]);
+  });
+
+  it('every bar can be turned into a filter rule that selects exactly its items', () => {
+    const find = (id: string) => cols.find((x) => x.id === id);
+    expect(chartBucketRule(undefined, 'g1')).toBeNull(); // groups are not a filter
+    expect(chartBucketRule(find('txt'), 'x')).toBeNull();
+    for (const by of ['st', 'tg', 'who', 'tm', 'ok']) {
+      const buckets = chartBuckets({ items, columns: cols, groups: groups as never, by, names, today: '2026-11-13' });
+      for (const b of buckets) {
+        const rule = chartBucketRule(find(by), b.key)!;
+        const hit = items.filter((i) => matchesBoardFilter({ match: 'all', rules: [rule] }, i, cols, '2026-11-13'));
+        // 'gone' is a label id that no longer exists: the chart counts it under "none", the filter sees a value
+        if (by === 'st' && b.key === CHART_NONE_KEY) continue;
+        expect(hit.length, `${by}/${b.label}`).toBe(b.count);
+      }
+    }
+    expect(chartBucketRule({ ...find('ok')!, type: 'rating' }, '4')).toEqual({ columnId: 'ok', op: 'eq', value: 4 });
   });
 });
 

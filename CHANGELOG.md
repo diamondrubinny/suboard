@@ -2,6 +2,12 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.23.0 — 2026-11-13
+
+### Added
+- Chart: pressing a bar's name shows its items in the table, as one more condition of the advanced filter (removable there). Not offered for the board's groups, or when the current filter is "any of".
+- Table: sorting by a team column (by the team's name).
+
 ## 1.22.1 — 2026-11-13
 
 ### Fixed
