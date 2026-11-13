@@ -91,10 +91,13 @@ export class DashboardService {
   /** Every open item / sub-item assigned to the actor, across the boards they can see, by due date. */
   myWork(actor: Actor): MyWorkItem[] {
     const out: MyWorkItem[] = [];
+    // Teams the actor belongs to: an item assigned to one of them is the actor's work too.
+    const myTeams = new Map((this.db.prepare('SELECT t.id, t.name FROM team_members tm JOIN teams t ON t.id = tm.team_id WHERE tm.user_id = ?').all(actor.id) as { id: string; name: string }[]).map((t) => [t.id, t.name]));
     for (const boardId of this.access.accessibleBoardIds(actor)) {
       const columns = this.boards.columns(boardId);
       const personCols = columns.filter((c) => c.type === 'person');
-      if (!personCols.length) continue;
+      const teamCols = myTeams.size ? columns.filter((c) => c.type === 'team') : [];
+      if (!personCols.length && !teamCols.length) continue;
       const { name: boardName } = this.db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string };
       const statusCol = findPrimaryStatusColumn(columns);
       const dueCol = findDueColumn(columns);
@@ -105,8 +108,10 @@ export class DashboardService {
       const names = new Map(items.map((i) => [i.id, i.name]));
       for (const item of items) {
         if (isItemDone(item, statusCol)) continue;
-        if (!personCols.some((c) => Array.isArray(item.values[c.id]) && (item.values[c.id] as string[]).includes(actor.id))) continue;
-        out.push({ ...this.ref(item, boardName, statusCol, dueCol), parentId: item.parentId, parentName: item.parentId ? (names.get(item.parentId) ?? null) : null, complete, statusId: statusCol && typeof item.values[statusCol.id] === 'string' ? (item.values[statusCol.id] as string) : null });
+        const direct = personCols.some((c) => Array.isArray(item.values[c.id]) && (item.values[c.id] as string[]).includes(actor.id));
+        const teamId = direct ? undefined : teamCols.flatMap((c) => (Array.isArray(item.values[c.id]) ? (item.values[c.id] as string[]) : [])).find((id) => myTeams.has(id));
+        if (!direct && !teamId) continue;
+        out.push({ ...this.ref(item, boardName, statusCol, dueCol), ...(teamId ? { viaTeam: myTeams.get(teamId)! } : {}), parentId: item.parentId, parentName: item.parentId ? (names.get(item.parentId) ?? null) : null, complete, statusId: statusCol && typeof item.values[statusCol.id] === 'string' ? (item.values[statusCol.id] as string) : null });
       }
     }
     return out.sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999') || a.itemName.localeCompare(b.itemName, 'he')).slice(0, 500);

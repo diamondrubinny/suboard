@@ -2,6 +2,12 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.20.0 — 2026-11-13
+
+### Added
+- Assigning a team to an item is now real work for its people: team members who can see the board are notified, the item appears in their "המשימות שלי" (marked with the team's name), and it is included in their daily overdue / due-tomorrow reminders.
+- A team still grants no access: team members who are not on the board hear nothing and see nothing.
+
 ## 1.19.0 — 2026-11-13
 
 ### Added

@@ -161,6 +161,32 @@ export class NotificationService {
     return recipients.length;
   }
 
+  /**
+   * Called after an item's team columns change: notifies the people of the newly-added teams who can
+   * see the board (a team grants no access, so its other members hear nothing). Not the actor, and
+   * not people who were just assigned by name — they already got that notification.
+   */
+  onTeamAssigned(actor: Sender, boardId: string, itemId: string, itemName: string, teamIds: string[], alreadyNotified: string[] = []): void {
+    if (!teamIds.length) return;
+    const skip = new Set([actor.id, ...alreadyNotified]);
+    const boardName = (this.db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string } | undefined)?.name ?? '';
+    const sent = new Set<string>();
+    for (const teamId of new Set(teamIds)) {
+      const team = this.db.prepare('SELECT name FROM teams WHERE id = ?').get(teamId) as { name: string } | undefined;
+      if (!team) continue;
+      const members = (this.db.prepare('SELECT user_id FROM team_members WHERE team_id = ?').all(teamId) as { user_id: string }[]).map((r) => r.user_id);
+      for (const userId of this.usersWithAccess(boardId, members)) {
+        if (skip.has(userId) || sent.has(userId)) continue;
+        sent.add(userId);
+        const id = this.insert(userId, 'assigned', boardId, itemId, itemName, actor.id);
+        void this.emailOne(userId, id, {
+          subject: 'SUBoard: הצוות שלך שויך לפריט',
+          lines: [{ text: `${actor.name} שייך/ה את הצוות "${team.name}" לפריט "${itemName}" בלוח "${boardName}".`, boardId, itemId }],
+        });
+      }
+    }
+  }
+
   /** Called after an item's person columns change: notifies newly-added assignees (not the actor). */
   onAssigned(actor: Sender, boardId: string, itemId: string, itemName: string, newAssignees: string[]): void {
     const boardName = (this.db.prepare('SELECT name FROM boards WHERE id = ?').get(boardId) as { name: string } | undefined)?.name ?? '';
@@ -271,6 +297,12 @@ export class NotificationService {
    * digest e-mail. Returns the number of notifications created.
    */
   async runDailyReminders(now: Date = new Date(), force = false): Promise<number> {
+    const teamCache = new Map<string, Set<string>>();
+    const teamsOf = (userId: string): Set<string> => {
+      let t = teamCache.get(userId);
+      if (!t) teamCache.set(userId, (t = new Set((this.db.prepare('SELECT team_id FROM team_members WHERE user_id = ?').all(userId) as { team_id: string }[]).map((r) => r.team_id))));
+      return t;
+    };
     const today = todayIso(this.config.timeZone, now);
     const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: this.config.timeZone, hour: '2-digit', hourCycle: 'h23' }).format(now));
     if (!force) {
@@ -297,11 +329,15 @@ export class NotificationService {
         if (!due) continue;
         const status = findPrimaryStatusColumn(columns);
         const persons = columns.filter((c) => c.type === 'person');
+        const teamCols = columns.filter((c) => c.type === 'team');
         const items = (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL').all(boardId) as ItemRow[]).map(toItem);
         for (const item of items) {
           const dueDate = item.values[due.id];
           if (typeof dueDate !== 'string' || isItemDone(item, status)) continue;
-          const assigned = persons.some((c) => Array.isArray(item.values[c.id]) && (item.values[c.id] as string[]).includes(user.id));
+          const assigned =
+            persons.some((c) => Array.isArray(item.values[c.id]) && (item.values[c.id] as string[]).includes(user.id)) ||
+            // an item of one of the user's teams is the user's too
+            teamCols.some((c) => Array.isArray(item.values[c.id]) && (item.values[c.id] as string[]).some((t) => teamsOf(user.id).has(t)));
           if (!assigned) continue;
           const kind: NotificationKind | null = dueDate < today ? 'overdue' : dueDate === tomorrow ? 'due_tomorrow' : null;
           if (!kind || exists.get(user.id, item.id, kind, today)) continue;

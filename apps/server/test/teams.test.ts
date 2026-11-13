@@ -49,6 +49,25 @@ describe('teams', () => {
     expect(res.added).toBe(1);
     expect(Object.fromEntries(res.members.map((m) => [m.userId, m.role]))).toEqual({ [bossUser.id]: 'owner', [noaUser.id]: 'viewer', [danUser.id]: 'editor' });
     expect((await dan.get(`/api/boards/${b.id}`)).statusCode).toBe(200);
+    // assigning the team is real work for its people on the board: notification + "my work"
+    const lab2 = (await boss.post('/api/teams', { name: 'צוות חיצוני' })).json().team as { id: string };
+    const { client: eve, user: eveUser } = await loggedIn(ctx, 'eve@x.org', 'member');
+    await boss.patch(`/api/teams/${lab2.id}`, { memberIds: [eveUser.id, danUser.id] });
+    const task = (await boss.post(`/api/boards/${b.id}/items`, { groupId: b.groups[0]!.id, name: 'כיול' })).json().item as { id: string };
+    const kinds = async (c: Client) => (await c.get('/api/notifications')).json().notifications.filter((n: { itemId: string }) => n.itemId === task.id).map((n: { kind: string }) => n.kind);
+    await boss.patch(`/api/items/${task.id}`, { values: { [col.id]: [lab2.id] } });
+    expect(await kinds(dan)).toEqual(['assigned']); // on the board and in the team
+    expect(await kinds(eve)).toEqual([]); // in the team, but the team grants no access to the board
+    expect(await kinds(noa)).toEqual([]); // on the board, not in that team
+    const work = (await dan.get('/api/me/work')).json().items as { itemId: string; viaTeam?: string }[];
+    expect(work.find((w) => w.itemId === task.id)).toMatchObject({ viaTeam: 'צוות חיצוני' });
+    expect((await eve.get('/api/me/work')).json().items).toEqual([]);
+    expect((await noa.get('/api/me/work')).json().items.some((w: { itemId: string }) => w.itemId === task.id)).toBe(false);
+    // saving the same team again does not notify again
+    await boss.patch(`/api/items/${task.id}`, { name: 'כיול שנתי', values: { [col.id]: [lab2.id] } });
+    expect(await kinds(dan)).toEqual(['assigned']);
+    expect((await boss.del(`/api/teams/${lab2.id}`)).statusCode).toBe(200);
+    expect((await dan.get('/api/me/work')).json().items.some((w: { itemId: string }) => w.itemId === task.id)).toBe(false);
     // a later change to the team does not change the board
     await boss.patch(`/api/teams/${gas.id}`, { memberIds: [] });
     expect((await dan.get(`/api/boards/${b.id}`)).statusCode).toBe(200);

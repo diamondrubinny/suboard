@@ -99,6 +99,17 @@ export class ItemService {
     return out;
   }
 
+  /** Teams newly added to team columns between two value sets. */
+  newTeams(boardId: string, prev: Record<string, unknown>, next: Record<string, unknown>): string[] {
+    const out: string[] = [];
+    for (const c of this.boards.columns(boardId)) {
+      if (c.type !== 'team' || !(c.id in next)) continue;
+      const before = new Set(Array.isArray(prev[c.id]) ? (prev[c.id] as string[]) : []);
+      for (const id of Array.isArray(next[c.id]) ? (next[c.id] as string[]) : []) if (!before.has(id)) out.push(id);
+    }
+    return out;
+  }
+
   /** A live (not deleted) item, or 404. */
   private getRow(itemId: string): Item {
     const r = this.db.prepare('SELECT * FROM items WHERE id = ? AND deleted_at IS NULL').get(itemId) as ItemRow | undefined;
@@ -300,7 +311,9 @@ export class ItemService {
       this.record(actor, boardId, 'item_created', { name: input.name, ...(input.parentId ? { parentId: input.parentId } : {}) }, id);
       this.boards.touch(boardId);
     })();
-    this.notifications.onAssigned(actor, boardId, id, input.name, this.newAssignees(boardId, {}, values));
+    const direct = this.newAssignees(boardId, {}, values);
+    this.notifications.onAssigned(actor, boardId, id, input.name, direct);
+    this.notifications.onTeamAssigned(actor, boardId, id, input.name, this.newTeams(boardId, {}, values), direct);
     this.openCorrectiveActions(id);
     return this.getRow(id);
   }
@@ -399,7 +412,9 @@ export class ItemService {
       this.boards.touch(boardId);
     })();
     if (Object.keys(patch).length) {
-      this.notifications.onAssigned(actor, boardId, itemId, this.getRow(itemId).name, this.newAssignees(boardId, item.values, patch));
+      const direct = this.newAssignees(boardId, item.values, patch);
+      this.notifications.onAssigned(actor, boardId, itemId, this.getRow(itemId).name, direct);
+      this.notifications.onTeamAssigned(actor, boardId, itemId, this.getRow(itemId).name, this.newTeams(boardId, item.values, patch), direct);
       this.openCorrectiveActions(itemId);
     }
     return this.getRow(itemId);

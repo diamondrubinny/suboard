@@ -792,6 +792,8 @@ export interface MyWorkItem extends DashboardItemRef {
   complete: { columnId: string; optionId: string } | null;
   /** Current option id of the primary status (to undo "mark done"). */
   statusId: string | null;
+  /** Set when the item is the user's through a team (not assigned by name): the team's name. */
+  viaTeam?: string;
 }
 
 // ---------- Wave M ----------

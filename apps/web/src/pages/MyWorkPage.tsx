@@ -94,6 +94,7 @@ export function MyWorkPage() {
                     <span className="muted">
                       {i.boardName}
                       {i.parentName && <> · תחת "{i.parentName}"</>}
+                      {i.viaTeam && <> · דרך הצוות "{i.viaTeam}"</>}
                     </span>
                     {i.dueDate && <span className={key === 'late' ? 'badge danger' : 'muted'}>{formatDateHe(i.dueDate)}</span>}
                     {i.statusLabel && <StatusPill label={i.statusLabel} color={i.statusColor} />}
