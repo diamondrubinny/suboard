@@ -9,6 +9,8 @@ import {
   updateWebhookSchema,
   moveBoardSchema,
   workspaceSchema,
+  updateTeamSchema,
+  addTeamToBoardSchema,
   idSchema,
   reactionSchema,
   saveTemplateSchema,
@@ -61,6 +63,21 @@ export async function boardRoutes(app: FastifyInstance, { services }: { services
   });
   app.get('/webhooks/:id/deliveries', async (req) => ({ deliveries: services.webhooks.deliveries(actorOf(req), param(req, 'id')) }));
   app.post('/webhooks/:id/test', { config: { rateLimit: { max: 20, timeWindow: 15 * 60_000 } } }, async (req) => ({ delivery: await services.webhooks.test(actorOf(req), param(req, 'id')) }));
+
+  // ---- teams (named groups of users; they grant nothing by themselves)
+  app.get('/teams', async () => ({ teams: services.teams.list() }));
+  app.post('/teams', { config: { rateLimit: { max: 30, timeWindow: 15 * 60_000 } } }, async (req, reply) =>
+    reply.code(201).send({ team: services.teams.create(actorOf(req), workspaceSchema.parse(req.body).name) }),
+  );
+  app.patch('/teams/:id', async (req) => ({ team: services.teams.update(actorOf(req), param(req, 'id'), updateTeamSchema.parse(req.body)) }));
+  app.delete('/teams/:id', async (req) => {
+    services.teams.remove(actorOf(req), param(req, 'id'));
+    return { ok: true };
+  });
+  app.post('/boards/:id/members/team', { config: { rateLimit: { max: 30, timeWindow: 15 * 60_000 } } }, async (req) => {
+    const input = addTeamToBoardSchema.parse(req.body);
+    return services.teams.addToBoard(actorOf(req), param(req, 'id'), input.teamId, input.role);
+  });
 
   // ---- workspaces (organisation of the board list only; access stays per board)
   app.get('/workspaces', async (req) => ({ workspaces: services.workspaces.list(actorOf(req)) }));

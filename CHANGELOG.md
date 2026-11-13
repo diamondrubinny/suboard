@@ -2,6 +2,14 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.19.0 — 2026-11-13
+
+### Added
+- Teams: named groups of users, managed by managers on a new "צוותים" page.
+- "Team" column type: one or more teams per item, with advanced filter and export.
+- Board settings: add everyone in a team to the board in one step. Existing members keep their role; later changes to the team do not change the board.
+- A team grants no access by itself. Guest accounts cannot be team members and cannot read the list of teams.
+
 ## 1.18.0 — 2026-11-13
 
 ### Added

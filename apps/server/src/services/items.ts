@@ -140,6 +140,9 @@ export class ItemService {
     return (row as { p: number }).p + 1;
   }
 
+  /** Wired after construction: which of these ids are existing teams. */
+  teamIds: (ids: string[]) => Set<string> = () => new Set();
+
   /** Users that may be assigned / mentioned on a board: active members, or system admins. */
   assertUsersOnBoard(boardId: string, ids: string[], label: string, field: string): void {
     if (!ids.length) return;
@@ -179,6 +182,12 @@ export class ItemService {
         const ids = [...new Set(v as string[])];
         if (ids.some((id) => !optionIds.has(id))) throw badRequest(`תגית לא קיימת בעמודה "${col.title}"`, { [columnId]: 'תגית לא קיימת' });
         v = ids;
+      }
+      if (col.type === 'team' && Array.isArray(v)) {
+        const ids = [...new Set(v as string[])];
+        const known = this.teamIds(ids);
+        if (ids.some((id) => !known.has(id))) throw badRequest(`צוות לא קיים בעמודה "${col.title}"`, { [columnId]: 'צוות לא קיים' });
+        v = ids.length ? ids : null;
       }
       if (col.type === 'person' && Array.isArray(v)) {
         const ids = [...new Set(v as string[])];

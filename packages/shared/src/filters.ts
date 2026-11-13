@@ -83,6 +83,7 @@ export function filterOpsFor(type: ColumnType | 'name'): FilterOp[] {
     case 'tags':
     case 'person':
     case 'color':
+    case 'team':
       return CHOICE_OPS;
     case 'checkbox':
       return ['checked', 'unchecked'];
@@ -173,7 +174,7 @@ function matchRule(rule: FilterRule, item: Item, columns: Column[], today: strin
     }
   }
 
-  if (c.type === 'status' || c.type === 'tags' || c.type === 'person' || c.type === 'color') {
+  if (c.type === 'status' || c.type === 'tags' || c.type === 'person' || c.type === 'color' || c.type === 'team') {
     const wanted = Array.isArray(rule.value) ? rule.value : [];
     const have = Array.isArray(raw) ? (raw as string[]) : typeof raw === 'string' ? [raw] : [];
     const hit = have.some((id) => wanted.includes(id));

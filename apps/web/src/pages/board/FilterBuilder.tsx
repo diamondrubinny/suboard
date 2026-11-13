@@ -13,6 +13,8 @@ import {
   type FilterRule,
 } from '@suboard/shared';
 import { useState } from 'react';
+import { useTeams } from '../../api/hooks';
+import { useAuth } from '../../auth/AuthContext';
 import { DateField } from '../../components/DateField';
 import { Dialog } from '../../components/Dialog';
 import { Icon } from '../../components/Icon';
@@ -126,13 +128,17 @@ export function FilterBuilder({ board, users, value, onChange }: { board: BoardD
 
 function RuleValue({ index, target, rule, users, board, onChange }: { index: number; target: Target; rule: FilterRule; users: DirectoryUser[]; board: BoardDetail; onChange: (v: FilterRule['value']) => void }) {
   const label = `ערך לתנאי ${index + 1}`;
+  const { user } = useAuth();
+  const teams = useTeams(target.type === 'team' && Boolean(user) && !user!.guest);
   if (rule.op === 'any_of' || rule.op === 'none_of') {
     const column = target as Column;
     const memberIds = new Set(board.members.map((m) => m.userId));
     const choices =
       column.type === 'person'
         ? users.filter((u) => memberIds.has(u.id)).map((u) => ({ id: u.id, label: u.name }))
-        : column.type === 'color'
+        : column.type === 'team'
+          ? (teams.data ?? []).map((t) => ({ id: t.id, label: t.name }))
+          : column.type === 'color'
           ? COLOR_KEYS.map((k) => ({ id: k as string, label: PALETTE[k].label }))
           : (column.settings.options ?? []).map((o) => ({ id: o.id, label: o.label }));
     const picked = Array.isArray(rule.value) ? rule.value : [];

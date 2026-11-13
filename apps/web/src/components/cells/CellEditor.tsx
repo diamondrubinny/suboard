@@ -1,7 +1,7 @@
 import { DateField } from '../DateField';
 import { RelationCell } from './RelationCell';
 import { TimeCell } from './TimeCell';
-import { ButtonCell, ColorCell, HourCell, VoteCell, WeekCell } from './MoreCells';
+import { ButtonCell, ColorCell, HourCell, VoteCell, WeekCell, TeamCell } from './MoreCells';
 import { evaluateFormula, formatFormulaValue, todayIso, checklistStats, isDateRange, formatAutoId, formatDateHe, formatDateTimeHe, type CellValue, type Column, type DirectoryUser, type LinkStat, type RelatedItem, type TimeTotal, type ColorKey, PALETTE, formatWeekHe, formatNumberCell } from '@suboard/shared';
 import { useEffect, useId, useState } from 'react';
 import { colorStyle, StatusPill } from '../StatusPill';
@@ -296,6 +296,9 @@ export function CellEditor(props: CellEditorProps) {
       if (readOnly) return <StatusPill label={current?.label} color={current?.color} />;
       return <StatusSelect id={inputId} options={options} value={current?.id ?? ''} label={label} onChange={(v) => onChange(v || null)} />;
     }
+
+    case 'team':
+      return <TeamCell value={Array.isArray(value) ? (value as string[]) : []} readOnly={Boolean(readOnly)} label={label} onChange={onChange} />;
 
     case 'person': {
       const ids = Array.isArray(value) ? value : [];

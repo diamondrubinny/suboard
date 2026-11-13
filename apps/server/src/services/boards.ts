@@ -208,7 +208,7 @@ export class BoardService {
     }
     const mirrorCols = columns.filter((c) => c.type === 'mirror' && c.settings.mirror);
     if (!mirrorCols.length) return { relations };
-    const users = new Map((this.db.prepare('SELECT id, name FROM users').all() as { id: string; name: string }[]).map((u) => [u.id, u.name]));
+    const users = new Map((this.db.prepare('SELECT id, name FROM users UNION ALL SELECT id, name FROM teams').all() as { id: string; name: string }[]).map((u) => [u.id, u.name]));
     const mirrors: NonNullable<BoardDetail['mirrors']> = {};
     const mirrorSums: NonNullable<BoardDetail['mirrorSums']> = {};
     const today = todayIso();

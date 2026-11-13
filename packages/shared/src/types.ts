@@ -108,6 +108,13 @@ export interface Webhook {
   last: { ok: boolean; status: number | null; error: string | null; at: string } | null;
 }
 
+export interface Team {
+  id: string;
+  name: string;
+  /** Active, non-guest users in the team. */
+  memberIds: string[];
+}
+
 export interface BoardFolder {
   id: string;
   name: string;

@@ -41,6 +41,7 @@ export const COLUMN_TYPES = [
   'vote',
   'created_at',
   'button',
+  'team',
 ] as const;
 
 /** Column types that hold a list of label options in their settings. */
@@ -113,6 +114,7 @@ export const COLUMN_TYPE_LABELS: Record<ColumnType, string> = {
   hour: 'שעה',
   week: 'שבוע',
   color: 'צבע',
+  team: 'צוות',
   vote: 'הצבעה',
   created_at: 'נוצר בתאריך',
   button: 'כפתור פעולה',

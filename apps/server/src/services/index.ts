@@ -33,6 +33,7 @@ import { PasswordResetService } from './passwordReset.js';
 import { PersonalService } from './personal.js';
 import { PasskeyService } from './passkeys.js';
 import { ModuleService } from './modules.js';
+import { TeamService } from './teams.js';
 import { WorkspaceService } from './workspaces.js';
 import { WebhookService } from './webhooks.js';
 import { ApiTokenService } from './apiTokens.js';
@@ -82,6 +83,7 @@ export interface Services {
   passkeys: PasskeyService;
   modules: ModuleService;
   workspaces: WorkspaceService;
+  teams: TeamService;
   webhooks: WebhookService;
   apiTokens: ApiTokenService;
   time: TimeTrackingService;
@@ -142,6 +144,8 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   auth.guestsEnabled = () => modules.enabled('guests');
   users.guestsEnabled = () => modules.enabled('guests');
   const workspaces = new WorkspaceService(db, access, audit);
+  const teams = new TeamService(db, access, boards, audit);
+  items.teamIds = (ids) => teams.existing(ids);
   const webhooks = new WebhookService(db, config, access, boards, modules, audit, items);
   const apiTokens = new ApiTokenService(db, auth, modules, audit);
   const time = new TimeTrackingService(db, access, boards);
@@ -149,6 +153,6 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const personal = new PersonalService(db, access, boards, items, activity, notifications);
   return {
     audit, access, activity, auth, users, boards, items, dashboard, mfa, notifications, attachments, exports, views, search,
-    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset, personal, passkeys, modules, workspaces, webhooks, apiTokens, time,
+    automations, recurrences, reports, calendar, links, investigations, compliance, forms, analytics, dashboards, dependencies, monthly, trainings, procedures, plans, sso, scim, favorites, follow, boardTemplates, passwordReset, personal, passkeys, modules, workspaces, teams, webhooks, apiTokens, time,
   };
 }

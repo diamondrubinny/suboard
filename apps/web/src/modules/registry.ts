@@ -37,6 +37,7 @@ export const NAV: readonly NavEntry[] = [
   { id: 'procedures', label: 'נהלים', icon: 'clipboard', to: '/procedures', module: 'procedures', section: 'main' },
   { id: 'compliance', label: 'תאימות', icon: 'checks', to: '/compliance', module: 'compliance', section: 'main' },
   { id: 'forms', label: 'טפסים ודיווחים', icon: 'clipboard', to: '/forms', module: 'forms', section: 'main' },
+  { id: 'teams', label: 'צוותים', icon: 'users', to: '/teams', roles: ['admin', 'manager'], keywords: 'קבוצות משתמשים', section: 'main' },
   { id: 'profile', label: 'הפרופיל שלי', icon: 'user', to: '/profile', guest: true, keywords: 'סיסמה אימות דו-שלבי חיבורים מכשירים מפתח גישה passkey', section: 'main' },
   { id: 'admin-users', label: 'ניהול משתמשים', icon: 'users', to: '/admin/users', roles: ['admin'], section: 'admin' },
   { id: 'admin-modules', label: 'מודולים', icon: 'grid', to: '/admin/modules', roles: ['admin'], keywords: 'הפעלה כיבוי הגדרות מערכת', section: 'admin' },

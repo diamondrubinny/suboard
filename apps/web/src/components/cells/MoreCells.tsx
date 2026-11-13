@@ -1,7 +1,8 @@
 import { BUTTON_ACTIONS, COLOR_KEYS, PALETTE, formatWeekHe, todayIso, weekStartIso, type ButtonAction, type CellValue, type ColorKey, type Column } from '@suboard/shared';
 import { useEffect, useState } from 'react';
 import { errorMessage } from '../../api/client';
-import { useToggleVote } from '../../api/hooks';
+import { useTeams, useToggleVote } from '../../api/hooks';
+import { PersonPicker, personNames } from './PersonPicker';
 import { useAuth } from '../../auth/AuthContext';
 import { DateField } from '../DateField';
 import { useFeedback } from '../Feedback';
@@ -169,4 +170,16 @@ export function ButtonCell({
       {cfg.label}
     </button>
   );
+}
+
+/** Team column: one or more teams. Guests cannot read the list of teams, so they only see how many were chosen. */
+export function TeamCell({ value, readOnly, onChange, label }: { value: string[]; readOnly: boolean; onChange: (ids: string[] | null) => void; label: string }) {
+  const { user } = useAuth();
+  const teams = useTeams(Boolean(user) && !user!.guest);
+  const list = (teams.data ?? []).map((t) => ({ id: t.id, name: t.name }));
+  // Teams that were deleted are no longer shown (and are dropped on the next change).
+  const known = value.filter((id) => list.some((t) => t.id === id));
+  if (user?.guest) return <span className="cell-readonly muted">{value.length ? `${value.length} צוותים` : '—'}</span>;
+  if (readOnly || !teams.data) return <span className="cell-readonly person-names">{personNames(known, list) || '—'}</span>;
+  return <PersonPicker value={known} users={list} label={label} searchLabel="חיפוש צוותים" onChange={(next) => onChange(next.length ? next : null)} />;
 }

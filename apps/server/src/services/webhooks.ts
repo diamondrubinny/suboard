@@ -176,7 +176,7 @@ export class WebhookService {
     const hooks = this.hooksFor(e.boardId, event);
     if (!hooks.length) return;
     const columns = this.boards.columns(e.boardId);
-    const users = new Map((this.db.prepare('SELECT id, name FROM users').all() as { id: string; name: string }[]).map((u) => [u.id, u.name]));
+    const users = new Map((this.db.prepare('SELECT id, name FROM users UNION ALL SELECT id, name FROM teams').all() as { id: string; name: string }[]).map((u) => [u.id, u.name]));
     // What a spreadsheet export of this row would hold — and nothing else: no e-mail addresses, no
     // updates, no files, and no values that only exist through another board (connected items, mirrors).
     const fields = Object.fromEntries(

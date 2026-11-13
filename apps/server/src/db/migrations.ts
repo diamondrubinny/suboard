@@ -808,4 +808,23 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       ALTER TABLE boards ADD COLUMN open_role TEXT CHECK (open_role IN ('viewer','editor'));
     `,
   },
+  {
+    version: 26,
+    name: 'teams',
+    sql: /* sql */ `
+      -- Teams: named groups of users. They grant nothing by themselves.
+      CREATE TABLE teams (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+        created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE TABLE team_members (
+        team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (team_id, user_id)
+      );
+      CREATE INDEX idx_team_members_user ON team_members(user_id);
+    `,
+  },
 ];

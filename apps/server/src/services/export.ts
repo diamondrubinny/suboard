@@ -46,6 +46,7 @@ export function formatCell(c: Column, v: CellValue | undefined, item: Item, user
     case 'tags':
       return Array.isArray(v) ? v.map(label).filter(Boolean).join('; ') : '';
     case 'person':
+    case 'team': // team names are in the same id → name map
       return Array.isArray(v) ? (v as string[]).map((id) => users.get(id) ?? '').filter(Boolean).join('; ') : '';
     case 'date':
       return formatDateHe(String(v));
@@ -83,7 +84,7 @@ export class ExportService {
   /** Rows (header first) for a board, sorted by group then position; sub-items follow their parent. */
   private table(actor: Actor, boardId: string) {
     const board = this.boards.get(actor, boardId); // enforces viewer access
-    const users = new Map((this.db.prepare('SELECT id, name FROM users').all() as { id: string; name: string }[]).map((u) => [u.id, u.name]));
+    const users = new Map((this.db.prepare('SELECT id, name FROM users UNION ALL SELECT id, name FROM teams').all() as { id: string; name: string }[]).map((u) => [u.id, u.name]));
     const groups = new Map(board.groups.map((g) => [g.id, g.name]));
     const groupOrder = new Map(board.groups.map((g, i) => [g.id, i]));
     const tops = board.items

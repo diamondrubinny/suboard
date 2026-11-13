@@ -16,7 +16,7 @@ import {
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { errorMessage } from '../../api/client';
-import { useArchiveBoard, useDuplicateBoard, useModules, useWorkspaceMutations, useWorkspaces, useBoard, useColumnMutations, useDirectory, useGroupMutations, useMemberMutations, useTemplateMutations, useTemplates, useUpdateBoard } from '../../api/hooks';
+import { useArchiveBoard, useDuplicateBoard, useModules, useWorkspaceMutations, useWorkspaces, useBoard, useColumnMutations, useDirectory, useGroupMutations, useMemberMutations, useTeamMutations, useTeams, useTemplateMutations, useTemplates, useUpdateBoard } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorState, LoadingState, useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
@@ -663,7 +663,57 @@ function MembersSection({ board }: { board: BoardDetail }) {
           <Icon name="plus" /> הוספה
         </button>
       </form>
+      <AddTeam board={board} />
     </section>
+  );
+}
+
+/** Adds everyone in a team to the board in one step. People who are already members keep their role. */
+function AddTeam({ board }: { board: BoardDetail }) {
+  const teams = useTeams();
+  const { addToBoard } = useTeamMutations();
+  const { toast } = useFeedback();
+  const [teamId, setTeamId] = useState('');
+  const [role, setRole] = useState<'viewer' | 'editor'>('editor');
+  if (!teams.data?.length) return null;
+  return (
+    <form
+      className="toolbar"
+      style={{ marginTop: 'var(--space-3)' }}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!teamId) return toast('יש לבחור צוות', 'error');
+        addToBoard.mutate(
+          { boardId: board.id, teamId, role },
+          { onSuccess: (r) => (setTeamId(''), toast(r.added ? `נוספו ${r.added} חברים מהצוות` : 'כל חברי הצוות כבר בלוח')), onError: (err) => toast(errorMessage(err), 'error') },
+        );
+      }}
+    >
+      <label htmlFor="add-team" className="sr-only">
+        צוות להוספה
+      </label>
+      <select id="add-team" className="select" value={teamId} onChange={(e) => setTeamId(e.target.value)} aria-describedby="add-team-hint">
+        <option value="">הוספת צוות שלם…</option>
+        {teams.data.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name} ({t.memberIds.length})
+          </option>
+        ))}
+      </select>
+      <label htmlFor="add-team-role" className="sr-only">
+        הרשאה לחברי הצוות
+      </label>
+      <select id="add-team-role" className="select" value={role} onChange={(e) => setRole(e.target.value as 'viewer' | 'editor')}>
+        <option value="editor">{BOARD_ROLE_LABELS.editor}</option>
+        <option value="viewer">{BOARD_ROLE_LABELS.viewer}</option>
+      </select>
+      <button type="submit" className="btn" disabled={addToBoard.isPending}>
+        <Icon name="plus" /> הוספת הצוות
+      </button>
+      <span id="add-team-hint" className="hint" style={{ flexBasis: '100%' }}>
+        מוסיף את חברי הצוות כפי שהם היום. מי שכבר חבר בלוח שומר על ההרשאה שלו; שינוי עתידי בצוות אינו משנה את חברי הלוח.
+      </span>
+    </form>
   );
 }
 

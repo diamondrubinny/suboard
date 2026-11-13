@@ -255,6 +255,8 @@ export function cellValueSchema(type: ColumnType): z.ZodType<unknown> {
       return z.string().min(1).max(40).nullable();
     case 'person':
       return z.array(idSchema).max(LIMITS.personsPerCell).nullable();
+    case 'team':
+      return z.array(idSchema).max(10).nullable();
     case 'date':
       return isoDateSchema.nullable();
     case 'checkbox':
@@ -355,6 +357,8 @@ export const createApiTokenSchema = z.object({
 });
 
 export const workspaceSchema = z.object({ name: line(60) });
+export const updateTeamSchema = z.object({ name: line(60).optional(), memberIds: z.array(idSchema).max(200).optional() }).refine((v) => Object.keys(v).length > 0, 'אין שינויים');
+export const addTeamToBoardSchema = z.object({ teamId: idSchema, role: z.enum(['viewer', 'editor']) });
 export const moveBoardSchema = z.object({ workspaceId: idSchema.nullable(), folderId: idSchema.nullable().optional() });
 
 export const setModulesSchema = z.object({ modules: z.record(z.string().max(40), z.boolean()) });

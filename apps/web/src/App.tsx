@@ -39,6 +39,7 @@ const ProceduresPage = lazy(() => import('./pages/modules/ProcedurePages').then(
 const ProcedurePage = lazy(() => import('./pages/modules/ProcedurePages').then((m) => ({ default: m.ProcedurePage })));
 const FloorPlansPage = lazy(() => import('./pages/modules/FloorPlanPage').then((m) => ({ default: m.FloorPlansPage })));
 const FloorPlanPage = lazy(() => import('./pages/modules/FloorPlanPage').then((m) => ({ default: m.FloorPlanPage })));
+const TeamsPage = lazy(() => import('./pages/TeamsPage').then((m) => ({ default: m.TeamsPage })));
 const AdminModulesPage = lazy(() => import('./pages/AdminModulesPage').then((m) => ({ default: m.AdminModulesPage })));
 const lazyPage = (node: ReactNode) => <Suspense fallback={<LoadingState />}>{node}</Suspense>;
 import { ProfilePage } from './pages/ProfilePage';
@@ -124,6 +125,7 @@ export function App() {
                     <Route path="forms/new" element={lazyPage(<FormBuilderPage />)} />
                     <Route path="forms/:formId" element={lazyPage(<FormFillPage />)} />
                   </Route>
+                  <Route path="teams" element={lazyPage(<TeamsPage />)} />
                   <Route path="profile" element={<ProfilePage />} />
                   <Route element={<RequireAuth admin />}>
                     <Route path="admin/users" element={<AdminUsersPage />} />

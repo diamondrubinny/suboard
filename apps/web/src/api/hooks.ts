@@ -9,6 +9,7 @@ import type {
   PasskeyInfo,
   ModuleState,
   Workspace,
+  Team,
   Webhook,
   ApiTokenInfo,
   ItemTime,
@@ -1044,5 +1045,21 @@ export function usePersonalMutations(itemId: string, boardId = '') {
       onSuccess: () => void qc.invalidateQueries({ queryKey: qk.board(boardId) }),
     }),
     removeTemplate: useMutation({ mutationFn: (id: string) => api(`/item-templates/${id}`, 'DELETE'), onSuccess: templates }),
+  };
+}
+
+/** Teams (named groups of users). Guests have no access to them, so the query stays off for a guest. */
+export const useTeams = (enabled = true) => useQuery({ queryKey: ['teams'] as const, queryFn: () => api<{ teams: Team[] }>('/teams').then((r) => r.teams), staleTime: 60_000, enabled });
+export function useTeamMutations() {
+  const qc = useQueryClient();
+  const refresh = () => void qc.invalidateQueries({ queryKey: ['teams'] });
+  return {
+    create: useMutation({ mutationFn: (name: string) => api<{ team: Team }>('/teams', 'POST', { name }).then((r) => r.team), onSuccess: refresh }),
+    update: useMutation({ mutationFn: ({ id, ...patch }: { id: string; name?: string; memberIds?: string[] }) => api<{ team: Team }>(`/teams/${id}`, 'PATCH', patch).then((r) => r.team), onSuccess: refresh }),
+    remove: useMutation({ mutationFn: (id: string) => api(`/teams/${id}`, 'DELETE'), onSuccess: refresh }),
+    addToBoard: useMutation({
+      mutationFn: ({ boardId, teamId, role }: { boardId: string; teamId: string; role: 'viewer' | 'editor' }) => api<{ added: number; members: BoardMember[] }>(`/boards/${boardId}/members/team`, 'POST', { teamId, role }),
+      onSuccess: (_r, v) => void qc.invalidateQueries({ queryKey: qk.board(v.boardId) }),
+    }),
   };
 }

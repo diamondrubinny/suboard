@@ -18,6 +18,7 @@ export function PersonPicker({
   candidates,
   label,
   onChange,
+  searchLabel = 'חיפוש אנשים',
 }: {
   value: string[];
   /** Directory used to display names of current values. */
@@ -26,6 +27,8 @@ export function PersonPicker({
   candidates?: DirectoryUser[];
   label: string;
   onChange: (ids: string[]) => void;
+  /** Accessible name of the search box (the picker also serves teams). */
+  searchLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
@@ -107,7 +110,7 @@ export function PersonPicker({
                 style={{ marginBottom: '0.4rem' }}
                 type="search"
                 placeholder="חיפוש…"
-                aria-label="חיפוש אנשים"
+                aria-label={searchLabel}
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
               />
