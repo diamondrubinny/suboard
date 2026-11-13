@@ -209,6 +209,7 @@ export function BoardsPage() {
                     <span style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                       <span className="badge">{b.itemCount} פריטים</span>
                       <span className="badge">{BOARD_ROLE_LABELS[b.myRole]}</span>
+                      {b.openRole && <span className="badge">פתוח לכולם</span>}
                     </span>
                   </Link>
                 </li>

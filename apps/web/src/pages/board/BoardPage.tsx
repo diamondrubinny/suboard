@@ -131,6 +131,11 @@ export function BoardPage() {
           <span className="badge" title="ההרשאה שלך בלוח">
             {BOARD_ROLE_LABELS[b.myRole]}
           </span>
+          {b.openRole && (
+            <span className="badge" title={b.openRole === 'editor' ? 'כל המשתמשים יכולים לראות ולערוך פריטים' : 'כל המשתמשים יכולים לראות את הלוח'}>
+              פתוח לכל המשתמשים
+            </span>
+          )}
           {user?.guest && <span className="badge warning">חשבון אורח</span>}
           {!user?.guest && (
           <>

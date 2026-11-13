@@ -380,6 +380,8 @@ export const updateBoardSchema = z
     description: multiline(LIMITS.boardDescription).optional(),
     /** What a row of the board is called ("פריט ציוד"); empty for the generic "פריט". */
     itemTerm: z.string().trim().max(30).regex(/^[^<>\n]*$/, 'תווים לא מותרים').optional(),
+    /** Open the board to every signed-in user (never guests) as viewers or editors; null = members only. */
+    openRole: z.enum(['viewer', 'editor']).nullable().optional(),
   })
   .refine((v) => Object.keys(v).length > 0, 'אין שינויים');
 

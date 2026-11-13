@@ -33,8 +33,11 @@ export class WorkspaceService {
     if (WorkspaceService.canManage(actor)) return withFolders(() => true);
     // Everyone else learns the name of a workspace or a folder only when one of their boards is in it.
     const mine = this.db
-      .prepare('SELECT DISTINCT b.workspace_id AS w, b.folder_id AS f FROM boards b JOIN board_members m ON m.board_id = b.id AND m.user_id = ? WHERE b.archived_at IS NULL AND b.workspace_id IS NOT NULL')
-      .all(actor.id) as { w: string; f: string | null }[];
+      .prepare(
+        `SELECT DISTINCT b.workspace_id AS w, b.folder_id AS f FROM boards b LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ?
+         WHERE b.archived_at IS NULL AND b.workspace_id IS NOT NULL AND (m.user_id IS NOT NULL OR (b.open_role IS NOT NULL AND ? = 0))`,
+      )
+      .all(actor.id, actor.guest ? 1 : 0) as { w: string; f: string | null }[];
     const ws = new Set(mine.map((r) => r.w));
     const fs = new Set(mine.map((r) => r.f));
     return withFolders((id) => fs.has(id)).filter((r) => ws.has(r.id));

@@ -73,7 +73,20 @@ export function BoardSettingsPage() {
 
 function GeneralSection({ board }: { board: BoardDetail }) {
   const update = useUpdateBoard(board.id);
-  const { toast } = useFeedback();
+  const { toast, confirm } = useFeedback();
+  const setOpen = async (value: string) => {
+    const openRole = value === '' ? null : (value as 'viewer' | 'editor');
+    if (
+      openRole &&
+      !(await confirm({
+        title: 'פתיחת הלוח לכל המשתמשים',
+        message: `כל משתמש במערכת (לא אורחים) יוכל ${openRole === 'editor' ? 'לראות ולערוך את הפריטים בלוח' : 'לראות את הלוח'} "${board.name}", כולל העדכונים והקבצים שבו. להמשיך?`,
+        confirmLabel: 'פתיחה לכולם',
+      }))
+    )
+      return;
+    update.mutate({ openRole }, { onSuccess: () => toast(openRole ? 'הלוח פתוח לכל המשתמשים' : 'הלוח גלוי רק לחבריו'), onError: (err) => toast(errorMessage(err), 'error') });
+  };
   const [name, setName] = useState(board.name);
   const [description, setDescription] = useState(board.description);
   const [itemTerm, setItemTerm] = useState(board.itemTerm ?? '');
@@ -135,6 +148,17 @@ function GeneralSection({ board }: { board: BoardDetail }) {
             </select>
           </div>
         )}
+        <div className="field">
+          <label htmlFor="s-open">מי רואה את הלוח?</label>
+          <select id="s-open" className="select" value={board.openRole ?? ''} disabled={update.isPending} onChange={(e) => void setOpen(e.target.value)} aria-describedby="s-open-hint">
+            <option value="">רק חברי הלוח</option>
+            <option value="viewer">כל המשתמשים — צפייה בלבד</option>
+            <option value="editor">כל המשתמשים — צפייה ועריכת פריטים</option>
+          </select>
+          <span id="s-open-hint" className="hint">
+            ברירת המחדל היא חברי הלוח בלבד. חשבונות אורח לעולם אינם רואים לוח פתוח — רק לוחות שהוזמנו אליהם. חברי הלוח שומרים על ההרשאה שלהם; מבנה הלוח וההגדרות נשארים אצל הבעלים. השינוי נרשם ביומן האבטחה.
+          </span>
+        </div>
         <div className="field">
           <label htmlFor="s-term">איך נקראת שורה בלוח הזה? (לא חובה)</label>
           <input id="s-term" className="input" value={itemTerm} maxLength={30} placeholder="פריט" onChange={(e) => setItemTerm(e.target.value)} aria-describedby="s-term-hint" />

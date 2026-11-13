@@ -39,6 +39,7 @@ const EVENTS: Record<string, string> = {
   sessions_revoked_by_admin: 'ניתוק מכשירים ע"י מנהל',
   modules_changed: 'הפעלה / כיבוי של מודולים',
   workspace_changed: 'שינוי בסביבות העבודה',
+  board_opened: 'שינוי בפתיחת לוח לכל המשתמשים',
   webhook_changed: 'הגדרת / מחיקת Webhook',
   api_token_changed: 'יצירת / ביטול אסימון API',
   board_duplicated: 'שכפול לוח',

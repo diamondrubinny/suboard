@@ -32,6 +32,7 @@ interface BoardRow {
   item_term: string;
   workspace_id: string | null;
   folder_id: string | null;
+  open_role: 'viewer' | 'editor' | null;
   created_at: string;
   updated_at: string;
 }
@@ -68,20 +69,24 @@ export class BoardService {
               `SELECT b.*, m.role AS my_role,
                  (SELECT COUNT(*) FROM items i WHERE i.board_id = b.id AND i.deleted_at IS NULL AND i.parent_id IS NULL) AS item_count,
                  EXISTS (SELECT 1 FROM board_favorites f WHERE f.board_id = b.id AND f.user_id = ?) AS fav
-               FROM boards b JOIN board_members m ON m.board_id = b.id AND m.user_id = ?
-               WHERE b.archived_at IS NULL ORDER BY b.updated_at DESC`,
+               FROM boards b LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ?
+               WHERE b.archived_at IS NULL AND (m.user_id IS NOT NULL OR (b.open_role IS NOT NULL AND ? = 0)) ORDER BY b.updated_at DESC`,
             )
-            .all(actor.id, actor.id)
+            .all(actor.id, actor.id, actor.guest ? 1 : 0)
     ) as (BoardRow & { my_role: BoardRole; item_count: number; fav: number })[];
-    return rows.map((r) => ({
+    // The access service has the last word (it reads the guest flag from the database itself).
+    const roles = new Map(rows.map((r) => [r.id, actor.role === 'admin' ? ('owner' as BoardRole) : this.access.boardRole(actor, r.id)]));
+    return rows.filter((r) => roles.get(r.id)).map((r) => ({
       id: r.id,
       name: r.name,
       description: r.description,
       workspaceId: r.workspace_id ?? null,
       folderId: r.workspace_id ? (r.folder_id ?? null) : null,
       templateKey: r.template_key,
-      // Admins have owner-level rights on every board regardless of membership row.
-      myRole: actor.role === 'admin' ? 'owner' : r.my_role,
+      // Admins have owner-level rights on every board regardless of membership row; on a board that
+      // is open to everyone the effective role is the higher of membership and the open role.
+      myRole: roles.get(r.id)!,
+      openRole: r.open_role ?? null,
       itemCount: r.item_count,
       updatedAt: r.updated_at,
       favorite: r.fav === 1,
@@ -147,6 +152,7 @@ export class BoardService {
       itemTerm: b.item_term ?? '',
       workspaceId: b.workspace_id ?? null,
       folderId: b.workspace_id ? (b.folder_id ?? null) : null,
+      openRole: b.open_role ?? null,
       groups: this.groups(boardId),
       columns: this.columns(boardId),
       items: (this.db.prepare('SELECT * FROM items WHERE board_id = ? AND deleted_at IS NULL ORDER BY position, created_at').all(boardId) as ItemRow[]).map(toItem),
@@ -253,7 +259,7 @@ export class BoardService {
     return out;
   }
 
-  update(actor: Actor, boardId: string, input: { name?: string; description?: string; itemTerm?: string }): BoardDetail {
+  update(actor: Actor, boardId: string, input: { name?: string; description?: string; itemTerm?: string; openRole?: 'viewer' | 'editor' | null }): BoardDetail {
     this.access.requireBoard(actor, boardId, 'owner');
     const sets: string[] = [];
     const params: unknown[] = [];
@@ -268,6 +274,12 @@ export class BoardService {
     if (input.itemTerm !== undefined) {
       sets.push('item_term = ?');
       params.push(input.itemTerm);
+    }
+    if (input.openRole !== undefined) {
+      sets.push('open_role = ?');
+      params.push(input.openRole);
+      // Who can see a board is a security decision: it goes to the security log, not only the board's history.
+      this.audit.log('board_opened', { userId: actor.id, meta: { boardId, openRole: input.openRole } });
     }
     sets.push('updated_at = ?');
     params.push(nowIso());

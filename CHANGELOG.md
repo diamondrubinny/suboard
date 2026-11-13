@@ -2,6 +2,13 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.18.0 — 2026-11-13
+
+### Added
+- A board's owner can open it to every signed-in user, for viewing only or for editing items ("מי רואה את הלוח?" in the board settings, with a confirmation). Members keep their own role; structure and settings stay with the owners.
+- Guest accounts never see an open board — the check reads the guest flag from the database on every access.
+- Opening and closing a board is recorded in the security log.
+
 ## 1.17.0 — 2026-11-12
 
 ### Added

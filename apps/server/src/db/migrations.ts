@@ -800,4 +800,12 @@ export const migrations: { version: number; name: string; sql: string }[] = [
       ALTER TABLE users ADD COLUMN guest_org TEXT NOT NULL DEFAULT '';
     `,
   },
+  {
+    version: 25,
+    name: 'open_boards',
+    sql: /* sql */ `
+      -- A board its owner opened to every signed-in user (never to guests): NULL = members only.
+      ALTER TABLE boards ADD COLUMN open_role TEXT CHECK (open_role IN ('viewer','editor'));
+    `,
+  },
 ];

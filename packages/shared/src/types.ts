@@ -127,6 +127,8 @@ export interface BoardSummary {
   /** The workspace the board is filed under, if any. */
   workspaceId: string | null;
   folderId: string | null;
+  /** Open to every signed-in user (never guests) with this role; null = members only. */
+  openRole: 'viewer' | 'editor' | null;
   description: string;
   templateKey: string;
   myRole: BoardRole;
@@ -200,6 +202,8 @@ export interface BoardDetail {
   itemTerm: string;
   workspaceId: string | null;
   folderId: string | null;
+  /** Open to every signed-in user (never guests) with this role; null = members only. */
+  openRole: 'viewer' | 'editor' | null;
   groups: Group[];
   columns: Column[];
   items: Item[];

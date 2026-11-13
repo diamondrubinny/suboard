@@ -22,13 +22,21 @@ export class AccessService {
 
   /** Returns the actor's effective role on a board, or null if no access / board missing. */
   boardRole(actor: Actor, boardId: string): BoardRole | null {
-    const board = this.db.prepare('SELECT id FROM boards WHERE id = ? AND archived_at IS NULL').get(boardId);
+    const board = this.db.prepare('SELECT id, open_role FROM boards WHERE id = ? AND archived_at IS NULL').get(boardId) as { id: string; open_role: 'viewer' | 'editor' | null } | undefined;
     if (!board) return null;
     if (actor.role === 'admin') return 'owner';
     const row = this.db
       .prepare('SELECT role FROM board_members WHERE board_id = ? AND user_id = ?')
       .get(boardId, actor.id) as { role: BoardRole } | undefined;
-    return row?.role ?? null;
+    const mine = row?.role ?? null;
+    // A board opened to everyone: every active, non-guest user gets at least that role.
+    if (!board.open_role || (mine && RANK[mine] >= RANK[board.open_role]) || !this.isRegularUser(actor.id)) return mine;
+    return board.open_role;
+  }
+
+  /** Active and not a guest — read from the database, never trusted from the caller. */
+  private isRegularUser(userId: string): boolean {
+    return this.db.prepare('SELECT 1 FROM users WHERE id = ? AND is_active = 1 AND is_guest = 0').get(userId) !== undefined;
   }
 
   /**
@@ -71,10 +79,10 @@ export class AccessService {
         ? this.db.prepare('SELECT id FROM boards WHERE archived_at IS NULL').all()
         : this.db
             .prepare(
-              `SELECT b.id FROM boards b JOIN board_members m ON m.board_id = b.id
-               WHERE m.user_id = ? AND b.archived_at IS NULL`,
+              `SELECT b.id FROM boards b LEFT JOIN board_members m ON m.board_id = b.id AND m.user_id = ?
+               WHERE b.archived_at IS NULL AND (m.user_id IS NOT NULL OR (b.open_role IS NOT NULL AND ? = 1))`,
             )
-            .all(actor.id);
+            .all(actor.id, this.isRegularUser(actor.id) ? 1 : 0);
     return (rows as { id: string }[]).map((r) => r.id);
   }
 }
