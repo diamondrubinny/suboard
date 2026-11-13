@@ -528,8 +528,10 @@ export const notifyTargetSchema = z
     /** Notify whoever is assigned in this person column. */
     columnId: idSchema.optional(),
     owners: z.boolean().default(false),
+    /** Everyone in these teams who can see the board. */
+    teamIds: z.array(idSchema).max(10).default([]),
   })
-  .refine((t) => t.userIds.length > 0 || t.columnId || t.owners, 'יש לבחור למי לשלוח');
+  .refine((t) => t.userIds.length > 0 || t.columnId || t.owners || t.teamIds.length > 0, 'יש לבחור למי לשלוח');
 
 export const ruleActionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('set_status'), columnId: idSchema, optionId: z.string().min(1).max(40) }),

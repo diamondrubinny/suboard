@@ -121,7 +121,7 @@ export function defaultAction(b: BoardDetail, type: RuleAction['type']): RuleAct
     case 'move_group':
       return { type, groupId: b.groups[b.groups.length - 1]?.id ?? '' };
     case 'notify':
-      return { type, to: { userIds: [], owners: true, columnId: first(b, 'person')?.id }, message: '' };
+      return { type, to: { userIds: [], teamIds: [], owners: true, columnId: first(b, 'person')?.id }, message: '' };
     case 'create_subitem':
       return { type, name: '' };
   }
@@ -149,7 +149,7 @@ export const RECIPES: Recipe[] = [
         name: 'SLA — לא טופל תוך 3 ימים',
         trigger: { type: 'status_stale', columnId: st.id, optionId: open, days: 3 },
         conditions: [],
-        actions: [{ type: 'notify', to: { userIds: [], owners: true }, message: 'פריט לא טופל יותר מ-3 ימים' }],
+        actions: [{ type: 'notify', to: { userIds: [], teamIds: [], owners: true }, message: 'פריט לא טופל יותר מ-3 ימים' }],
       };
     },
   },
@@ -164,7 +164,7 @@ export const RECIPES: Recipe[] = [
         name: 'תזכורת — יעד מחר',
         trigger: { type: 'date_reached', columnId: due.id, offsetDays: -1 },
         conditions: [{ type: 'not_done' }],
-        actions: [{ type: 'notify', to: { userIds: [], columnId: person.id, owners: false }, message: 'תאריך היעד מחר' }],
+        actions: [{ type: 'notify', to: { userIds: [], teamIds: [], columnId: person.id, owners: false }, message: 'תאריך היעד מחר' }],
       };
     },
   },
@@ -178,7 +178,7 @@ export const RECIPES: Recipe[] = [
         name: 'הסלמה — 7 ימים באיחור',
         trigger: { type: 'date_reached', columnId: due.id, offsetDays: 7 },
         conditions: [{ type: 'not_done' }],
-        actions: [{ type: 'notify', to: { userIds: [], owners: true }, message: 'פריט באיחור של שבוע — נדרשת הסלמה' }],
+        actions: [{ type: 'notify', to: { userIds: [], teamIds: [], owners: true }, message: 'פריט באיחור של שבוע — נדרשת הסלמה' }],
       };
     },
   },
@@ -308,6 +308,7 @@ export function actionText(b: BoardDetail, a: RuleAction): string {
         a.to.owners ? 'בעלי הלוח' : '',
         a.to.columnId ? `האחראים ב"${colTitle(b, a.to.columnId)}"` : '',
         a.to.userIds.length ? people(b, a.to.userIds) : '',
+        a.to.teamIds?.length ? (a.to.teamIds.length === 1 ? 'צוות אחד' : `${a.to.teamIds.length} צוותים`) : '',
       ].filter(Boolean);
       return `התראה ל${who.join(', ')}: "${a.message}"`;
     }

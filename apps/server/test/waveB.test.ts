@@ -319,4 +319,22 @@ describe('B5 scheduled reports', () => {
     await m.post(`/api/boards/${board.id}/reports`, { name: 'לא היום', frequency: 'weekly', weekday: (wd + 1) % 7, recipients: [ids.e] });
     expect(await ctx.app.services.reports.runDue(new Date(), true)).toBe(0);
   });
+
+  it('a rule message quotes the item\'s fields, and a team can be the recipient', async () => {
+    const st = col('סטטוס');
+    const team = (await m.post('/api/teams', { name: 'צוות תחזוקה' })).json().team as { id: string };
+    await m.patch(`/api/teams/${team.id}`, { memberIds: [ids.v, ids.o] }); // v is on the board, o is not
+    await addRule({
+      name: 'סגירה עם פרטים',
+      trigger: { type: 'status_changed', columnId: st.id, to: 'done' },
+      actions: [{ type: 'notify', to: { teamIds: [team.id] }, message: 'נסגר: {שם הפריט} בלוח {לוח}, יעד {תאריך יעד}, אחראי {אחראי ביצוע}, {אין שדה כזה}' }],
+    });
+    const it = await newItem('החלפת מסנן', { [col('תאריך יעד').id]: '2026-12-01', [col('אחראי ביצוע').id]: [ids.e] });
+    await e.patch(`/api/items/${it.id}`, { values: { [st.id]: 'done' } });
+    const note = async (c: typeof v) => ((await c.get('/api/notifications')).json().notifications as { itemId: string; detail: string | null; kind: string }[]).filter((n) => n.itemId === it.id && n.kind === 'automation');
+    const got = await note(v);
+    expect(got).toHaveLength(1);
+    expect(got[0]!.detail).toMatch(/^נסגר: החלפת מסנן בלוח .+, יעד 01\/12\/2026, אחראי .+, \{אין שדה כזה\}$/);
+    expect(await note(o)).toEqual([]); // in the team, not on the board: nothing
+  });
 });

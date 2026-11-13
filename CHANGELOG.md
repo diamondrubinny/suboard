@@ -2,6 +2,15 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.21.0 — 2026-11-13
+
+### Added
+- Automation messages can quote the item's fields: `{שם הפריט}`, `{לוח}` or `{column title}` are replaced by the current value when the message is sent. The rule editor has a chip for each field. An unknown name stays as written, so a typo is visible.
+- A rule's notification can be sent to teams: everyone in the team who can see the board.
+
+### Security
+- Recipients are re-checked against the board when the message is sent, and values that only exist through another board (connections, mirrors) are never quoted.
+
 ## 1.20.1 — 2026-11-13
 
 ### Fixed

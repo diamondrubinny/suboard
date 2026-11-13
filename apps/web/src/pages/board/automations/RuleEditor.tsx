@@ -1,4 +1,4 @@
-import { isReadonlyColumnType,
+import { RULE_MESSAGE_FIELDS, isReadonlyColumnType,
   createAutomationSchema,
   LIMITS,
   type Automation,
@@ -10,7 +10,7 @@ import { isReadonlyColumnType,
 } from '@suboard/shared';
 import { useId, useState } from 'react';
 import { errorMessage } from '../../../api/client';
-import { useAutomationMutations } from '../../../api/hooks';
+import { useAutomationMutations, useTeams } from '../../../api/hooks';
 import { Dialog } from '../../../components/Dialog';
 import { useFeedback } from '../../../components/Feedback';
 import { Icon } from '../../../components/Icon';
@@ -94,6 +94,22 @@ function NumberField({ label, value, onChange, min, max, hint }: { label: string
         </span>
       )}
     </div>
+  );
+}
+
+/** Teams as recipients: everyone in the team who can see the board gets the message. */
+function TeamChecks({ value, onChange }: { value: string[]; onChange: (ids: string[]) => void }) {
+  const teams = useTeams();
+  if (!teams.data?.length) return null;
+  return (
+    <fieldset className="check-list">
+      <legend className="label">צוותים (מי מחבריהם שרואה את הלוח)</legend>
+      {teams.data.map((t) => (
+        <label key={t.id} className="check">
+          <input type="checkbox" checked={value.includes(t.id)} onChange={(e) => onChange(e.target.checked ? [...value, t.id].slice(0, 10) : value.filter((x) => x !== t.id))} /> {t.name}
+        </label>
+      ))}
+    </fieldset>
   );
 }
 
@@ -296,6 +312,7 @@ function ActionFields({ board, value, onChange }: { board: BoardDetail; value: R
             ))}
           </fieldset>
           <MemberChecks board={board} legend="משתמשים נוספים" value={value.to.userIds} onChange={(userIds) => onChange({ ...value, to: { ...value.to, userIds } })} />
+          <TeamChecks value={value.to.teamIds ?? []} onChange={(teamIds) => onChange({ ...value, to: { ...value.to, teamIds } })} />
           <div className="field">
             <label htmlFor={msgId}>הודעה</label>
             <input
@@ -307,8 +324,22 @@ function ActionFields({ board, value, onChange }: { board: BoardDetail; value: R
               onChange={(e) => onChange({ ...value, message: e.target.value })}
             />
             <span id={`${msgId}-hint`} className="hint">
-              עד {LIMITS.ruleMessage} תווים. נשלחת גם בדוא"ל (למי שלא כיבה התראות דוא"ל). אין לכלול מידע רפואי או אישי רגיש.
+              עד {LIMITS.ruleMessage} תווים. נשלחת גם בדוא"ל (למי שלא כיבה התראות דוא"ל). אין לכלול מידע רפואי או אישי רגיש. אפשר לשבץ שדות מהפריט — הם יוחלפו בערך הנוכחי בזמן השליחה.
             </span>
+            <div className="toolbar" role="group" aria-label="שיבוץ שדה בהודעה">
+              {[...RULE_MESSAGE_FIELDS, ...board.columns.filter((c) => !['relation', 'mirror', 'linked', 'files', 'time', 'button', 'checklist'].includes(c.type)).map((c) => c.title)].map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className="btn btn-sm"
+                  aria-label={`${f} — שיבוץ בהודעה`}
+                  disabled={value.message.length + f.length + 2 > LIMITS.ruleMessage}
+                  onClick={() => onChange({ ...value, message: `${value.message}{${f}}` })}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
           </div>
         </>
       );

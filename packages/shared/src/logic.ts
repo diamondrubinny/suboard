@@ -260,3 +260,21 @@ export function visibleFormFields(fields: { columnId: string; showIf?: { columnI
   }
   return visible;
 }
+
+/** Fields a rule's message may quote besides the board's columns. */
+export const RULE_MESSAGE_FIELDS = ['שם הפריט', 'לוח'] as const;
+
+/**
+ * Fills `{field}` placeholders in a rule's message: `{שם הפריט}`, `{לוח}` or `{<column title>}`.
+ * `lookup` returns the text for a name, or undefined when there is no such field — the placeholder
+ * then stays as written, so a typo is visible instead of silently disappearing. The result is plain
+ * text, cut to `max` characters.
+ */
+export function renderRuleMessage(message: string, lookup: (name: string) => string | undefined, max = 500): string {
+  const out = message.replace(/\{([^{}\n]{1,80})\}/g, (whole, name: string) => {
+    const v = lookup(name.trim());
+    return v === undefined ? whole : v === '' ? '—' : v;
+  });
+  return out.length > max ? `${out.slice(0, max - 1)}…` : out;
+}
+

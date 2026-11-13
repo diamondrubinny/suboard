@@ -279,6 +279,7 @@ describe('formula columns', () => {
 
 // ---------------------------------------------------------------- advanced filter
 import { filterOpsFor, matchesBoardFilter, type BoardFilter } from './filters.js';
+import { renderRuleMessage } from './logic.js';
 import type { Column as XCol, Item as XItem } from './types.js';
 
 describe('advanced board filter', () => {
@@ -385,5 +386,19 @@ describe('filters and formulas on the newer column types', () => {
     expect(run('age', {})).toBe(10); // days since it was created
     expect(validateFormula('{v} + {h} + {born}', cols)).toBeNull();
     expect(validateFormula('{rel}', cols)).toBeTruthy(); // connected items are not a value
+  });
+});
+
+describe('rule message placeholders', () => {
+  const fields: Record<string, string> = { 'שם הפריט': 'מעקה', 'תאריך יעד': '01/12/2026', ריק: '' };
+  const r = (m: string, max?: number) => renderRuleMessage(m, (n) => fields[n], max);
+  it('fills known fields, keeps unknown ones visible, and stays plain text', () => {
+    expect(r('נסגר: {שם הפריט} עד { תאריך יעד }')).toBe('נסגר: מעקה עד 01/12/2026');
+    expect(r('{לא קיים} {שם הפריט}')).toBe('{לא קיים} מעקה');
+    expect(r('ערך: {ריק}')).toBe('ערך: —');
+    expect(r('בלי שדות')).toBe('בלי שדות');
+    expect(r('{} {{שם הפריט}} {שם\nהפריט}')).toBe('{} {מעקה} {שם\nהפריט}');
+    expect(r('{שם הפריט}'.repeat(40), 20)).toHaveLength(20);
+    expect(r('{שם הפריט}'.repeat(40), 20).endsWith('…')).toBe(true);
   });
 });

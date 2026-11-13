@@ -1,4 +1,4 @@
-import { isReadonlyColumnType,
+import { renderRuleMessage, isReadonlyColumnType,
   addDaysIso,
   diffDaysIso,
   findPrimaryStatusColumn,
@@ -24,6 +24,7 @@ import type { AccessService, Actor } from './access.js';
 import type { ActivityService } from './activity.js';
 import type { BoardService } from './boards.js';
 import type { ItemEvent, ItemService } from './items.js';
+import { formatCell } from './export.js';
 import { toItem, type ItemRow } from './mappers.js';
 import type { NotificationService } from './notifications.js';
 
@@ -384,10 +385,32 @@ export class AutomationService {
             ids.add(r.user_id);
           }
         }
-        this.notifications.onAutomation(item.boardId, item.id, item.name, a.name, action.message, [...ids]);
+        for (const teamId of action.to.teamIds ?? []) {
+          for (const r of this.db.prepare('SELECT user_id FROM team_members WHERE team_id = ?').all(teamId) as { user_id: string }[]) ids.add(r.user_id);
+        }
+        // Recipients are re-checked against the board at send time, so quoting the item's fields
+        // tells nobody anything they could not open themselves.
+        this.notifications.onAutomation(item.boardId, item.id, item.name, a.name, this.renderMessage(action.message, item), [...ids]);
         return;
       }
     }
+  }
+
+  /** `{שם הפריט}`, `{לוח}` and `{column title}` in a rule's message become the item's current values. */
+  private renderMessage(message: string, item: Item): string {
+    if (!message.includes('{')) return message;
+    // Values that only exist through another board (connections, mirrors) are never quoted.
+    const columns = this.boards.columns(item.boardId).filter((c) => !['relation', 'mirror', 'linked', 'files', 'time', 'button', 'checklist'].includes(c.type));
+    const all = this.boards.columns(item.boardId);
+    let names: Map<string, string> | undefined;
+    return renderRuleMessage(message, (name) => {
+      if (name === 'שם הפריט') return item.name;
+      if (name === 'לוח') return (this.db.prepare('SELECT name FROM boards WHERE id = ?').get(item.boardId) as { name: string } | undefined)?.name ?? '';
+      const c = columns.find((x) => x.title === name);
+      if (!c) return undefined;
+      names ??= new Map((this.db.prepare('SELECT id, name FROM users UNION ALL SELECT id, name FROM teams').all() as { id: string; name: string }[]).map((u) => [u.id, u.name]));
+      return formatCell(c, item.values[c.id], item, names, all);
+    });
   }
 
   // ---------------------------------------------------------------- scheduled (date / SLA)
