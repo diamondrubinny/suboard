@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react';
+import { useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
 
 /**
  * Light formatting for updates, stored as plain text and rendered as React elements — never as
@@ -100,16 +100,22 @@ export function RichText({ text, className }: { text: string; className?: string
 
 /** Formatting buttons for a textarea: wrap the selection, or start list lines. */
 export function FormatBar({ target, value, onChange, label }: { target: RefObject<HTMLTextAreaElement | null>; value: string; onChange: (v: string) => void; label: string }) {
+  const pending = useRef<[number, number] | null>(null);
+  useLayoutEffect(() => {
+    if (!pending.current) return;
+    target.current?.setSelectionRange(pending.current[0], pending.current[1]);
+    pending.current = null;
+  }, [value, target]);
   const apply = (fn: (sel: string) => { text: string; from: number; to: number }) => {
     const el = target.current;
     const start = el?.selectionStart ?? value.length;
     const end = el?.selectionEnd ?? value.length;
     const r = fn(value.slice(start, end));
+    // Focus now, and place the selection as soon as the new text is in the box (before the browser
+    // paints): typing right after pressing a button always lands on the selected placeholder.
+    pending.current = [start + r.from, start + r.to];
+    el?.focus();
     onChange(value.slice(0, start) + r.text + value.slice(end));
-    requestAnimationFrame(() => {
-      el?.focus();
-      el?.setSelectionRange(start + r.from, start + r.to);
-    });
   };
   const wrap = (mark: string, placeholder: string) => () =>
     apply((sel) => {

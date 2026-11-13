@@ -2,6 +2,11 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.20.1 — 2026-11-13
+
+### Fixed
+- Format bar (updates and replies): the inserted placeholder is selected before the browser paints, so typing immediately after pressing a button always replaces it.
+
 ## 1.20.0 — 2026-11-13
 
 ### Added
