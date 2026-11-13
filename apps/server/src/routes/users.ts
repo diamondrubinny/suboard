@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { forbidden, notFound } from '../lib/errors.js';
 import { actorOf } from '../plugins/auth.js';
 import type { Services } from '../services/index.js';
+import { APP_VERSION } from '../version.js';
 
 function requireAdmin(req: FastifyRequest) {
   const actor = actorOf(req);
@@ -48,6 +49,11 @@ export async function userRoutes(app: FastifyInstance, { services }: { services:
 
   // ---- optional modules: every signed-in user reads the state (to build the menu); admins change it
   app.get('/modules', async () => ({ modules: services.modules.state() }));
+  // What is running: for administrators only (the public health check says nothing about versions).
+  app.get('/admin/system', async (req) => {
+    requireAdmin(req);
+    return { version: APP_VERSION, schema: services.modules.schemaVersion(), node: process.version };
+  });
   app.put('/admin/modules', { config: { rateLimit: { max: 30, timeWindow: 15 * 60_000 } } }, async (req) => {
     const actor = requireAdmin(req);
     return { modules: services.modules.set(actor, setModulesSchema.parse(req.body).modules, req.ip) };

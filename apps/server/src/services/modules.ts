@@ -56,4 +56,9 @@ export class ModuleService {
     }
     return next;
   }
+
+  /** Highest database migration applied. */
+  schemaVersion(): number {
+    return (this.db.prepare('SELECT COALESCE(MAX(version), 0) AS v FROM schema_migrations').get() as { v: number }).v;
+  }
 }

@@ -1063,3 +1063,6 @@ export function useTeamMutations() {
     }),
   };
 }
+
+/** Running version and database schema (administrators only). */
+export const useSystemInfo = () => useQuery({ queryKey: ['system-info'] as const, queryFn: () => api<{ version: string; schema: number; node: string }>('/admin/system'), staleTime: 5 * 60_000 });

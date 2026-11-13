@@ -60,4 +60,17 @@ describe('optional modules', () => {
     expect(audit).toHaveLength(2);
     expect(JSON.parse(audit[0]!.meta)).toEqual({ trainings: false, forms: false });
   });
+
+  it('tells only administrators which version and schema are running', async () => {
+    ctx = await setup();
+    const { client: admin } = await loggedIn(ctx, 'root@x.org', 'admin');
+    const { client: boss } = await loggedIn(ctx, 'boss@x.org', 'manager');
+    expect((await boss.get('/api/admin/system')).statusCode).toBe(403);
+    const sys = (await admin.get('/api/admin/system')).json() as { version: string; schema: number; node: string };
+    expect(sys.version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(sys.schema).toBe((ctx.db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get() as { v: number }).v);
+    expect(sys.schema).toBeGreaterThanOrEqual(26);
+    // the public health check stays silent about versions
+    expect(Object.keys((await admin.get('/api/health')).json())).toEqual(['status']);
+  });
 });

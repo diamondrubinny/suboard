@@ -1,6 +1,6 @@
 import { MODULES, type ModuleKey } from '@suboard/shared';
 import { errorMessage } from '../api/client';
-import { useModules, useSetModules } from '../api/hooks';
+import { useModules, useSetModules, useSystemInfo } from '../api/hooks';
 import { ErrorState, LoadingState, useFeedback } from '../components/Feedback';
 import { usePageTitle } from '../components/Layout';
 
@@ -8,6 +8,7 @@ import { usePageTitle } from '../components/Layout';
 export function AdminModulesPage() {
   usePageTitle('מודולים');
   const q = useModules();
+  const sys = useSystemInfo();
   const set = useSetModules();
   const { toast, confirm } = useFeedback();
 
@@ -24,6 +25,11 @@ export function AdminModulesPage() {
         <div>
           <h1>מודולים</h1>
           <p className="muted">הפעילו רק את מה שהיחידה משתמשת בו. לוחות, פריטים, "המשימות שלי", התראות וניהול משתמשים פעילים תמיד.</p>
+          {sys.data && (
+            <p className="muted" role="status">
+              גרסת המערכת: <strong className="num" dir="ltr">{sys.data.version}</strong> · סכימת מסד הנתונים: <span className="num">{sys.data.schema}</span>
+            </p>
+          )}
         </div>
       </div>
       {q.isPending && <LoadingState />}

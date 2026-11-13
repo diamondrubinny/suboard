@@ -2,6 +2,14 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.23.1 — 2026-11-13
+
+### Added
+- Administrators see the running version and the database schema number at the top of the "מודולים" page (`GET /api/admin/system`). The public health check still reveals nothing about versions.
+
+### Documentation
+- Production checklist updated with results that were actually verified (dependency audit, secret scan, security headers, backup-and-restore drill, SBOM) and a step-by-step go-live runbook.
+
 ## 1.23.0 — 2026-11-13
 
 ### Added
