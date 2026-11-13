@@ -280,6 +280,7 @@ describe('formula columns', () => {
 // ---------------------------------------------------------------- advanced filter
 import { filterOpsFor, matchesBoardFilter, type BoardFilter } from './filters.js';
 import { renderRuleMessage } from './logic.js';
+import { chartBuckets } from './chart.js';
 import type { Column as XCol, Item as XItem } from './types.js';
 
 describe('advanced board filter', () => {
@@ -402,3 +403,37 @@ describe('rule message placeholders', () => {
     expect(r('{שם הפריט}'.repeat(40), 20).endsWith('…')).toBe(true);
   });
 });
+
+describe('board chart buckets', () => {
+  const c = (id: string, type: XCol['type'], settings: XCol['settings'] = {}): XCol => ({ id, boardId: 'b', title: id, type, settings, position: 0 });
+  const opts = [{ id: 'open', label: 'פתוח', color: 'red' as const }, { id: 'done', label: 'בוצע', color: 'green' as const, done: true }, { id: 'unused', label: 'לא בשימוש', color: 'gray' as const }];
+  const cols = [c('st', 'status', { options: opts }), c('tg', 'tags', { options: opts }), c('who', 'person'), c('tm', 'team'), c('ok', 'checkbox'), c('cost', 'number'), c('dbl', 'formula', { formula: '{cost} * 2' }), c('txt', 'text')];
+  const groups = [{ id: 'g1', boardId: 'b', name: 'ראשונה', color: 'blue' as const, position: 0, collapsed: false }, { id: 'g2', boardId: 'b', name: 'שנייה', color: 'purple' as const, position: 1, collapsed: false }];
+  const mk = (id: string, groupId: string, values: Record<string, unknown>): XItem => ({ id, boardId: 'b', groupId, parentId: null, name: id, values: values as XItem['values'], position: 0, seq: 1, createdBy: null, createdAt: '', updatedAt: '' });
+  const items = [
+    mk('a', 'g2', { st: 'done', tg: ['open', 'done'], who: ['u1', 'u2'], tm: ['t1'], ok: true, cost: 100 }),
+    mk('b', 'g1', { st: 'open', who: ['u1'], cost: 50 }),
+    mk('c', 'g1', { st: 'gone', cost: 'x' }),
+  ];
+  const names = new Map([['u1', 'דן'], ['u2', 'נועה'], ['t1', 'צוות גזים']]);
+  const run = (by: string, valueColumnId?: string) => chartBuckets({ items, columns: cols, groups: groups as never, by, valueColumnId, names, today: '2026-11-13' }).map((b) => [b.label, b.value, b.count]);
+
+  it('splits by groups, labels, people, teams and checkboxes, in a stable order', () => {
+    expect(run('group')).toEqual([['ראשונה', 2, 2], ['שנייה', 1, 1]]);
+    expect(run('st')).toEqual([['פתוח', 1, 1], ['בוצע', 1, 1], ['ללא', 1, 1]]); // option order, unknown label → none, unused dropped
+    expect(run('tg')).toEqual([['פתוח', 1, 1], ['בוצע', 1, 1], ['ללא', 2, 2]]); // an item with two tags is in both
+    expect(run('who')).toEqual([['דן', 2, 2], ['נועה', 1, 1], ['לא משויך', 1, 1]]); // largest first, none last
+    expect(run('tm')).toEqual([['צוות גזים', 1, 1], ['ללא צוות', 2, 2]]);
+    expect(run('ok')).toEqual([['מסומן', 1, 1], ['לא מסומן', 2, 2]]);
+  });
+
+  it('sums a number or a formula column, and falls back safely', () => {
+    expect(run('st', 'cost')).toEqual([['פתוח', 50, 1], ['בוצע', 100, 1], ['ללא', 0, 1]]); // a non-number counts as 0
+    expect(run('group', 'dbl')).toEqual([['ראשונה', 100, 2], ['שנייה', 200, 1]]);
+    expect(run('st', 'txt')).toEqual(run('st')); // not a value column → count
+    expect(run('txt')).toEqual(run('group')); // not a chartable column → groups
+    expect(run('nope')).toEqual(run('group'));
+    expect(chartBuckets({ items: [], columns: cols, groups: groups as never, by: 'st', names, today: '2026-11-13' })).toEqual([]);
+  });
+});
+

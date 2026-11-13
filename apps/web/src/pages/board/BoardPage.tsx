@@ -18,6 +18,7 @@ import { CalendarView } from './CalendarView';
 import { ItemDrawer } from './ItemDrawer';
 import { NewFromTemplate } from './PersonalPanel';
 import { KanbanView } from './KanbanView';
+import { ChartView } from './ChartView';
 import { TableView } from './TableView';
 import { filterItems } from './viewLogic';
 
@@ -220,6 +221,9 @@ export function BoardPage() {
               <Icon name="chart" /> ציר זמן
             </button>
           )}
+          <button type="button" aria-pressed={config.view === 'chart'} onClick={() => changeView('chart')}>
+            <Icon name="chart" /> תרשים
+          </button>
           {b.columns.some((c) => c.type === 'risk') && (
             <button type="button" aria-pressed={config.view === 'risk'} onClick={() => changeView('risk')}>
               <Icon name="grid" /> מפת סיכונים
@@ -315,6 +319,9 @@ export function BoardPage() {
 
       {config.view === 'gantt' && (
         <GanttView board={b} items={filteredItems.filter((i) => !i.parentId)} onOpenItem={openItem} scale={config.ganttScale ?? 'week'} onScaleChange={(ganttScale) => patch({ ganttScale })} />
+      )}
+      {config.view === 'chart' && (
+        <ChartView board={b} items={filteredItems.filter((i) => !i.parentId)} users={users} by={config.chartBy} valueColumnId={config.chartValueColumnId} onChange={(p) => patch(p)} />
       )}
       {config.view === 'risk' && (
         <RiskMatrixView board={b} items={filteredItems.filter((i) => !i.parentId)} onOpenItem={openItem} columnId={config.riskColumnId} onColumnChange={(id) => patch({ riskColumnId: id })} />

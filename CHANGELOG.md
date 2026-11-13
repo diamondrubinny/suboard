@@ -2,6 +2,12 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.22.0 — 2026-11-13
+
+### Added
+- Chart view inside a board, next to table / kanban / calendar. One bar per group, status label, tag, person, team, checkbox state, colour or rating; the measure is the number of items or the sum of a number / formula column.
+- The chart shows exactly what the board shows after search and filters, and its settings are saved with a view.
+
 ## 1.21.0 — 2026-11-13
 
 ### Added

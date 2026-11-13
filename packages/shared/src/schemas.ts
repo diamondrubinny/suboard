@@ -439,7 +439,7 @@ export const reactionSchema = z.enum(REACTIONS);
 const sortSchema = z.object({ by: z.union([z.literal('name'), z.literal('seq'), idSchema]), dir: z.enum(['asc', 'desc']) });
 
 export const viewConfigSchema = z.object({
-  view: z.enum(['table', 'kanban', 'calendar', 'risk', 'gantt']).default('table'),
+  view: z.enum(['table', 'kanban', 'calendar', 'risk', 'gantt', 'chart']).default('table'),
   search: z.string().max(LIMITS.searchQuery).optional(),
   statusFilter: z.string().max(40).optional(),
   mine: z.boolean().optional(),
@@ -466,6 +466,9 @@ export const viewConfigSchema = z.object({
   calendarColumnId: idSchema.optional(),
   riskColumnId: idSchema.optional(),
   ganttScale: z.enum(['week', 'month']).optional(),
+  /** Chart: split by the board's groups ("group") or by a column; optionally sum a number column instead of counting. */
+  chartBy: z.union([z.literal('group'), idSchema]).optional(),
+  chartValueColumnId: idSchema.optional(),
   /** Table column widths in px, by column id (or "name" for the item column). */
   widths: z
     .record(z.string().regex(/^(name|[0-9a-f-]{36})$/), z.number().int().min(COLUMN_WIDTH.min).max(COLUMN_WIDTH.max))

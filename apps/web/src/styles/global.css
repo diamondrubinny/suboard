@@ -4282,3 +4282,11 @@ kbd {
   flex-wrap: wrap;
   margin: 0;
 }
+
+/* Board chart: wider value column than the status summary (sums with a unit). */
+.chart-bars li {
+  grid-template-columns: minmax(6rem, 12rem) 1fr minmax(3rem, max-content);
+}
+.chart-bars .chart-sub {
+  font-weight: 400;
+}
