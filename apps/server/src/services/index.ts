@@ -143,6 +143,7 @@ export function createServices(db: DB, config: AppConfig, overrides: ServiceOver
   const modules = new ModuleService(db, audit);
   auth.guestsEnabled = () => modules.enabled('guests');
   users.guestsEnabled = () => modules.enabled('guests');
+  notifications.guestsEnabled = () => modules.enabled('guests');
   const workspaces = new WorkspaceService(db, access, audit);
   const teams = new TeamService(db, access, boards, audit);
   items.teamIds = (ids) => teams.existing(ids);

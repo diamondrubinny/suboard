@@ -7,6 +7,7 @@ import {
   todayIso,
   type AppNotification,
   type NotificationKind,
+  GUEST_WARN_DAYS,
 } from '@suboard/shared';
 import type { FastifyBaseLogger } from 'fastify';
 import type { AppConfig } from '../config.js';
@@ -43,6 +44,7 @@ const KIND_TEXT: Record<NotificationKind, string> = {
   followed: 'פריט במעקב',
   reminder: 'תזכורת',
   reply: 'תשובה לעדכון',
+  guest: 'חשבון אורח',
 };
 
 type Sender = { id: string | null; name: string };
@@ -296,6 +298,34 @@ export class NotificationService {
    * assigned to them that are overdue or due tomorrow → one notification per item per day, and one
    * digest e-mail. Returns the number of notifications created.
    */
+  /** Wired after construction: is the guest-accounts module switched on? */
+  guestsEnabled: () => boolean = () => false;
+
+  /**
+   * Tells every administrator once that a guest account is about to expire (within GUEST_WARN_DAYS).
+   * One notification per guest per expiry date: extending the account allows a new one later.
+   */
+  notifyGuestExpiry(now: Date = new Date()): number {
+    if (!this.guestsEnabled()) return 0;
+    const until = new Date(now.getTime() + GUEST_WARN_DAYS * 86_400_000).toISOString();
+    const guests = this.db
+      .prepare('SELECT name, guest_expires_at FROM users WHERE is_guest = 1 AND is_active = 1 AND guest_expires_at > ? AND guest_expires_at <= ?')
+      .all(now.toISOString(), until) as { name: string; guest_expires_at: string }[];
+    if (!guests.length) return 0;
+    const admins = this.db.prepare("SELECT id FROM users WHERE role = 'admin' AND is_active = 1").all() as { id: string }[];
+    const seen = this.db.prepare("SELECT 1 FROM notifications WHERE user_id = ? AND kind = 'guest' AND title = ? AND detail = ?");
+    let n = 0;
+    for (const g of guests) {
+      const day = g.guest_expires_at.slice(0, 10);
+      for (const a of admins) {
+        if (seen.get(a.id, g.name, day)) continue;
+        this.insert(a.id, 'guest', null, null, g.name, null, day);
+        n++;
+      }
+    }
+    return n;
+  }
+
   async runDailyReminders(now: Date = new Date(), force = false): Promise<number> {
     const teamCache = new Map<string, Set<string>>();
     const teamsOf = (userId: string): Set<string> => {
@@ -313,6 +343,8 @@ export class NotificationService {
     this.db
       .prepare("INSERT INTO job_runs (name, last_run_day) VALUES ('daily_reminders', ?) ON CONFLICT(name) DO UPDATE SET last_run_day = excluded.last_run_day")
       .run(today);
+
+    this.notifyGuestExpiry(now);
 
     const tomorrow = addDaysIso(today, 1);
     const users = this.db.prepare('SELECT id, name, role FROM users WHERE is_active = 1').all() as Actor[];

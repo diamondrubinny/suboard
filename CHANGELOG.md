@@ -2,6 +2,11 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.24.0 — 2026-11-14
+
+### Added
+- Administrators are notified (in the app) a week before a guest account expires, once per expiry date, with a link to the user list where the account can be extended.
+
 ## 1.23.1 — 2026-11-13
 
 ### Added

@@ -95,6 +95,18 @@ describe('guest accounts', () => {
     await boss.put(`/api/boards/${open.id}/members`, { userId: guest.id, role: 'viewer' });
     expect((await g.patch(`/api/items/${mine.id}`, { name: 'שוב' })).statusCode).toBe(403);
 
+    // a week before the expiry every administrator is told once; extending allows a new reminder later
+    const notes = async () => ((await admin.get('/api/notifications')).json().notifications as { kind: string; title: string; detail: string }[]).filter((n) => n.kind === 'guest');
+    expect(ctx.app.services.notifications.notifyGuestExpiry()).toBe(0); // 30 days away
+    await admin.patch(`/api/users/${guest.id}`, { guestExpiresAt: inDays(5) });
+    expect(ctx.app.services.notifications.notifyGuestExpiry()).toBe(1);
+    expect(ctx.app.services.notifications.notifyGuestExpiry()).toBe(0); // only once
+    expect(await notes()).toEqual([expect.objectContaining({ title: 'קבלן', detail: inDays(5) })]);
+    expect(((await boss.get('/api/notifications')).json().notifications as { kind: string }[]).some((n) => n.kind === 'guest')).toBe(false); // administrators only
+    await admin.patch(`/api/users/${guest.id}`, { guestExpiresAt: inDays(6) });
+    expect(ctx.app.services.notifications.notifyGuestExpiry()).toBe(1);
+    await admin.patch(`/api/users/${guest.id}`, { guestExpiresAt: inDays(30) });
+
     // expiry: the session dies, sign-in is refused; an administrator extends it
     ctx.db.prepare('UPDATE users SET guest_expires_at = ? WHERE id = ?').run(new Date(Date.now() - 1000).toISOString(), guest.id);
     expect((await g.get('/api/boards')).statusCode).toBe(401);

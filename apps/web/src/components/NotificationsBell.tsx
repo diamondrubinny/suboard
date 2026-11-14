@@ -23,6 +23,7 @@ const TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
         ? `${n.actorName ?? 'מישהו'} העביר/ה את "${n.title}" לקבוצה אחרת (במעקב)`
         : `${n.actorName ?? 'מישהו'} הוסיף/ה עדכון ל"${n.title}" (במעקב)`,
   reminder: (n) => `תזכורת: "${n.title}"${n.detail ? ` — ${n.detail}` : ''}`,
+  guest: (n) => `חשבון האורח של ${n.title} יפוג ב-${n.detail ? n.detail.split('-').reverse().join('/') : 'קרוב'} — אפשר להאריך בניהול המשתמשים`,
   reply: (n) => `${n.actorName ?? 'מישהו'} ענה/תה לעדכון שלך ב"${n.title}"`,
 };
 
@@ -31,6 +32,8 @@ function notifLink(n: AppNotification): string | null {
   switch (n.kind) {
     case 'monthly':
       return `/reports/monthly?month=${n.detail ?? ''}`;
+    case 'guest':
+      return '/admin/users';
     case 'training':
       return '/trainings/me';
     case 'procedure':

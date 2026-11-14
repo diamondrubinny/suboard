@@ -318,7 +318,7 @@ export interface MfaSetup {
   qrSvg: string;
 }
 
-export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly' | 'training' | 'procedure' | 'followed' | 'reply' | 'reminder';
+export type NotificationKind = 'assigned' | 'overdue' | 'due_tomorrow' | 'mentioned' | 'automation' | 'report' | 'effectiveness' | 'monthly' | 'training' | 'procedure' | 'followed' | 'reply' | 'reminder' | 'guest';
 
 export interface AppNotification {
   id: string;

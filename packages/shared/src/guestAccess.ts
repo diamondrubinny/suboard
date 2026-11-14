@@ -48,3 +48,5 @@ export function guestMayCall(method: string, path: string): boolean {
 /** Guest accounts always expire: 90 days by default, a year at most. */
 export const GUEST_DEFAULT_DAYS = 90;
 export const GUEST_MAX_DAYS = 366;
+/** Administrators are told this many days before a guest account expires. */
+export const GUEST_WARN_DAYS = 7;
