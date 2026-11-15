@@ -26,6 +26,7 @@ import { ChecklistSettingsEditor, ComplianceSection } from './FieldSettings';
 import { FormulaEditor } from './FormulaEditor';
 import { RelationSetup } from './RelationSetup';
 import { ColumnOptions } from './ColumnOptions';
+import { SectionNav } from '../../components/SectionNav';
 import { WebhooksSection } from './WebhooksSection';
 
 export function BoardSettingsPage() {
@@ -47,7 +48,8 @@ export function BoardSettingsPage() {
           </Link>
         </div>
       </div>
-      <div className="grid" style={{ gap: '1.25rem' }}>
+      <SectionNav container="#board-settings" label="קפיצה לחלק בהגדרות" />
+      <div className="grid" id="board-settings" style={{ gap: '1.25rem' }}>
         <GeneralSection board={b} />
         <ColumnsSection board={b} />
         <ComplianceSection board={b} />
@@ -573,7 +575,7 @@ function MembersSection({ board }: { board: BoardDetail }) {
       </p>
       {/* Scrolls sideways on narrow screens instead of widening the page. */}
       <div className="table-wrap" tabIndex={0} role="region" aria-label="חברי הלוח">
-        <table className="data-table">
+        <table className="data-table stack-phone">
           <thead>
             <tr>
               <th scope="col">שם</th>

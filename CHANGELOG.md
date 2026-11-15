@@ -2,6 +2,14 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.28.0 — 2026-11-15
+
+### Added
+- Board settings: a sticky "jump to a section" strip under the header (all screen sizes). It lists the page's sections as they are — including ones switched on or off by modules — scrolls to the chosen one and moves the keyboard focus to its heading.
+
+### Changed (phones)
+- Board members are shown as cards (name, e-mail, role, remove) instead of a table cut off at the edge.
+
 ## 1.27.0 — 2026-11-15
 
 ### Changed (phones, up to 700px wide — wide screens are unchanged)
