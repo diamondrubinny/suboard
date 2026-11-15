@@ -45,7 +45,9 @@ export function SectionNav({ container, label }: { container: string; label: str
       <ul className="list-plain">
         {entries.map((e) => (
           <li key={e.id}>
-            <button type="button" className="section-nav-link" onClick={() => go(e.id)}>
+            {/* The name starts with the visible text (WCAG 2.5.3) and says what the chip does, so it is
+                never confused with a button of the same name inside the section. */}
+            <button type="button" className="section-nav-link" aria-label={`${e.title} — מעבר לחלק`} onClick={() => go(e.id)}>
               {e.title}
             </button>
           </li>
