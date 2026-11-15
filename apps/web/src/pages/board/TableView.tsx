@@ -104,7 +104,8 @@ function AddRow({
           value={name}
           maxLength={300}
           ref={inputRef}
-          disabled={create.isPending}
+          // Not disabled while saving: that would drop the keyboard focus, and the next item could not be typed straight away.
+          aria-busy={create.isPending || undefined}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit();

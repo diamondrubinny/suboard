@@ -10,6 +10,9 @@ All notable changes to SUBoard. Versions follow [Semantic Versioning](https://se
 ### Changed (phones)
 - Board members are shown as cards (name, e-mail, role, remove) instead of a table cut off at the edge.
 
+### Fixed
+- Adding items in a row: the "new item" field (table and cards) keeps the keyboard focus while the item is saved, so the next one can be typed straight away. It used to be disabled for a moment, which dropped the focus.
+
 ## 1.27.0 — 2026-11-15
 
 ### Changed (phones, up to 700px wide — wide screens are unchanged)

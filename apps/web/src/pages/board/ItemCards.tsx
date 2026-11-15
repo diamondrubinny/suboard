@@ -145,7 +145,7 @@ function AddCard({ boardId, groupId, label, term }: { boardId: string; groupId: 
         submit();
       }}
     >
-      <input className="input" placeholder={term ? `+ הוספת ${term}` : '+ פריט חדש'} aria-label={label} value={name} maxLength={300} disabled={create.isPending} onChange={(e) => setName(e.target.value)} />
+      <input className="input" placeholder={term ? `+ הוספת ${term}` : '+ פריט חדש'} aria-label={label} value={name} maxLength={300} aria-busy={create.isPending || undefined} onChange={(e) => setName(e.target.value)} />
       <button type="submit" className="btn" disabled={create.isPending || !name.trim()}>
         הוספה
       </button>
