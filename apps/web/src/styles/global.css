@@ -4294,3 +4294,119 @@ kbd {
 .chart-bars .chart-sub {
   font-weight: 400;
 }
+
+/* ==========================================================================
+   Phone pass (≤ 700px): the board's content first, the tools one tap away
+   ========================================================================== */
+.fold-toggle {
+  display: none;
+}
+.fold-body {
+  display: contents; /* wide screens: the wrapper does not exist for layout */
+}
+.fold-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: var(--primary-tint);
+  color: var(--primary-ink);
+}
+.fold-chevron {
+  display: inline-flex;
+  margin-inline-start: auto;
+  transition: transform 0.15s ease;
+}
+.fold-toggle[aria-expanded='true'] .fold-chevron {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fold-chevron {
+    transition: none;
+  }
+}
+
+@media (max-width: 700px) {
+  /* Secondary tools fold behind one full-width button. */
+  .fold-toggle {
+    display: inline-flex;
+    inline-size: 100%;
+    justify-content: flex-start;
+    min-block-size: 2.75rem;
+  }
+  .fold-body {
+    display: none;
+  }
+  .fold-body[data-open] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    flex-basis: 100%;
+    padding: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--surface-sunken);
+  }
+  .fold-body[data-open] > .btn,
+  .fold-body[data-open] > a.btn {
+    flex: 1 1 calc(50% - var(--space-2));
+    justify-content: center;
+    min-block-size: 2.75rem;
+  }
+  .fold-body[data-open] > .select,
+  .fold-body[data-open] > .input {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .page-header {
+    margin-bottom: var(--space-3);
+  }
+  .page-header .actions {
+    inline-size: 100%;
+    margin-inline-start: 0;
+  }
+
+  /* The search box takes the row; the view switcher is a tidy grid instead of a ragged wrap. */
+  .toolbar > .input[type='search'] {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .segmented {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    inline-size: 100%;
+  }
+  .segmented button {
+    justify-content: center;
+    padding-inline: 0.4rem;
+    min-block-size: 2.5rem;
+  }
+
+  /* Table: on a narrow screen pinned columns would cover the whole width, so nothing is pinned —
+     the table scrolls sideways as a whole and every column can be read. */
+  .board-table .col-select,
+  .board-table .col-name,
+  .board-table .col-select + .col-name,
+  .board-table .col-select + th.col-name {
+    position: static;
+  }
+  .board-table thead .col-select,
+  .board-table thead .col-name {
+    position: sticky; /* header cells still stick to the top */
+    inset-inline-start: auto;
+  }
+  .board-table .col-name {
+    min-width: 19rem; /* the name stays readable; the next column peeks in as a hint that the table scrolls */
+  }
+  /* Room at the end of the page so the floating accessibility button never covers the last controls. */
+  .main {
+    padding-block-end: 6rem;
+  }
+  .board-table .cell {
+    min-width: 7.5rem;
+  }
+  table.board-table {
+    min-width: 0;
+  }
+}

@@ -19,6 +19,7 @@ import { ItemDrawer } from './ItemDrawer';
 import { NewFromTemplate } from './PersonalPanel';
 import { KanbanView } from './KanbanView';
 import { ChartView } from './ChartView';
+import { MobileFold } from '../../components/MobileFold';
 import { TableView } from './TableView';
 import { filterItems } from './viewLogic';
 
@@ -138,6 +139,7 @@ export function BoardPage() {
             </span>
           )}
           {user?.guest && <span className="badge warning">חשבון אורח</span>}
+          <MobileFold label="פעולות בלוח" icon="gear">
           {!user?.guest && (
           <>
           <a href={apiUrl(`/boards/${b.id}/export.xlsx`)} className="btn" download>
@@ -198,6 +200,7 @@ export function BoardPage() {
               <Icon name="gear" /> הגדרות לוח
             </Link>
           )}
+          </MobileFold>
         </div>
       </div>
 
@@ -234,6 +237,7 @@ export function BoardPage() {
           חיפוש בלוח
         </label>
         <input id="board-search" type="search" className="input" placeholder="חיפוש בלוח…" value={config.search ?? ''} onChange={(e) => patch({ search: e.target.value })} />
+        <MobileFold label="סינון ותצוגה" icon="search" badge={isFiltered || config.sort || config.groupBy ? 'פעיל' : undefined}>
         {statusCol && (
           <>
             <label htmlFor="status-filter" className="sr-only">
@@ -282,6 +286,7 @@ export function BoardPage() {
             ניקוי סינון
           </button>
         )}
+        </MobileFold>
         <span className="muted" role="status" aria-live="polite" style={{ marginInlineStart: 'auto' }}>
           {isFiltered ? `${shownCount} מתוך ${topCount} פריטים` : `${topCount} פריטים`}
         </span>
