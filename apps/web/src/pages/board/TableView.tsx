@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 import { errorMessage } from '../../api/client';
 import { useCreateItem, useGroupMutations, useTeams, useUpdateItem } from '../../api/hooks';
 import { useAuth } from '../../auth/AuthContext';
+import { ItemCards, useIsPhone, usePhoneTablePreference } from './ItemCards';
 import { CellEditor } from '../../components/cells/CellEditor';
 import { useFeedback } from '../../components/Feedback';
 import { Icon } from '../../components/Icon';
@@ -344,6 +345,10 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
   const { user: me } = useAuth();
   const teams = useTeams(Boolean(me) && !me!.guest && board.columns.some((c) => c.type === 'team'));
   const sortNames = teams.data?.length ? [...users, ...teams.data.map((t) => ({ id: t.id, name: t.name }))] : users;
+  // Narrow screens show cards; the full table is one tap away for whoever prefers it.
+  const phone = useIsPhone();
+  const [phoneTable, setPhoneTable] = usePhoneTablePreference();
+  const cards = phone && !phoneTable;
   const childrenOf = (id: string) => sortItems(board.items.filter((i) => i.parentId === id), board.columns, config.sort, sortNames, board);
   const matchingIds = new Set(items.map((i) => i.id));
 
@@ -503,7 +508,14 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
 
   return (
     <>
-      {withKids.length > 0 && (
+      {phone && (
+        <div className="toolbar phone-layout">
+          <button type="button" className="btn btn-ghost btn-sm" aria-pressed={phoneTable} onClick={() => setPhoneTable(!phoneTable)}>
+            <Icon name="table" size={16} /> {phoneTable ? 'חזרה לכרטיסים' : 'הצגה כטבלה מלאה'}
+          </button>
+        </div>
+      )}
+      {withKids.length > 0 && !cards && (
         <div className="toolbar subitems-all">
           <button type="button" className="btn btn-ghost btn-sm" aria-pressed={allOpen} onClick={() => setExpanded(allOpen ? {} : Object.fromEntries(withKids.map((id) => [id, true])))}>
             <Icon name="chevronDown" size={16} /> {allOpen ? 'כיווץ כל תת-הפריטים' : 'הרחבת כל תת-הפריטים'}
@@ -547,7 +559,8 @@ export function TableView({ board, items, users, onOpenItem, filtered, config, o
               {virtual ? <h2 className="group-title-static">{group.name}</h2> : <GroupNameInput key={group.name} group={group} boardId={board.id} canEdit={canEdit} />}
               <span className="badge">{tops.length}</span>
             </div>
-            {!isCollapsed && (
+            {!isCollapsed && cards && <ItemCards id={tableId} color={color} board={board} items={tops} users={users} groupId={group.id} groupName={group.name} canAdd={canEdit && !virtual} onOpenItem={onOpenItem} />}
+            {!isCollapsed && !cards && (
               <div className="table-wrap" id={tableId}>
                 <table className="board-table" style={{ ['--group-color' as string]: color }}>
                   <caption className="sr-only">
