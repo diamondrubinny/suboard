@@ -2,6 +2,14 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.26.0 — 2026-11-15
+
+### Changed (phones, up to 700px wide — wide screens are unchanged)
+- Board page: the items now appear on the first screen. The board's secondary actions (exports, print, QR, import, trash, settings…) fold behind one "פעולות בלוח" button, and the filters behind "סינון ותצוגה" (with an "active" tag when something is filtered, sorted or grouped). Search stays visible.
+- The view switcher is a tidy three-per-row grid with larger touch targets.
+- Table: no pinned columns on a narrow screen — pinned name and selection columns used to cover the whole width, so other columns could not be read. The table now scrolls sideways as a whole.
+- Extra space at the end of the page so the floating accessibility button never covers the last controls.
+
 ## 1.25.0 — 2026-11-15
 
 ### Added
