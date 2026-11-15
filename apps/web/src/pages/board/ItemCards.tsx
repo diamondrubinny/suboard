@@ -1,7 +1,8 @@
 import { canEditColumn, findDueColumn, findPrimaryStatusColumn, formatDateHe, isOverdue, todayIso, type BoardDetail, type DirectoryUser, type Item } from '@suboard/shared';
 import { useEffect, useState } from 'react';
 import { errorMessage } from '../../api/client';
-import { useCreateItem, useUpdateItem } from '../../api/hooks';
+import { useCreateItem, useTeams, useUpdateItem } from '../../api/hooks';
+import { useAuth } from '../../auth/AuthContext';
 import { personNames } from '../../components/cells/PersonPicker';
 import { useFeedback } from '../../components/Feedback';
 import { colorStyle } from '../../components/StatusPill';
@@ -53,6 +54,11 @@ export function ItemCards({ board, items, users, groupId, groupName, canAdd, onO
   const status = findPrimaryStatusColumn(board.columns);
   const due = findDueColumn(board.columns);
   const people = board.columns.filter((c) => c.type === 'person');
+  // Teams are "who handles it" too. Guests cannot read the list of teams, so they see none here.
+  const teamCols = board.columns.filter((c) => c.type === 'team');
+  const { user } = useAuth();
+  const teams = useTeams(Boolean(user) && !user!.guest && teamCols.length > 0);
+  const teamList = (teams.data ?? []).map((t) => ({ id: t.id, name: t.name }));
   const today = todayIso();
   const update = useUpdateItem(board.id);
   const { toast } = useFeedback();
@@ -67,6 +73,7 @@ export function ItemCards({ board, items, users, groupId, groupName, canAdd, onO
           const dueValue = due ? item.values[due.id] : undefined;
           const late = isOverdue(item, board.columns, today);
           const names = personNames([...new Set(people.flatMap((c) => (Array.isArray(item.values[c.id]) ? (item.values[c.id] as string[]) : [])))], users);
+          const teamNames = personNames([...new Set(teamCols.flatMap((c) => (Array.isArray(item.values[c.id]) ? (item.values[c.id] as string[]) : [])))].filter((id) => teamList.some((t) => t.id === id)), teamList);
           const prog = subtaskProgress(board, item.id);
           return (
             <li key={item.id} className="item-card">
@@ -105,6 +112,7 @@ export function ItemCards({ board, items, users, groupId, groupName, canAdd, onO
                   </span>
                 )}
                 {names && <span className="item-card-people">{names}</span>}
+                {teamNames && <span className="item-card-people">{teamNames}</span>}
                 {prog.total > 0 && (
                   <span className="muted num">
                     {prog.done}/{prog.total} תת-פריטים

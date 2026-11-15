@@ -2,6 +2,12 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.27.0 — 2026-11-15
+
+### Changed (phones, up to 700px wide — wide screens are unchanged)
+- Board items are shown as cards instead of a table that scrolls sideways: the name opens the item, the main status can be changed in place, and the due date (with an "overdue" mark in text, not only colour), the people, the teams and the sub-item progress are shown. Each group ends with an "add item" field. "הצגה כטבלה מלאה" brings the table back; the choice is remembered in the browser.
+- The accessibility menu moved from a floating button to an icon in the header. On a small screen a floating button always covered something: the first words of a line, the footer links, a menu entry, a checkbox. The login page and wide screens keep the floating button.
+
 ## 1.26.0 — 2026-11-15
 
 ### Changed (phones, up to 700px wide — wide screens are unchanged)
