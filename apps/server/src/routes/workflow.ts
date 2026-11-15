@@ -61,7 +61,7 @@ export async function workflowRoutes(app: FastifyInstance, { services }: { servi
   app.post('/items/:id/restore', async (req) => ({ item: items.restore(actorOf(req), param(req, 'id')) }));
 
   // Import receives rows already parsed in the browser (the server never parses the uploaded file).
-  app.post('/boards/:id/import', { bodyLimit: 2 * 1024 * 1024, config: { rateLimit: { max: 10, timeWindow: 10 * 60_000 } } }, async (req) =>
+  app.post('/boards/:id/import', { bodyLimit: 2 * 1024 * 1024, config: { rateLimit: { max: 60, timeWindow: 10 * 60_000 } } }, async (req) =>
     items.importRows(actorOf(req), param(req, 'id'), importSchema.parse(req.body)),
   );
 

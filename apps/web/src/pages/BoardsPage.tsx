@@ -3,6 +3,7 @@ import { useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { errorMessage } from '../api/client';
 import { boardSections } from '../modules/boardSections';
+import { ImportBoardDialog } from './ImportBoardDialog';
 import { useBoards, useCreateBoard, useTemplates, useWorkspaceMutations, useWorkspaces } from '../api/hooks';
 import { useAuth } from '../auth/AuthContext';
 import { Dialog } from '../components/Dialog';
@@ -159,6 +160,7 @@ export function BoardsPage() {
   const { user } = useAuth();
   const boards = useBoards();
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const canCreate = user?.role === 'admin' || user?.role === 'manager';
   const workspaces = useWorkspaces();
   const sorted = [...(boards.data ?? [])].sort((x, y) => Number(y.favorite) - Number(x.favorite));
@@ -170,6 +172,9 @@ export function BoardsPage() {
         <h1>לוחות</h1>
         {canCreate && (
           <div className="actions">
+            <button type="button" className="btn" onClick={() => setImporting(true)}>
+              <Icon name="download" /> לוח חדש מקובץ
+            </button>
             <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
               <Icon name="plus" /> לוח חדש
             </button>
@@ -218,6 +223,7 @@ export function BoardsPage() {
           </section>
         ))}
       {canCreate && <CreateBoardDialog open={creating} onClose={() => setCreating(false)} />}
+      {canCreate && <ImportBoardDialog open={importing} onClose={() => setImporting(false)} />}
     </>
   );
 }

@@ -281,6 +281,7 @@ describe('formula columns', () => {
 import { filterOpsFor, matchesBoardFilter, type BoardFilter } from './filters.js';
 import { renderRuleMessage } from './logic.js';
 import { chartBucketRule, chartBuckets, CHART_NONE_KEY } from './chart.js';
+import { analyzeSheet, importCellText } from './boardImport.js';
 import type { Column as XCol, Item as XItem } from './types.js';
 
 describe('advanced board filter', () => {
@@ -451,6 +452,84 @@ describe('board chart buckets', () => {
       }
     }
     expect(chartBucketRule({ ...find('ok')!, type: 'rating' }, '4')).toEqual({ columnId: 'ok', op: 'eq', value: 4 });
+  });
+});
+
+describe('whole-board import: sheet analysis', () => {
+  const L = { maxColumns: 40, maxGroups: 30, maxItems: 5000, maxOptions: 30, titleLength: 60, groupLength: 80 };
+  const ok = (rows: unknown[][], limits = L) => {
+    const r = analyzeSheet(rows, limits);
+    if ('error' in r) throw new Error(r.error);
+    return r;
+  };
+  const H = ['Name', 'Subitems', 'Owner', 'Status', 'Due', 'Cost', 'Done', 'Notes', 'Empty'];
+
+  it('reads a sectioned export: title, groups, repeated header, sub-item blocks', () => {
+    const a = ok([
+      ['ציוד גזים'],
+      [],
+      ['פעיל'],
+      H,
+      ['מנדף 3', 'בדיקה, כיול', 'דן', 'תקין', new Date(2026, 10, 1), 1200, 'v', 'הערה קצרה', ''],
+      ['Subitems', 'Name', 'Owner'],
+      ['', 'בדיקה', 'דן'],
+      ['', 'כיול', 'נועה'],
+      ['פאנל 7', '', 'נועה', 'תקול', '15/11/2026', '300.5', '', 'x'.repeat(250), ''],
+      [],
+      ['בארכיון'],
+      H,
+      ['ארון 12', '', 'דן', 'תקין', '2026-12-01', 40, 'v', '', ''],
+      ['', '', 'שורה בלי שם'],
+    ]);
+    expect(a.title).toBe('ציוד גזים');
+    expect(a.nameHeader).toBe('Name');
+    expect(a.groups.map((g) => [g.name, g.rows.length])).toEqual([['פעיל', 2], ['בארכיון', 1]]);
+    expect(a.itemCount).toBe(3);
+    expect([a.subitemRows, a.skippedRows]).toEqual([2, 1]);
+    expect(a.columns.map((c) => [c.title, c.type])).toEqual([['Owner', 'status'], ['Status', 'status'], ['Due', 'date'], ['Cost', 'number'], ['Done', 'checkbox'], ['Notes', 'long_text']]);
+    expect(a.columns.find((c) => c.title === 'Status')!.options).toEqual(['תקין', 'תקול']);
+    expect(a.warnings.join(' ')).toMatch(/2 שורות של תת-פריטים.*1 שורות בלי שם/);
+    expect(a.nameIndex).toBe(0);
+  });
+
+  it('reads a plain table, with or without a title row', () => {
+    const plain = ok([['שם', 'טלפון', 'פעיל'], ['א', '050-1234567', 'כן'], ['ב', '052-7654321', 'לא'], ['רק שם']]);
+    expect([plain.title, plain.groups.length, plain.groups[0]!.name, plain.itemCount]).toEqual([null, 1, 'קבוצה 1', 3]);
+    expect(plain.columns.map((c) => c.type)).toEqual(['text', 'checkbox']); // unique values stay text
+    const titled = ok([['רשימת ספקים'], ['שם', 'עיר'], ['א', 'חיפה'], ['ב', 'חיפה'], ['ג', 'עכו']]);
+    expect([titled.title, titled.groups[0]!.name]).toEqual(['רשימת ספקים', 'קבוצה 1']);
+    expect(titled.columns[0]).toMatchObject({ title: 'עיר', type: 'status', options: ['חיפה', 'עכו'] });
+  });
+
+  it('reads a flat export where the name, the group and the parent item are named columns', () => {
+    const a = ok([
+      ['קבוצה', 'פריט', 'תת-פריט של', 'סטטוס', 'עלות'],
+      ['פתוחות', 'מעקה', '', 'בטיפול', 100],
+      ['פתוחות', 'בדיקת ריתוך', 'מעקה', 'בוצע', ''],
+      ['הושלמו', 'שילוט', '', 'בוצע', 50],
+      ['פתוחות', 'תאורה', '', 'בטיפול', 70],
+      ['', 'בלי קבוצה', '', 'בוצע', 5],
+    ]);
+    expect([a.nameIndex, a.nameHeader]).toEqual([1, 'פריט']);
+    expect(a.groups.map((g) => [g.name, g.rows.map((r) => r[1])])).toEqual([['פתוחות', ['מעקה', 'תאורה']], ['הושלמו', ['שילוט']], ['ללא קבוצה', ['בלי קבוצה']]]);
+    expect(a.subitemRows).toBe(1);
+    expect(a.columns.map((c) => [c.title, c.type, c.index])).toEqual([['סטטוס', 'status', 3], ['עלות', 'number', 4]]); // group / parent are not columns
+    // a column called "קבוצה" in a sectioned file stays an ordinary column
+    const sectioned = ok([['כותרת'], ['א'], ['Name', 'קבוצה'], ['x', 'p'], ['ב'], ['Name', 'קבוצה'], ['y', 'q']]);
+    expect(sectioned.groups.map((g) => g.name)).toEqual(['א', 'ב']);
+    expect(sectioned.columns.map((c) => c.title)).toEqual(['קבוצה']);
+  });
+
+  it('refuses sheets without a table, applies limits, and keeps duplicate titles apart', () => {
+    expect(analyzeSheet([], L)).toEqual({ error: expect.stringContaining('שורת כותרות') });
+    expect(analyzeSheet([['רק כותרת']], L)).toEqual({ error: expect.stringContaining('שורת כותרות') });
+    expect(analyzeSheet([['שם', 'ערך'], ['', 'x']], L)).toEqual({ error: expect.stringContaining('שורות עם שם') });
+    const many = ok([['שם', 'א', 'א', 'ב'], ...Array.from({ length: 10 }, (_, i) => [`פריט ${i}`, i, `t${i}`, i % 2])], { ...L, maxItems: 4, maxColumns: 2 });
+    expect(many.itemCount).toBe(4);
+    expect(many.columns.map((c) => c.title)).toEqual(['א', 'א (2)']);
+    expect(many.warnings.join(' ')).toMatch(/10 פריטים; יובאו 4.*1 עמודות לא יובאו/);
+    expect(importCellText(new Date(2026, 0, 5))).toBe('2026-01-05');
+    expect(importCellText(null)).toBe('');
   });
 });
 

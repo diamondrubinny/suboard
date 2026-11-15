@@ -2,6 +2,15 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.25.0 — 2026-11-15
+
+### Added
+- "לוח חדש מקובץ": a whole board from a CSV / XLSX file — title, groups, columns with a guessed type (text, long text, number, date, checkbox, status labels) and items. The outline is shown for review before anything is created; column types can be changed and columns skipped.
+- Understands a sectioned export (a group name row followed by the header row, per group; sub-item blocks are counted and skipped) and a flat table, including this system's own export (group, item and parent-item columns are recognised by their headers).
+
+### Security
+- The file is read in the browser only and never uploaded; the board is built through the ordinary API, so every value passes the same server-side validation and permission checks as manual entry.
+
 ## 1.24.0 — 2026-11-14
 
 ### Added
