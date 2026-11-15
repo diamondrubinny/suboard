@@ -147,6 +147,7 @@ export function Layout() {
         </Link>
         <span className="header-spacer" />
         <div className="user-chip">
+          <A11yToolbar dock />
           {!pending && <GlobalSearch />}
           {!pending && <NotificationsBell />}
           <Avatar name={user.name} />
@@ -208,7 +209,6 @@ export function Layout() {
         <Outlet />
       </main>
       <Footer />
-      <A11yToolbar />
     </div>
   );
 }

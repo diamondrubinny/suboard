@@ -4492,3 +4492,28 @@ kbd {
 .toolbar.phone-layout {
   margin-bottom: var(--space-2);
 }
+
+/* ---------- accessibility menu: docked in the header on phones ---------- */
+.a11y-dock {
+  display: none;
+}
+@media (max-width: 700px) {
+  .a11y-dock {
+    display: inline-flex;
+  }
+  .a11y-fab.a11y-fab-dockable {
+    display: none; /* the header icon replaces it: a floating button on a small screen always covers something */
+  }
+  .a11y-panel.a11y-panel-docked {
+    inset-block-end: auto;
+    inset-block-start: 4.25rem;
+    inset-inline-start: auto;
+    inset-inline-end: var(--space-3);
+    max-block-size: calc(100dvh - 5.5rem);
+    overflow-y: auto;
+  }
+  /* no floating button on signed-in pages, so the extra space at the end of the page is not needed */
+  .app-shell .main {
+    padding-block-end: var(--space-7);
+  }
+}

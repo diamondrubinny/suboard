@@ -38,11 +38,18 @@ function apply(p: Prefs) {
   if (p.motionOff) root.setAttribute('data-motion', 'off');
 }
 
-export function A11yToolbar() {
+/**
+ * `dock`: the toolbar lives in the app header. On a wide screen it is still the floating button;
+ * on a phone the floating button is replaced by an icon in the header, so it never covers content.
+ */
+export function A11yToolbar({ dock = false }: { dock?: boolean } = {}) {
   const [open, setOpen] = useState(false);
   const [prefs, setPrefs] = useState<Prefs>(load);
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const dockRef = useRef<HTMLButtonElement>(null);
+  /** Whichever of the two triggers is on screen right now. */
+  const trigger = () => (dockRef.current && dockRef.current.offsetParent !== null ? dockRef.current : buttonRef.current);
 
   useEffect(() => {
     apply(prefs);
@@ -59,7 +66,7 @@ export function A11yToolbar() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setOpen(false);
-        buttonRef.current?.focus();
+        trigger()?.focus();
       }
     };
     document.addEventListener('keydown', onKey);
@@ -71,10 +78,15 @@ export function A11yToolbar() {
 
   return (
     <>
+      {dock && (
+        <button ref={dockRef} type="button" className="icon-btn a11y-dock" aria-expanded={open} aria-controls="a11y-panel" aria-label="תפריט נגישות" onClick={() => setOpen((o) => !o)}>
+          <Icon name="a11y" size={22} />
+        </button>
+      )}
       <button
         ref={buttonRef}
         type="button"
-        className="a11y-fab"
+        className={dock ? 'a11y-fab a11y-fab-dockable' : 'a11y-fab'}
         aria-expanded={open}
         aria-controls="a11y-panel"
         aria-label="תפריט נגישות"
@@ -83,7 +95,7 @@ export function A11yToolbar() {
         <Icon name="a11y" size={24} />
       </button>
       {open && (
-        <div id="a11y-panel" ref={panelRef} className="card a11y-panel" role="region" aria-label="התאמות נגישות">
+        <div id="a11y-panel" ref={panelRef} className={dock ? 'card a11y-panel a11y-panel-docked' : 'card a11y-panel'} role="region" aria-label="התאמות נגישות">
           <h2>התאמות נגישות</h2>
           <div role="group" aria-label="גודל טקסט" className="segmented" style={{ marginBottom: '0.6rem' }}>
             {sizes.map((s) => (
