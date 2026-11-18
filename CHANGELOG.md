@@ -2,6 +2,15 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.29.0 — 2026-11-18
+
+### Added
+- Item cards (phones): the sub-item counter opens the sub-items inside the card, each with its status; a sub-item's name opens it.
+- Dashboard: each counter ("overdue", "due soon", "assigned to me", "open items") leads to its list on the page and moves the keyboard focus there.
+
+### Fixed
+- Dashboard, "status by board": the coloured bar now covers all the items. Items without a status used to be left out, so a board where most items had no status showed a short bar that looked like a rendering fault; they are now a neutral segment with their own legend entry.
+
 ## 1.28.0 — 2026-11-15
 
 ### Added

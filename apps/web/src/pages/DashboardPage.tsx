@@ -78,22 +78,10 @@ export function DashboardPage() {
       )}
 
       <section aria-label="תמונת מצב" className="stat-row">
-        <div className="card stat">
-          <span className="muted">פריטים פתוחים</span>
-          <span className="value">{totalOpen}</span>
-        </div>
-        <div className={`card stat ${d.overdue.length ? 'danger' : ''}`}>
-          <span className="muted">באיחור</span>
-          <span className="value">{d.overdue.length}</span>
-        </div>
-        <div className="card stat">
-          <span className="muted">יעד ב-7 הימים הקרובים</span>
-          <span className="value">{d.dueSoon.length}</span>
-        </div>
-        <div className="card stat">
-          <span className="muted">משויכים אליי</span>
-          <span className="value">{d.myOpenItems.length}</span>
-        </div>
+        <StatLink target="boards-h" label="פריטים פתוחים" value={totalOpen} />
+        <StatLink target="overdue-h" label="באיחור" value={d.overdue.length} danger={d.overdue.length > 0} />
+        <StatLink target="soon-h" label="יעד ב-7 הימים הקרובים" value={d.dueSoon.length} />
+        <StatLink target="mine-h" label="משויכים אליי" value={d.myOpenItems.length} />
       </section>
 
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', alignItems: 'start' }}>
@@ -141,6 +129,10 @@ export function DashboardPage() {
                         .map((s) => (
                           <span key={s.label} style={{ inlineSize: `${(s.count / b.total) * 100}%`, background: PALETTE[s.color].bg }} />
                         ))}
+                      {/* Items without a status complete the bar, so its length always means "all the items". */}
+                      {b.total - b.byStatus.reduce((a, s) => a + s.count, 0) > 0 && (
+                        <span className="dist-rest" style={{ inlineSize: `${((b.total - b.byStatus.reduce((a, s) => a + s.count, 0)) / b.total) * 100}%` }} />
+                      )}
                     </div>
                     <div className="legend">
                       {b.byStatus
@@ -151,6 +143,12 @@ export function DashboardPage() {
                             {s.label}: {s.count}
                           </span>
                         ))}
+                      {b.total - b.byStatus.reduce((a, s) => a + s.count, 0) > 0 && (
+                        <span>
+                          <i className="dist-rest" aria-hidden="true" />
+                          ללא סטטוס: {b.total - b.byStatus.reduce((a, s) => a + s.count, 0)}
+                        </span>
+                      )}
                     </div>
                   </>
                 )}
@@ -162,3 +160,23 @@ export function DashboardPage() {
     </>
   );
 }
+
+/** A counter that leads to its list further down the page (and moves the keyboard focus there). */
+function StatLink({ target, label, value, danger }: { target: string; label: string; value: number; danger?: boolean }) {
+  const go = () => {
+    const h = document.getElementById(target);
+    if (!h) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.getAttribute('data-motion') === 'off';
+    h.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    h.setAttribute('tabindex', '-1');
+    h.focus({ preventScroll: true });
+  };
+  return (
+    <button type="button" className={`card stat stat-link${danger ? ' danger' : ''}`} onClick={go}>
+      <span className="muted">{label}</span>
+      <span className="value">{value}</span>
+      <span className="sr-only"> — מעבר לרשימה</span>
+    </button>
+  );
+}
+

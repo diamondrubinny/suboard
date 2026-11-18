@@ -6,7 +6,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { personNames } from '../../components/cells/PersonPicker';
 import { useFeedback } from '../../components/Feedback';
 import { colorStyle } from '../../components/StatusPill';
-import { subtaskProgress } from './subtasks';
+import { descendantsOf, subtaskProgress } from './subtasks';
 
 const PHONE = '(max-width: 700px)';
 const KEY = 'suboard.phoneTable';
@@ -63,6 +63,7 @@ export function ItemCards({ board, items, users, groupId, groupName, canAdd, onO
   const update = useUpdateItem(board.id);
   const { toast } = useFeedback();
   const mayStatus = Boolean(status) && canEditColumn(status!, board.myRole);
+  const [open, setOpen] = useState<Record<string, boolean>>({});
   return (
     <div id={id} className="item-cards" style={color ? ({ ['--group-color' as string]: color } as React.CSSProperties) : undefined}>
       {items.length === 0 && <p className="muted item-cards-empty">אין פריטים בקבוצה זו.</p>}
@@ -114,11 +115,35 @@ export function ItemCards({ board, items, users, groupId, groupName, canAdd, onO
                 {names && <span className="item-card-people">{names}</span>}
                 {teamNames && <span className="item-card-people">{teamNames}</span>}
                 {prog.total > 0 && (
-                  <span className="muted num">
-                    {prog.done}/{prog.total} תת-פריטים
-                  </span>
+                  <button type="button" className="item-card-subs" aria-expanded={Boolean(open[item.id])} aria-controls={`${id}-subs-${item.id}`} onClick={() => setOpen((o) => ({ ...o, [item.id]: !o[item.id] }))}>
+                    <span className="num">
+                      {prog.done}/{prog.total}
+                    </span>{' '}
+                    תת-פריטים
+                    <span className="sr-only"> של {item.name}</span>
+                  </button>
                 )}
               </div>
+              {prog.total > 0 && open[item.id] && (
+                <ul className="list-plain item-card-sublist" id={`${id}-subs-${item.id}`} aria-label={`תת-פריטים של ${item.name}`}>
+                  {descendantsOf(board, item.id).map((sub) => {
+                    const sv = status ? sub.values[status.id] : undefined;
+                    const so = status?.settings.options?.find((o) => o.id === sv);
+                    return (
+                      <li key={sub.id}>
+                        <button type="button" className="item-card-subname" onClick={() => onOpenItem(sub.id)} aria-label={`פתיחת הפריט ${sub.name}`}>
+                          {sub.name}
+                        </button>
+                        {so && (
+                          <span className="pill" style={colorStyle(so.color)}>
+                            {so.label}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </li>
           );
         })}
