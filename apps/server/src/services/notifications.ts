@@ -257,14 +257,14 @@ export class NotificationService {
     return sent;
   }
 
-  list(userId: string, limit = 50): { notifications: AppNotification[]; unread: number } {
+  list(userId: string, limit = 50, unreadOnly = false): { notifications: AppNotification[]; unread: number } {
     const rows = this.db
       .prepare(
         `SELECT n.id, n.kind, n.board_id, n.item_id, n.title, a.name AS actor_name, n.detail, n.read_at, n.created_at
          FROM notifications n LEFT JOIN users a ON a.id = n.actor_id
-         WHERE n.user_id = ? ORDER BY n.created_at DESC LIMIT ?`,
+         WHERE n.user_id = ? ${unreadOnly ? 'AND n.read_at IS NULL' : ''} ORDER BY n.created_at DESC LIMIT ?`,
       )
-      .all(userId, Math.min(limit, 200)) as NotificationRow[];
+      .all(userId, Math.max(1, Math.min(limit, 200))) as NotificationRow[];
     const unread = (this.db.prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL').get(userId) as { n: number }).n;
     return {
       unread,

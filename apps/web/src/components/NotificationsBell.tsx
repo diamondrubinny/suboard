@@ -5,7 +5,7 @@ import { useMarkNotificationsRead, useNotifications } from '../api/hooks';
 import { formatDateTime } from '../pages/board/activityText';
 import { Icon } from './Icon';
 
-const TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
+export const NOTIFICATION_TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
   assigned: (n) => (n.actorName ? `${n.actorName} שייך/ה אותך ל"${n.title}"` : `שויכת אוטומטית ל"${n.title}"`),
   overdue: (n) => `באיחור: "${n.title}"`,
   due_tomorrow: (n) => `תאריך יעד מחר: "${n.title}"`,
@@ -28,7 +28,7 @@ const TEXT: Record<AppNotification['kind'], (n: AppNotification) => string> = {
 };
 
 /** Where a notification leads (null = plain text). */
-function notifLink(n: AppNotification): string | null {
+export function notifLink(n: AppNotification): string | null {
   switch (n.kind) {
     case 'monthly':
       return `/reports/monthly?month=${n.detail ?? ''}`;
@@ -103,6 +103,11 @@ export function NotificationsBell() {
             )}
           </div>
           {q.data?.notifications.length === 0 && <p className="muted">אין התראות.</p>}
+          <p style={{ margin: '0 0 0.5rem' }}>
+            <Link to="/notifications" onClick={() => setOpen(false)}>
+              כל ההתראות
+            </Link>
+          </p>
           <ul className="list-plain">
             {q.data?.notifications.map((n) => (
               <li key={n.id} className={n.read ? 'notif-item' : 'notif-item unread'}>
@@ -115,10 +120,10 @@ export function NotificationsBell() {
                     }}
                   >
                     {!n.read && <span className="sr-only">חדש: </span>}
-                    {TEXT[n.kind](n)}
+                    {NOTIFICATION_TEXT[n.kind](n)}
                   </Link>
                 ) : (
-                  <span>{TEXT[n.kind](n)}</span>
+                  <span>{NOTIFICATION_TEXT[n.kind](n)}</span>
                 )}
                 <br />
                 <time className="muted" dateTime={n.createdAt} style={{ fontSize: '0.8rem' }}>

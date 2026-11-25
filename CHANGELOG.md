@@ -2,6 +2,17 @@
 
 All notable changes to SUBoard. Versions follow [Semantic Versioning](https://semver.org/).
 
+## 1.30.0 — 2026-11-25
+
+### Added
+- Notifications page (`/notifications`, also in the side menu): up to 200 notifications by day, an "unread only" view, mark one or all as read. The bell panel links to it.
+- "New board from a file": a column can be imported as people. A name in the file is matched only to exactly one active, non-guest user with the same full name — no partial or fuzzy matching. The dialog lists who was recognised and who was not.
+- `suboard-doctor`: a read-only diagnostic command installed on the server. One line per check (service, local answer, web build, web-server include line, public address, backup age, disk space, virus scanner, e-mail) with the next step. It never prints secrets.
+
+### Security
+- Assigning people requires them to be board members, so importing a people column adds the recognised people to the new board as editors — which gives them access to it. This happens only after ticking an explicit box that names how many people; without it nothing is created.
+- The notifications query still returns only the caller's own notifications; `limit` is clamped to 1–200.
+
 ## 1.29.0 — 2026-11-18
 
 ### Added

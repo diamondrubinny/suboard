@@ -4684,3 +4684,46 @@ kbd {
   color: var(--primary-ink);
   text-decoration: underline;
 }
+
+/* ---------- notifications page ---------- */
+.notif-day {
+  margin-bottom: var(--space-4);
+}
+.notif-day h2 {
+  font-size: 1rem;
+  margin: 0 0 var(--space-2);
+}
+.notif-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+.notif-row:last-child {
+  border-bottom: 0;
+}
+.notif-row-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.notif-row.unread .notif-row-text {
+  font-weight: 600;
+}
+.notif-dot {
+  display: inline-block;
+  inline-size: 0.5rem;
+  block-size: 0.5rem;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-inline-end: var(--space-2);
+}
+@media (max-width: 700px) {
+  .notif-row {
+    flex-wrap: wrap;
+  }
+  .notif-row-text {
+    flex-basis: 100%;
+  }
+}

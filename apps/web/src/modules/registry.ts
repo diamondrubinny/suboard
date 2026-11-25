@@ -29,6 +29,7 @@ export interface NavEntry {
 export const NAV: readonly NavEntry[] = [
   { id: 'home', label: 'לוח בקרה', icon: 'home', to: '/', end: true, keywords: 'בית ראשי', section: 'main' },
   { id: 'my-work', label: 'המשימות שלי', icon: 'checks', to: '/my-work', guest: true, keywords: 'משימות שלי action items תת-פריטים', section: 'main' },
+  { id: 'notifications', label: 'התראות', icon: 'bell', to: '/notifications', guest: true, keywords: 'הודעות עדכונים', section: 'main' },
   { id: 'boards', label: 'כל הלוחות', icon: 'boards', to: '/boards', end: true, guest: true, section: 'main' },
   { id: 'dashboards', label: 'דשבורדים', icon: 'chart', to: '/dashboards', module: 'dashboards', keywords: 'גרפים', section: 'main' },
   { id: 'workload', label: 'עומס צוות', icon: 'users', to: '/workload', module: 'workload', section: 'main' },

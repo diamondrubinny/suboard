@@ -158,6 +158,10 @@ curl -fs "http://127.0.0.1:$PORT$BASE_PATH/api/auth/sso/config" | grep -q '"loca
 curl -fs "http://127.0.0.1:$PORT$BASE_PATH/" | grep -q "$BASE_PATH/assets/" \
   || die "the web app was not built for $BASE_PATH — re-run this script"
 
+echo "==> Diagnostic command"
+# Read-only checks for later: sudo suboard-doctor
+install -m 755 "$APP_DIR/deploy/doctor.sh" /usr/local/bin/suboard-doctor 2>/dev/null || echo "WARN: could not install suboard-doctor"
+
 echo "==> Daily backup"
 cat > /etc/cron.d/suboard-backup <<EOF
 # SUBoard: daily local database backup, 14 kept. Copy $DATA_DIR/backups (encrypted) off this server.
@@ -361,6 +365,7 @@ One-time password (shown once, not stored anywhere — change it after the first
 you will be asked to set up two-step verification): $ADMIN_PW
 EOF
 fi
+echo "Something looks wrong later? Run:  sudo suboard-doctor   (read-only checks, says what is broken and how to fix it)"
 echo "Logs: journalctl -u suboard -f      Update later: re-run this script (the database is backed up first)."
 echo "Backups: $DATA_DIR/backups (daily, 14 kept) — copy them, encrypted, off this server."
 echo "E-mail (notifications, forgot password): fill in SMTP_* in $ENV_FILE, then: systemctl restart suboard"

@@ -151,6 +151,14 @@ export const useNotifications = () =>
     refetchInterval: 60_000,
   });
 
+/** The full notifications page: more rows, optionally only the unread ones. */
+export const useNotificationsPage = (unreadOnly: boolean) =>
+  useQuery({
+    queryKey: [...qk.notifications, 'page', unreadOnly] as const,
+    queryFn: () => api<{ notifications: AppNotification[]; unread: number }>(`/notifications?limit=200${unreadOnly ? '&unread=1' : ''}`),
+    refetchInterval: 60_000,
+  });
+
 export function useMarkNotificationsRead() {
   const qc = useQueryClient();
   return useMutation({

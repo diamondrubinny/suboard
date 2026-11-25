@@ -12,7 +12,12 @@ const param = (req: FastifyRequest, name: string): string => idSchema.parse((req
 /** Phase 2 routes: notifications, attachments, export, MFA reset. */
 export async function operationsRoutes(app: FastifyInstance, { services, config }: { services: Services; config: AppConfig }) {
   // ---- notifications (always scoped to the requesting user)
-  app.get('/notifications', async (req) => services.notifications.list(actorOf(req).id));
+  // Only ever the caller's own notifications; `limit` (1–200) and `unread=1` shape the page.
+  app.get('/notifications', async (req) => {
+    const q = req.query as { limit?: string; unread?: string };
+    const limit = /^\d{1,3}$/.test(q.limit ?? '') ? Number(q.limit) : 50;
+    return services.notifications.list(actorOf(req).id, limit, q.unread === '1');
+  });
 
   app.post('/notifications/read', async (req) => {
     services.notifications.markRead(actorOf(req).id, markNotificationsReadSchema.parse(req.body));

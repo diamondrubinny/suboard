@@ -3,12 +3,16 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, errorMessage } from '../api/client';
-import { useWorkspaces } from '../api/hooks';
+import { useDirectory, useWorkspaces } from '../api/hooks';
+import { useAuth } from '../auth/AuthContext';
 import { Dialog } from '../components/Dialog';
 import { useFeedback } from '../components/Feedback';
 import { convertCell, readSpreadsheet } from './board/importParse';
 
-const TYPE_LABELS: Record<ImportColumnType | 'skip', string> = { text: 'טקסט', long_text: 'טקסט ארוך', number: 'מספר', date: 'תאריך', checkbox: 'תיבת סימון', status: 'סטטוס (תוויות)', skip: 'לא לייבא' };
+type ChosenType = ImportColumnType | 'person' | 'skip';
+const TYPE_LABELS: Record<ChosenType, string> = { text: 'טקסט', long_text: 'טקסט ארוך', number: 'מספר', date: 'תאריך', checkbox: 'תיבת סימון', status: 'סטטוס (תוויות)', person: 'אנשים (שיוך למשתמשים)', skip: 'לא לייבא' };
+const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLocaleLowerCase('he');
+const namesIn = (v: unknown) => importCellText(v).split(/[;,\n]/).map((x) => x.trim()).filter(Boolean);
 const IMPORT_LIMITS = { maxColumns: LIMITS.columnsPerBoard, maxGroups: 30, maxItems: 5000, maxOptions: LIMITS.statusOptions, titleLength: LIMITS.columnTitle, groupLength: LIMITS.groupName };
 const CHUNK = 500;
 
@@ -24,12 +28,16 @@ export function ImportBoardDialog({ open, onClose }: { open: boolean; onClose: (
   const workspaces = useWorkspaces();
   const [sheet, setSheet] = useState<SheetAnalysis | null>(null);
   const [name, setName] = useState('');
-  const [types, setTypes] = useState<(ImportColumnType | 'skip')[]>([]);
+  const [types, setTypes] = useState<ChosenType[]>([]);
+  const directory = useDirectory();
+  const { user } = useAuth();
+  /** Adding people to the new board grants them access to it: off until the person ticks it. */
+  const [addMembers, setAddMembers] = useState(false);
   const [workspaceId, setWorkspaceId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
 
-  const reset = () => (setSheet(null), setName(''), setTypes([]), setError(null), setProgress(null));
+  const reset = () => (setSheet(null), setName(''), setTypes([]), setError(null), setProgress(null), setAddMembers(false));
   const close = () => {
     if (progress) return; // never close in the middle of building the board
     reset();
@@ -53,10 +61,25 @@ export function ImportBoardDialog({ open, onClose }: { open: boolean; onClose: (
   /** Distinct labels of a column that was switched to "status" by hand. */
   const labelsOf = (a: SheetAnalysis, index: number): string[] => [...new Set(a.groups.flatMap((g) => g.rows.map((r) => importCellText(r[index]).slice(0, LIMITS.statusLabel))).filter(Boolean))];
 
+  // People columns: a name in the file is matched only to exactly one active, non-guest user of
+  // the same full name. No partial or fuzzy matching — assigning the wrong person is worse than an empty cell.
+  const byName = new Map<string, string | null>();
+  for (const u of directory.data ?? []) {
+    if (u.guest) continue;
+    const k = norm(u.name);
+    byName.set(k, byName.has(k) ? null : u.id); // two users with the same name: ambiguous, never matched
+  }
+  const personIndexes = sheet ? sheet.columns.filter((_, i) => types[i] === 'person').map((c) => c.index) : [];
+  const fileNames = sheet ? [...new Set(sheet.groups.flatMap((g) => g.rows.flatMap((r) => personIndexes.flatMap((ix) => namesIn(r[ix])))))] : [];
+  const matched = fileNames.filter((n) => byName.get(norm(n)));
+  const unmatched = fileNames.filter((n) => !byName.get(norm(n)));
+  const idsToAdd = [...new Set(matched.map((n) => byName.get(norm(n))!))].filter((id) => id !== user?.id);
+
   const build = async () => {
     if (!sheet) return;
+    if (personIndexes.length && !addMembers) return setError('כדי לשייך אנשים צריך לאשר את הוספתם כחברי הלוח (התיבה שמתחת לטבלה), או לשנות את סוג העמודה ל"טקסט".');
     if (!name.trim()) return setError('יש לתת שם ללוח');
-    const chosen = sheet.columns.map((c, i) => ({ c, type: types[i] ?? c.type })).filter((x) => x.type !== 'skip') as { c: SheetAnalysis['columns'][number]; type: ImportColumnType }[];
+    const chosen = sheet.columns.map((c, i) => ({ c, type: types[i] ?? c.type })).filter((x) => x.type !== 'skip') as { c: SheetAnalysis['columns'][number]; type: ImportColumnType | 'person' }[];
     for (const x of chosen) {
       if (x.type === 'status' && labelsOf(sheet, x.c.index).length > LIMITS.statusOptions) return setError(`בעמודה "${x.c.title}" יש יותר מ-${LIMITS.statusOptions} ערכים שונים — היא אינה מתאימה לסטטוס. בחרו "טקסט".`);
     }
@@ -68,6 +91,11 @@ export function ImportBoardDialog({ open, onClose }: { open: boolean; onClose: (
       boardId = board.id;
       // The blank template's own columns are replaced by the file's columns.
       for (const c of board.columns) await api(`/columns/${c.id}`, 'DELETE');
+      // The people who were recognised become editors of the new board (the person agreed above).
+      if (personIndexes.length) {
+        setProgress('מוסיף את האנשים שזוהו כחברי הלוח…');
+        for (const userId of idsToAdd) await api(`/boards/${board.id}/members`, 'PUT', { userId, role: 'editor' });
+      }
       const created: { column: Column; index: number }[] = [];
       for (const x of chosen) {
         const settings = x.type === 'status' ? { options: labelsOf(sheet, x.c.index).map((label, i) => ({ id: `o${i + 1}`, label, color: COLOR_KEYS[i % COLOR_KEYS.length]! })) } : undefined;
@@ -86,6 +114,11 @@ export function ImportBoardDialog({ open, onClose }: { open: boolean; onClose: (
           const rows = g.rows.slice(at, at + CHUNK).map((r) => {
             const values: Record<string, unknown> = {};
             for (const { column, index } of created) {
+              if (column.type === 'person') {
+                const ids = [...new Set(namesIn(r[index]).map((n) => byName.get(norm(n))).filter((id): id is string => Boolean(id)))].slice(0, LIMITS.personsPerCell);
+                if (ids.length) values[column.id] = ids;
+                continue;
+              }
               let v = convertCell(column, column.type === 'status' ? importCellText(r[index]).slice(0, LIMITS.statusLabel) : r[index], []);
               if (typeof v === 'string' && column.type === 'text') v = v.slice(0, LIMITS.text);
               if (typeof v === 'string' && column.type === 'long_text') v = v.slice(0, LIMITS.longText);
@@ -192,8 +225,8 @@ export function ImportBoardDialog({ open, onClose }: { open: boolean; onClose: (
                 <tr key={c.index}>
                   <th scope="row">{c.title}</th>
                   <td>
-                    <select className="select" value={types[i] ?? c.type} aria-label={`סוג העמודה ${c.title}`} onChange={(e) => setTypes((t) => t.map((x, j) => (j === i ? (e.target.value as ImportColumnType | 'skip') : x)))}>
-                      {(Object.keys(TYPE_LABELS) as (ImportColumnType | 'skip')[]).map((t) => (
+                    <select className="select" value={types[i] ?? c.type} aria-label={`סוג העמודה ${c.title}`} onChange={(e) => setTypes((t) => t.map((x, j) => (j === i ? (e.target.value as ChosenType) : x)))}>
+                      {(Object.keys(TYPE_LABELS) as ChosenType[]).map((t) => (
                         <option key={t} value={t}>
                           {TYPE_LABELS[t]}
                         </option>
@@ -212,7 +245,28 @@ export function ImportBoardDialog({ open, onClose }: { open: boolean; onClose: (
               ))}
             </tbody>
           </table>
-          <p className="hint">שמות של אנשים מיובאים כטקסט או כתוויות — שיוך לאנשים במערכת נעשה אחרי הייבוא. תת-פריטים, קבצים ועדכונים אינם חלק מקובץ כזה.</p>
+          {personIndexes.length > 0 && (
+            <fieldset className="formula-editor">
+              <legend>שיוך אנשים</legend>
+              <p>
+                זוהו <strong className="num">{matched.length}</strong> מתוך <strong className="num">{fileNames.length}</strong> שמות, בהתאמה מלאה לשם של משתמש פעיל במערכת.
+              </p>
+              {matched.length > 0 && <p className="hint">זוהו: {matched.join(', ')}</p>}
+              {unmatched.length > 0 && (
+                <p className="hint">
+                  לא זוהו ולא ישויכו (התא יישאר ריק): {unmatched.slice(0, 30).join(', ')}
+                  {unmatched.length > 30 ? '…' : ''}
+                </p>
+              )}
+              <label className="check">
+                <input type="checkbox" checked={addMembers} onChange={(e) => setAddMembers(e.target.checked)} aria-describedby="ib-members-hint" /> להוסיף את {idsToAdd.length} האנשים שזוהו כחברי הלוח החדש (עורכים)
+              </label>
+              <span id="ib-members-hint" className="hint">
+                אפשר לשייך לפריט רק חבר לוח, ולכן שיוך מחייב להוסיף אותם ללוח — וזה נותן להם גישה לכל תוכנו. בלי הסימון, שנו את סוג העמודה ל"טקסט".
+              </span>
+            </fieldset>
+          )}
+          <p className="hint">שיוך אנשים: בחרו לעמודה את הסוג "אנשים" (ברירת המחדל היא טקסט או תוויות). תת-פריטים, קבצים ועדכונים אינם חלק מקובץ כזה.</p>
         </>
       )}
     </Dialog>
